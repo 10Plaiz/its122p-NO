@@ -11,9 +11,12 @@ create extension if not exists "citext";
 -- ---------------------------------------------------------------- enumerations
 
 create type user_role     as enum ('admin', 'staff', 'citizen');
-create type report_status as enum ('pending', 'under_review', 'in_progress', 'resolved');
 create type photo_kind    as enum ('initial', 'resolution');
-create type update_type   as enum ('status_change', 'assignment', 'remark', 'photo');
+create type update_type   as enum ('status_change', 'assignment', 'remark', 'photo', 'edit');
+
+-- 'cancelled' is a dead end reached only by the citizen who filed the report,
+-- while it is still pending. The row is kept so its history survives.
+create type report_status as enum ('pending', 'under_review', 'in_progress', 'resolved', 'cancelled');
 
 -- -------------------------------------------------------------------- profiles
 
@@ -169,6 +172,7 @@ create trigger reports_touch_updated_at before update on reports
 -- ----------------------------------------------------- public transparency view
 
 -- Login-free board: reviewed reports only, and no citizen PII.
+-- Photos are included as object keys; the API turns them into URLs.
 create view public_reports as
 select r.id,
        r.reference_code,
@@ -180,7 +184,18 @@ select r.id,
        r.address_text,
        r.status,
        r.submitted_at,
-       r.resolved_at
+       r.resolved_at,
+       coalesce(
+           (select json_agg(json_build_object('kind', p.kind, 'storage_path', p.storage_path)
+                            order by p.created_at)
+            from report_photos p
+            where p.report_id = r.id),
+           '[]'::json
+       ) as photos
 from reports r
 join categories c on c.id = r.category_id
-where r.is_public;
+where r.is_public
+  -- Belt and braces: a cancelled report is never public, but never publish one anyway.
+  and r.status <> 'cancelled';
+
+grant select on public_reports to anon, authenticated;

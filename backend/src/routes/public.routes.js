@@ -3,6 +3,7 @@ import { z } from "zod";
 import { db } from "../config/supabase.js";
 import { orThrow } from "../lib/errors.js";
 import { parse } from "../lib/validate.js";
+import { photoUrl } from "../lib/photos.js";
 import { STATUSES } from "../services/reports.service.js";
 
 const router = Router();
@@ -28,9 +29,14 @@ router.get("/reports", async (req, res) => {
   if (status) query = query.eq("status", status);
 
   const result = await query;
+  const reports = orThrow(result, "The public board could not be loaded.");
 
   res.json({
-    reports: orThrow(result, "The public board could not be loaded."),
+    // The view carries the photo object keys; the URLs are built here.
+    reports: reports.map((report) => ({
+      ...report,
+      photos: report.photos.map((photo) => ({ ...photo, url: photoUrl(photo.storage_path) })),
+    })),
     page,
     per_page,
     total: result.count ?? 0,

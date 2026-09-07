@@ -7,12 +7,16 @@ import { photoUpload, photoUrl, savePhoto } from "../lib/photos.js";
 import { requireAuth, requireRole } from "../middleware/auth.js";
 import {
   REPORT_FIELDS,
+  STAFF_STATUSES,
   STATUSES,
   addRemark,
+  assertCanEdit,
   assertCanUpdate,
   assertCanView,
   assignStaff,
+  cancelReport,
   changeStatus,
+  editReport,
   findReport,
 } from "../services/reports.service.js";
 
@@ -44,8 +48,14 @@ const listSchema = z.object({
   per_page: z.coerce.number().int().min(1).max(50).default(20),
 });
 
+// A citizen may correct any of these while the report is still pending.
+const editSchema = createSchema.partial().refine(
+  (changes) => Object.keys(changes).length > 0,
+  "Send at least one field to change.",
+);
+
 const statusSchema = z.object({
-  status: z.enum(STATUSES),
+  status: z.enum(STAFF_STATUSES),
   details: z.string().trim().max(500).optional(),
 });
 
@@ -116,6 +126,24 @@ router.get("/:id/updates", async (req, res) => {
   );
 
   res.json({ updates });
+});
+
+// PATCH /api/reports/:id — the citizen corrects their own pending report.
+router.patch("/:id", requireRole("citizen"), async (req, res) => {
+  const changes = parse(editSchema, req.body);
+  const report = await findReport(req.params.id);
+  assertCanEdit(report, req.user);
+
+  res.json({ report: present(await editReport({ report, user: req.user, changes })) });
+});
+
+// POST /api/reports/:id/cancel — withdraw a pending report. The row is kept.
+router.post("/:id/cancel", requireRole("citizen"), async (req, res) => {
+  const { details } = parse(z.object({ details: z.string().trim().max(500).optional() }), req.body ?? {});
+  const report = await findReport(req.params.id);
+  assertCanEdit(report, req.user);
+
+  res.json({ report: present(await cancelReport({ report, user: req.user, details })) });
 });
 
 // PATCH /api/reports/:id/status — assigned staff or an admin moves it forward.

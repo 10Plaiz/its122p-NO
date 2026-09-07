@@ -2,14 +2,20 @@ import { db } from "../config/supabase.js";
 import { badRequest, forbidden, notFound, orThrow } from "../lib/errors.js";
 
 // The status flow from the proposal. A report moves forward one step at a time.
+// "cancelled" is a dead end reached only by the citizen who filed the report.
 const NEXT_STATUS = {
   pending: ["under_review"],
   under_review: ["in_progress"],
   in_progress: ["resolved"],
   resolved: [],
+  cancelled: [],
 };
 
+// Every status a report can hold — used for filtering.
 export const STATUSES = Object.keys(NEXT_STATUS);
+
+// The subset staff and admins can set. Only a citizen cancels their own report.
+export const STAFF_STATUSES = ["under_review", "in_progress", "resolved"];
 
 // Every column the API returns for a report, with its related rows joined in.
 const REPORT_FIELDS = `
@@ -38,6 +44,15 @@ export function assertCanUpdate(report, user) {
   if (user.role === "admin") return;
   if (user.role === "staff" && report.assigned_staff?.id === user.id) return;
   throw forbidden("You can only update reports assigned to you.");
+}
+
+// A citizen owns their report until staff pick it up. After that it is out of
+// their hands, because staff may already be acting on what it says.
+export function assertCanEdit(report, user) {
+  if (report.citizen.id !== user.id) throw forbidden("You can only change your own reports.");
+  if (report.status !== "pending") {
+    throw forbidden("This report is already being handled and can no longer be changed.");
+  }
 }
 
 // Records a history entry and notifies the citizen who filed the report.
@@ -76,7 +91,7 @@ export async function changeStatus({ report, user, newStatus, details }) {
     const allowed = NEXT_STATUS[report.status];
     throw badRequest(
       allowed.length === 0
-        ? "A resolved report cannot change status."
+        ? `A ${report.status} report can no longer change status.`
         : `A "${report.status}" report can only move to "${allowed.join('" or "')}".`,
     );
   }
@@ -101,6 +116,48 @@ export async function changeStatus({ report, user, newStatus, details }) {
     newStatus,
     details,
     message: `Report ${report.reference_code} is now "${newStatus}".`,
+  });
+
+  return updated;
+}
+
+// Citizens correct their own report while it is still pending — a wrong pin or a
+// vague description is easier to fix than to re-file.
+export async function editReport({ report, user, changes }) {
+  const updated = orThrow(
+    await db.from("reports").update(changes).eq("id", report.id).select(REPORT_FIELDS).single(),
+    "Your report could not be updated.",
+  );
+
+  await recordUpdate({
+    report,
+    actorId: user.id,
+    updateType: "edit",
+    details: `Edited by the reporter: ${Object.keys(changes).join(", ")}.`,
+  });
+
+  return updated;
+}
+
+// Cancelling keeps the row so the history stays intact; it just leaves the queue.
+export async function cancelReport({ report, user, details }) {
+  const updated = orThrow(
+    await db
+      .from("reports")
+      .update({ status: "cancelled", is_public: false })
+      .eq("id", report.id)
+      .select(REPORT_FIELDS)
+      .single(),
+    "Your report could not be cancelled.",
+  );
+
+  await recordUpdate({
+    report,
+    actorId: user.id,
+    updateType: "status_change",
+    previousStatus: report.status,
+    newStatus: "cancelled",
+    details: details ?? "Cancelled by the reporter.",
   });
 
   return updated;

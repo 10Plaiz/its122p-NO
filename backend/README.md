@@ -12,7 +12,7 @@ cp .env.example .env      # then fill in your Supabase keys
 npm run dev
 ```
 
-Run the three SQL files in `../supabase/migrations/` in order (Supabase dashboard → SQL Editor) before starting the server.
+Run the three SQL files in `../supabase/migrations/` **in numeric order** (Supabase dashboard → SQL Editor) before starting the server: `0001_schema` → `0002_rls` → `0003_seed`.
 
 ## How authentication works
 
@@ -38,6 +38,8 @@ The API holds the **service role key**, which bypasses Row Level Security. That 
 | `GET` | `/api/reports` | signed in — scoped by role |
 | `POST` | `/api/reports` | citizen (multipart, optional `photo`) |
 | `GET` | `/api/reports/:id` | owner, staff, admin |
+| `PATCH` | `/api/reports/:id` | owner, while `pending` |
+| `POST` | `/api/reports/:id/cancel` | owner, while `pending` |
 | `GET` | `/api/reports/:id/updates` | owner, staff, admin |
 | `PATCH` | `/api/reports/:id/status` | assigned staff, admin |
 | `PATCH` | `/api/reports/:id/assign` | **admin only** |
@@ -56,9 +58,13 @@ The API holds the **service role key**, which bypasses Row Level Security. That 
 
 ```
 pending  →  under_review  →  in_progress  →  resolved
+   ↓
+cancelled          (citizen only, and only from pending)
 ```
 
 One step at a time, no skipping and no going back. Enforced in `changeStatus()`. Each change writes a `report_updates` row and a notification for the citizen, and a report becomes visible on the public board once it leaves `pending`.
+
+While a report is still `pending` its owner may edit it (`PATCH /api/reports/:id`) or cancel it (`POST /api/reports/:id/cancel`). Once staff have picked it up, it is out of the citizen's hands — staff may already be acting on what it says. A cancelled report is kept, never deleted, so its history survives, and it never appears on the public board.
 
 ## Files
 

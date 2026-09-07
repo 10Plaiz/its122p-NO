@@ -104,8 +104,6 @@ create policy notifications_mark_read on notifications
 create policy activity_logs_admin_read on activity_logs
     for select using (auth_role() = 'admin');
 
--- ----------------------------------------------- public transparency board view
-
--- The view is security-definer by default, so the anon role reads only the
--- non-PII columns it exposes, and only rows where is_public is true.
-grant select on public_reports to anon, authenticated;
+-- The public_reports view is granted to anon in 0001_schema.sql. It is
+-- security-definer by default, so the anon role reads only the non-PII columns
+-- it exposes, and only rows where is_public is true.
