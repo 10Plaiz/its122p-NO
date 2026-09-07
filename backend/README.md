@@ -12,7 +12,9 @@ cp .env.example .env      # then fill in your Supabase keys
 npm run dev
 ```
 
-Run the three SQL files in `../supabase/migrations/` **in numeric order** (Supabase dashboard → SQL Editor) before starting the server: `0001_schema` → `0002_rls` → `0003_seed`.
+For a fresh database, run all SQL files in `../supabase/migrations/` **in numeric order** (Supabase dashboard → SQL Editor) before starting the server: `0001_schema` → `0002_rls` → `0003_seed` → `0004_api_access`.
+
+For an existing database, apply `0004_api_access.sql` once the first three migrations have been applied; do not rerun the original schema. This migration only fixes permissions. It does not add the `edit`/`cancelled` enum values or public-photo fields to databases created from an older version of `0001_schema.sql`.
 
 ## How authentication works
 
@@ -23,7 +25,15 @@ Supabase Auth owns passwords and issues the JWT. The API verifies that token and
 3. `requireAuth` attaches `req.user = { id, name, email, role }`.
 4. `requireRole("admin")` gates whatever comes after it.
 
-The API holds the **service role key**, which bypasses Row Level Security. That means permission checks in `src/middleware/auth.js` and `src/services/reports.service.js` are the real gate; the RLS policies in `0002_rls.sql` are a second layer for anything that reaches Supabase directly.
+The API holds the **service role key**, which bypasses Row Level Security. Permission checks in `src/middleware/auth.js` and `src/services/reports.service.js` therefore enforce user access. `0004_api_access.sql` prevents `anon` and `authenticated` database roles from directly reading or writing protected application tables, even when an older RLS policy would allow it. Direct client reads are limited to `categories` and the filtered `public_reports` view. Use the Express endpoints for all protected data, including profile changes, reports and notifications; Supabase Auth still handles login.
+
+To check these permissions on a disposable database after applying the migrations, run the regression test as the database owner:
+
+```bash
+psql "$TEST_DATABASE_URL" -X -v ON_ERROR_STOP=1 -f ../supabase/tests/api_access.sql
+```
+
+The test uses synthetic records inside a transaction and rolls them back.
 
 ## Endpoints
 
