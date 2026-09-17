@@ -5,11 +5,14 @@ Data lives in Supabase. There is no frontend yet — every endpoint below can be
 
 ## Setup
 
+Bun manages dependencies and runs the project scripts. Node.js runs the API.
+Use Bun 1.4 or newer and Node.js 22 or newer.
+
 ```bash
 cd backend
-npm install
+bun install
 cp .env.example .env      # then fill in your Supabase keys
-npm run dev
+bun run dev
 ```
 
 For a fresh database, run all SQL files in `../supabase/migrations/` **in numeric order** (Supabase dashboard → SQL Editor) before starting the server: `0001_schema` → `0002_rls` → `0003_seed` → `0004_api_access`.
