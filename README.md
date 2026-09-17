@@ -1,24 +1,38 @@
 # KAMOTI
 
-KAMOTI is a web application for reporting damaged public infrastructure.
-Citizens submit reports and follow their status. Staff work on assigned reports.
-Administrators manage users, categories, and assignments. A public board shows
-reviewed reports without exposing citizen details.
+KAMOTI lets citizens report damaged public infrastructure and track progress.
+Staff work on assigned reports, administrators manage the system, and the
+public board shows reviewed reports without citizen details.
 
-## Current stack
+## Stack and layout
 
-| Part | Technology |
+One root Bun package contains a React + Vite + TypeScript frontend in
+`src/web/` and an Express + TypeScript API in `src/server/`. Node.js runs
+the API. Supabase provides PostgreSQL, Auth, and Storage. The intended
+deployment is one Vercel project for the site and API.
+
+## Run locally
+
+Install Bun 1.4+ and Node.js 22+, then from the repository root:
+
+```bash
+bun install
+cp .env.example .env
+# Fill in the Supabase URL and keys in .env.
+bun run dev
+```
+
+Open `http://localhost:5173`. Vite forwards `/api/*` requests to the
+Express server on port 4000. Before using data routes, apply the Supabase
+migrations as described in the [API guide](docs/API.md#setup).
+
+| Command | Purpose |
 | :--- | :--- |
-| Backend API | Node.js and Express in [`backend/`](backend/) |
-| Package manager | Bun; the backend lockfile is [`backend/bun.lock`](backend/bun.lock) |
-| Database and services | Supabase PostgreSQL, Auth, and Storage; SQL is in [`supabase/`](supabase/) |
-| Frontend | React and Tailwind are proposed in the [project proposal](docs/Final_Project.md); frontend code has not started |
+| `bun run dev` | Start web and API together |
+| `bun run typecheck` | Check web, API, and Vercel entry types |
+| `bun run build` | Compile the API and build the web app |
+| `bun run start` | Run the compiled API with Node.js |
 
-## Start here
-
-1. Follow the [backend guide](backend/README.md#setup) to set up Supabase, apply the migrations, and run the API.
-2. Use the [backend endpoint reference](backend/README.md#endpoints) to inspect the available routes.
-3. Use the [documentation index](docs/INDEX.md) to find the proposal and course instructions.
-
-The [course guide](docs/Guide.md) includes the instructor's later clarification
-that the team may choose its technology stack.
+The web app is a small starter. Phase 3 screens are still to be built.
+See the [documentation index](docs/INDEX.md) for the proposal, architecture,
+API reference, and course instructions.

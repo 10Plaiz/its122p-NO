@@ -1,0 +1,45 @@
+{
+  "name": "kamoti",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "KAMOTI full-stack public infrastructure reporting application",
+  "scripts": {
+    "dev": "bun run --parallel dev:api dev:web",
+    "dev:api": "tsx watch src/server/server.ts",
+    "dev:web": "vite",
+    "typecheck": "bun run typecheck:api && bun run typecheck:web && bun run typecheck:deploy",
+    "typecheck:api": "tsc --noEmit -p tsconfig.server.json",
+    "typecheck:web": "tsc --noEmit -p tsconfig.web.json",
+    "typecheck:deploy": "tsc --noEmit -p tsconfig.deploy.json",
+    "build": "bun run build:api && bun run build:web",
+    "build:api": "tsc -p tsconfig.server.json",
+    "build:web": "vite build",
+    "start": "node dist/server/server.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.58.0",
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.3",
+    "express": "^5.1.0",
+    "multer": "^2.0.2",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "zod": "^4.1.11"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/multer": "^2.2.0",
+    "@types/node": "^26.6.1",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.1.1",
+    "tsx": "^4.23.13",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.0"
+  }
+}
