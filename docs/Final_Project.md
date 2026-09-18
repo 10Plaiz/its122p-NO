@@ -155,11 +155,13 @@ erDiagram
     PROFILES ||--o{ REPORTS : assigned_to
     PROFILES ||--o{ REPORT_PHOTOS : uploads
     PROFILES ||--o{ REPORT_UPDATES : writes
+    PROFILES ||--o{ REPORT_INSPECTIONS : inspects
     PROFILES ||--o{ NOTIFICATIONS : receives
     PROFILES ||--o{ ACTIVITY_LOGS : acts
     CATEGORIES ||--o{ REPORTS : classifies
     REPORTS ||--o{ REPORT_PHOTOS : has
     REPORTS ||--o{ REPORT_UPDATES : has
+    REPORTS ||--o{ REPORT_INSPECTIONS : has
     REPORTS ||--o{ NOTIFICATIONS : triggers
 
     AUTH_USERS {
@@ -190,6 +192,12 @@ erDiagram
         uuid report_id FK
         uuid updated_by FK
     }
+    REPORT_INSPECTIONS {
+        bigint id PK
+        uuid report_id FK
+        uuid inspector_id FK
+        string severity
+    }
     NOTIFICATIONS {
         uuid id PK
         uuid user_id FK
@@ -208,13 +216,13 @@ erDiagram
 | reports | Submissions, locations, assignments, and current status |
 | report_photos | Photo metadata and Supabase Storage paths |
 | report_updates | Report history, status changes, assignments, and remarks |
+| report_inspections | Staff assessments, findings, and severity for a report |
 | notifications | In-app messages for users |
 | activity_logs | System-wide administrative activity |
 
 Supabase owns auth.users, shown above to explain its relationship with
-profiles. The application schema currently contains seven tables. The course
-guide separately lists a minimum of eight related tables; that count still
-needs to be resolved before submission.
+profiles. The application schema now contains eight related tables. Inspection
+records support the staff inspection log described in the proposed features.
 
 ---
 

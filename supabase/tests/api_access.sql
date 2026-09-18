@@ -11,7 +11,7 @@ begin
     foreach client_role in array array['anon', 'authenticated'] loop
         foreach relation_name in array array[
             'profiles', 'reports', 'report_photos', 'report_updates',
-            'notifications', 'activity_logs'
+            'notifications', 'activity_logs', 'report_inspections'
         ] loop
             if has_table_privilege(client_role, 'public.' || relation_name,
                                    'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
@@ -63,6 +63,11 @@ insert into public.report_updates (report_id, updated_by, update_type, previous_
 values ('70000000-0000-4000-8000-000000000003',
         '70000000-0000-4000-8000-000000000002', 'status_change', 'pending', 'under_review');
 
+insert into public.report_inspections (report_id, inspector_id, severity, findings)
+values ('70000000-0000-4000-8000-000000000003',
+        '70000000-0000-4000-8000-000000000002',
+        'high', 'Road surface requires repair.');
+
 insert into public.notifications (user_id, report_id, message)
 values ('70000000-0000-4000-8000-000000000001',
         '70000000-0000-4000-8000-000000000003', 'Your report is under review.');
@@ -84,6 +89,7 @@ $test$;
 set local role anon;
 select pg_temp.expect_denied('select citizen_id, assigned_staff_id from public.reports');
 select pg_temp.expect_denied('select uploaded_by from public.report_photos');
+select pg_temp.expect_denied('select findings from public.report_inspections');
 
 do $test$
 declare

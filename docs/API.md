@@ -15,9 +15,17 @@ cp .env.example .env      # then fill in your Supabase keys
 bun run dev:api
 ```
 
-For a fresh database, run all SQL files in `supabase/migrations/` **in numeric order** (Supabase dashboard → SQL Editor) before starting the server: `0001_schema` → `0002_rls` → `0003_seed` → `0004_api_access`.
+For a fresh database, run all SQL files in `supabase/migrations/` **in numeric order** (Supabase dashboard → SQL Editor) before starting the server: `0001_schema` → `0002_rls` → `0003_seed` → `0004_api_access` → `0005_report_inspections`.
 
-For an existing database, apply `0004_api_access.sql` once the first three migrations have been applied; do not rerun the original schema. This migration only fixes permissions. It does not add the `edit`/`cancelled` enum values or public-photo fields to databases created from an older version of `0001_schema.sql`.
+For an existing database with the first four migrations applied, apply
+`0005_report_inspections.sql` once; do not rerun the original schema. If an
+older database has only the first three migrations, apply `0004_api_access.sql`
+first. Migration 0004 only fixes permissions. It does not add the
+`edit`/`cancelled` enum values or public-photo fields to databases created
+from an older version of `0001_schema.sql`.
+
+The inspection table stores staff assessments, but inspection API routes and
+screens are planned for Phase 3.
 
 ## How authentication works
 

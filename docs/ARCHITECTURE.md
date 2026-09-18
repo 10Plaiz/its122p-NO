@@ -26,6 +26,6 @@ filtered `public_reports` view.
 
 Use [Final_Project.md](Final_Project.md) for intended behavior and system
 diagrams, [API.md](API.md) for setup and endpoint usage, and
-[Guide.md](Guide.md) for course requirements. The course guide's requirement
-for eight related tables is still open: the current application schema has
-seven tables plus Supabase Auth's external `auth.users` table.
+[Guide.md](Guide.md) for course requirements. The application schema has eight
+related tables. Supabase Auth's external `auth.users` table is shown separately
+in the proposal.

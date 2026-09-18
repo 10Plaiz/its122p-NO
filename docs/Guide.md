@@ -4,7 +4,7 @@
 > **Later instructor clarification:** The team may choose its technology stack.
 > The PHP and MySQL wording below is preserved from the original handout and
 > does not restrict KAMOTI's stack. The separate minimum of eight related
-> tables has not been clarified.
+> tables remains a project requirement.
 
 Students will design and develop a real-world web application for a small business, school office, community organization, or service provider.
 
