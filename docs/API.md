@@ -12,18 +12,32 @@ Use Bun 1.4 or newer and Node.js 22 or newer.
 ```bash
 bun install
 bunx supabase login
-bunx supabase orgs list
-bunx supabase projects create kamoti --org-id YOUR_ORG_ID --region YOUR_REGION
-bunx supabase projects list
-# Use the new project's ref:
 bunx supabase link --project-ref YOUR_PROJECT_REF
-bunx supabase db push --dry-run
-# After reviewing the dry run:
-bunx supabase db push
+bunx supabase migration list
 cp .env.example .env
 # Fill in the URL, publishable key, and secret key in .env.
 bun run dev
 ```
+
+Create a fresh Supabase project in the dashboard before linking. Enable the
+Data API and automatic RLS, and disable automatic exposure of new tables. The
+Express API uses Supabase's Data API through `supabase-js`; the migrations grant
+only the access each database role needs. The project ref appears in the
+dashboard URL. Complete CLI login in the same environment where you run the
+commands above; keep access tokens and database passwords private.
+
+For a **fresh project**, or after a reviewed migration is merged, one teammate
+applies pending migrations:
+
+```bash
+bunx supabase db push --dry-run
+# Confirm that only the expected migrations are listed, then:
+bunx supabase db push --skip-vault
+bunx supabase migration list
+```
+
+Do not push feature-branch migrations to the shared database before review.
+The `--skip-vault` flag keeps this command focused on SQL migrations.
 
 The five timestamped SQL files in `supabase/migrations/` are applied in order.
 They create the schema, access rules, reference categories, photo bucket, and
