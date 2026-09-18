@@ -1,5 +1,5 @@
 -- KAMOTI: Key Alert and Monitoring for Online Tracking of Infrastructures
--- 0001_schema.sql — enums, tables, indexes, triggers
+-- Initial schema: enums, tables, indexes, triggers
 --
 -- Target: Supabase (PostgreSQL 15+). Passwords are NOT stored here; Supabase Auth
 -- owns auth.users and issues the JWTs. `profiles` extends auth.users with the

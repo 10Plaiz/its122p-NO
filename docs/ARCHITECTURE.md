@@ -18,7 +18,7 @@ and sends API requests to the Node function in `api/index.ts`, which calls
 the same Express app. `server.ts` only starts the local Node listener.
 
 Supabase Auth issues access tokens. The API verifies each token, loads the
-profile role, and checks access before using the service role database client.
+profile role, and checks access before using the secret-key database client.
 That key stays on the server. Report rules live in
 `src/server/services/reports.service.ts`; route files handle transport
 details. Protected data goes through the API. The public board reads the

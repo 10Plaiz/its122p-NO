@@ -1,4 +1,4 @@
--- KAMOTI — 0002_rls.sql
+-- KAMOTI: row level security
 -- Row Level Security.
 --
 -- The Express API talks to Supabase with the service_role key, which bypasses RLS;
@@ -104,6 +104,6 @@ create policy notifications_mark_read on notifications
 create policy activity_logs_admin_read on activity_logs
     for select using (auth_role() = 'admin');
 
--- The public_reports view is granted to anon in 0001_schema.sql. It is
+-- The public_reports view is granted to anon in the initial schema migration. It is
 -- security-definer by default, so the anon role reads only the non-PII columns
 -- it exposes, and only rows where is_public is true.

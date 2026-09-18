@@ -11,18 +11,27 @@ Use Bun 1.4 or newer and Node.js 22 or newer.
 
 ```bash
 bun install
-cp .env.example .env      # then fill in your Supabase keys
-bun run dev:api
+bunx supabase login
+bunx supabase orgs list
+bunx supabase projects create kamoti --org-id YOUR_ORG_ID --region YOUR_REGION
+bunx supabase projects list
+# Use the new project's ref:
+bunx supabase link --project-ref YOUR_PROJECT_REF
+bunx supabase db push --dry-run
+# After reviewing the dry run:
+bunx supabase db push
+cp .env.example .env
+# Fill in the URL, publishable key, and secret key in .env.
+bun run dev
 ```
 
-For a fresh database, run all SQL files in `supabase/migrations/` **in numeric order** (Supabase dashboard → SQL Editor) before starting the server: `0001_schema` → `0002_rls` → `0003_seed` → `0004_api_access` → `0005_report_inspections`.
-
-For an existing database with the first four migrations applied, apply
-`0005_report_inspections.sql` once; do not rerun the original schema. If an
-older database has only the first three migrations, apply `0004_api_access.sql`
-first. Migration 0004 only fixes permissions. It does not add the
-`edit`/`cancelled` enum values or public-photo fields to databases created
-from an older version of `0001_schema.sql`.
+The five timestamped SQL files in `supabase/migrations/` are applied in order.
+They create the schema, access rules, reference categories, photo bucket, and
+inspection records. The CLI tracks which migrations have reached the linked
+project. Use a fresh project for this baseline; an older database built from
+earlier copies of the schema needs its history reconciled before `db push`.
+Keep the secret key in the ignored local `.env` and add it separately to the
+Vercel project's environment when deployment is ready.
 
 The inspection table stores staff assessments, but inspection API routes and
 screens are planned for Phase 3.
@@ -36,7 +45,14 @@ Supabase Auth owns passwords and issues the JWT. The API verifies that token and
 3. `requireAuth` attaches `req.user = { id, name, email, role }`.
 4. `requireRole("admin")` gates whatever comes after it.
 
-The API holds the **service role key**, which bypasses Row Level Security. Permission checks in `src/server/middleware/auth.ts` and `src/server/services/reports.service.ts` therefore enforce user access. `0004_api_access.sql` prevents `anon` and `authenticated` database roles from directly reading or writing protected application tables, even when an older RLS policy would allow it. Direct client reads are limited to `categories` and the filtered `public_reports` view. Use the Express endpoints for all protected data, including profile changes, reports and notifications; Supabase Auth still handles login.
+The API holds a **Supabase secret key**, which acts as the database
+`service_role` and bypasses Row Level Security. Permission checks in
+`src/server/middleware/auth.ts` and
+`src/server/services/reports.service.ts` therefore enforce user access. The
+API access migration prevents `anon` and `authenticated` database roles from
+directly reading or writing protected application tables. Direct client reads
+are limited to `categories` and the filtered `public_reports` view. Use the
+Express endpoints for protected data; Supabase Auth still handles login.
 
 To check these permissions on a disposable database after applying the migrations, run the regression test as the database owner:
 

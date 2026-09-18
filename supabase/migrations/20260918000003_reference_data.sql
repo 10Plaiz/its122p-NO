@@ -1,4 +1,4 @@
--- KAMOTI — 0003_seed.sql
+-- KAMOTI: categories and the report photo bucket
 -- Baseline reference data. Safe to re-run.
 
 insert into categories (name, description) values
