@@ -71,7 +71,7 @@ export function Layout() {
 
         <button
           type="button"
-          className="btn btn-secondary md:hidden"
+          className="btn btn-secondary nav-toggle"
           aria-expanded={menuOpen}
           aria-controls="main-menu"
           onClick={() => setMenuOpen((open) => !open)}

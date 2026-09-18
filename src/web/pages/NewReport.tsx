@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { MapPicker } from "../components/MapPicker.js";
 import type { Point } from "../components/MapPicker.js";
+import { ALLOWED_TYPES, MAX_PHOTO_BYTES, PhotoPicker } from "../components/PhotoPicker.js";
 import { Alert, Button, Field, Input, Select, Textarea } from "../components/ui.js";
 import { api } from "../lib/api.js";
 import { reverseGeocode } from "../lib/leaflet.js";
@@ -11,9 +12,6 @@ import type { Category, Report } from "../lib/types.js";
 
 // Wireframe 1b: location first, so the map and any GPS prompt arrive while intent is
 // highest and a citizen who abandons has given up the least.
-
-const MAX_PHOTO_BYTES = 3 * 1024 * 1024; // matches photoUpload in src/server/lib/photos.ts
-const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
 
 const STEPS = ["Where is it?", "What is wrong?", "Show us"] as const;
 
@@ -76,21 +74,6 @@ export function NewReportPage() {
   const [addressAuto, setAddressAuto] = useState(false);
   const [locating, setLocating] = useState(false);
   const addressTouched = useRef(false);
-
-  // Each object URL pins the file in memory until it is revoked, so the preview is
-  // built in an effect rather than during render.
-  const [preview, setPreview] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!values.photo) {
-      setPreview(null);
-      return;
-    }
-
-    const url = URL.createObjectURL(values.photo);
-    setPreview(url);
-    return () => URL.revokeObjectURL(url);
-  }, [values.photo]);
 
   const { run, pending, error } = useAction((formData: FormData) =>
     api.upload<{ report: Report }>("/reports", formData),
@@ -213,7 +196,7 @@ export function NewReportPage() {
 
           <div className="flex flex-wrap gap-3 items-center">
             <Button type="button" onClick={useMyLocation} disabled={locating}>
-              {locating ? "Finding you..." : "Use my location"}
+              {locating ? "Finding you…" : "Use my location"}
             </Button>
             {values.point && (
               <span className="text-muted font-mono text-[11px]">
@@ -300,27 +283,14 @@ export function NewReportPage() {
 
       {step === 2 && (
         <div className="flex flex-col gap-4">
-          <Field
+          <PhotoPicker
+            id="photo"
             label="Photo"
-            htmlFor="photo"
-            hint="Optional, but it is the fastest way to prove how bad the problem is. JPG, PNG or WebP, up to 3 MB."
+            purpose="Optional, but a photo is the fastest way to show how bad the problem is."
             error={shown.photo}
-          >
-            <Input
-              id="photo"
-              type="file"
-              accept={ALLOWED_TYPES.join(",")}
-              onChange={(event) =>
-                setValues((current) => ({ ...current, photo: event.target.files?.[0] ?? null }))
-              }
-            />
-          </Field>
-
-          {preview && !shown.photo && (
-            <div className="grayscale border border-divider">
-              <img src={preview} alt="" className="max-h-64 w-full object-cover" />
-            </div>
-          )}
+            value={values.photo}
+            onChange={(photo) => setValues((current) => ({ ...current, photo }))}
+          />
 
           <div className="border-2 border-divider p-4 flex flex-col gap-2">
             <h6>Check before sending</h6>
@@ -349,7 +319,7 @@ export function NewReportPage() {
           </Button>
         ) : (
           <Button type="button" variant="primary" onClick={submit} disabled={pending}>
-            {pending ? "Submitting..." : "Submit report"}
+            {pending ? "Submitting…" : "Submit report"}
           </Button>
         )}
       </div>

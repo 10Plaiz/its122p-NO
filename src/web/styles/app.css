@@ -86,3 +86,15 @@
   font-family: var(--font-body);
   background: var(--color-neutral-200);
 }
+
+/* The header's mobile menu toggle. This cannot be `md:hidden` on the button:
+   ds.css is imported unlayered, so every rule in it beats every Tailwind
+   utility regardless of specificity, and `.btn { display: inline-flex }` would
+   win — leaving the toggle on screen at desktop width, where it opens a menu
+   that is already open. This rule is unlayered too and comes later, so it wins.
+   It lives here rather than in ds.css, which stays a verbatim copy of the
+   upstream design system. 48rem is Tailwind's `md`, matching the `md:flex` on
+   the nav it controls; change both together. */
+@media (width >= 48rem) {
+  .nav-toggle { display: none; }
+}

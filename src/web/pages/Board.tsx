@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { ReportMap } from "../components/ReportMap.js";
 import type { Bounds } from "../components/ReportMap.js";
 import {
@@ -8,8 +8,8 @@ import {
   EmptyState,
   Field,
   Input,
-  Loading,
   Pagination,
+  PhotoFrame,
   Select,
   StatusBadge,
   formatDate,
@@ -26,24 +26,73 @@ const SORT_LABEL: Record<Sort, string> = {
   status: "By status",
 };
 
+type PublicStatus = (typeof PUBLIC_STATUSES)[number];
+
+// The board's whole state lives in the URL: a filtered view is then something a
+// resident can send to a councillor, and something the Back button can return to.
+// Anything hand-typed into the query string is validated back to a default here
+// rather than forwarded to the API to be rejected.
+function readParams(params: URLSearchParams) {
+  const status = params.get("status") ?? "";
+  const sort = params.get("sort") ?? "";
+  const page = Number(params.get("page"));
+
+  return {
+    q: params.get("q") ?? "",
+    // `as const` on the empty case, or the union widens to plain string and the
+    // STATUS_LABEL lookup below loses its key type.
+    status: (PUBLIC_STATUSES as readonly string[]).includes(status) ? (status as PublicStatus) : ("" as const),
+    categoryId: params.get("category") ?? "",
+    sort: ((SORTS as readonly string[]).includes(sort) ? sort : "newest") as Sort,
+    page: Number.isInteger(page) && page > 0 ? page : 1,
+    // Off unless asked for. Narrowing by map view is useful, but as a default it let a
+    // filter change be swallowed by wherever the map happened to be pointing.
+    inView: params.get("view") === "map",
+  };
+}
+
 export function BoardPage() {
-  const [search, setSearch] = useState("");
-  // Held apart from `search` so a keystroke does not become a request.
-  const [q, setQ] = useState("");
-  const [status, setStatus] = useState("");
-  const [categoryId, setCategoryId] = useState("");
-  const [sort, setSort] = useState<Sort>("newest");
-  const [page, setPage] = useState(1);
+  const [params, setParams] = useSearchParams();
+  const { q, status, categoryId, sort, page, inView } = readParams(params);
+
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [bounds, setBounds] = useState<Bounds | null>(null);
 
+  // Typing stays local; only the settled term reaches the URL and the API.
+  const [search, setSearch] = useState(q);
+
+  // Writes one or more params. Filters replace, so Back leaves the board rather than
+  // unwinding every tweak; turning a page pushes, so Back returns to the page before.
+  const update = useCallback(
+    (changes: Record<string, string | number | null>, { push = false }: { push?: boolean } = {}) => {
+      setParams(
+        (current) => {
+          const next = new URLSearchParams(current);
+          for (const [key, value] of Object.entries(changes)) {
+            if (value === null || value === "") next.delete(key);
+            else next.set(key, String(value));
+          }
+          return next;
+        },
+        { replace: !push },
+      );
+    },
+    [setParams],
+  );
+
+  // Debounced so a keystroke does not become a request. Skipped when the term already
+  // matches, so landing on /board?q=… does not immediately rewrite the URL it came from.
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setQ(search.trim());
-      setPage(1);
-    }, 300);
+    if (search.trim() === q) return;
+    const timer = setTimeout(() => update({ q: search.trim() || null, page: null }), 300);
     return () => clearTimeout(timer);
-  }, [search]);
+  }, [search, q, update]);
+
+  // Follow the URL when it changes from anywhere but this input — Back, forward, or
+  // Clear filters. Comparing on the trimmed value leaves a half-typed term alone.
+  useEffect(() => {
+    setSearch((current) => (current.trim() === q ? current : q));
+  }, [q]);
 
   const query = useMemo(
     () => ({ q, status, category_id: categoryId, sort, page, per_page: PER_PAGE }),
@@ -56,11 +105,14 @@ export function BoardPage() {
 
   const reports = useMemo(() => data?.reports ?? [], [data]);
 
-  // Panning narrows the list without refetching — the wireframe's stated behaviour.
-  // Only what this page already returned can be narrowed this way, which is why the
-  // count below says how many are shown rather than implying it is the whole set.
+  // Every refetch hands back a fresh array, so the map is re-aimed on what changed
+  // rather than on that new identity: same reports, same key, and the visitor keeps
+  // whatever they had panned to.
+  const fitKey = useMemo(() => reports.map((report) => report.id).join(","), [reports]);
+
+  // Opt-in: panning narrows the list only while the toggle is on.
   const visible = useMemo(() => {
-    if (!bounds) return reports;
+    if (!inView || !bounds) return reports;
     return reports.filter(
       (report) =>
         report.latitude <= bounds.north &&
@@ -68,21 +120,43 @@ export function BoardPage() {
         report.longitude <= bounds.east &&
         report.longitude >= bounds.west,
     );
-  }, [reports, bounds]);
+  }, [reports, bounds, inView]);
 
   const handleMove = useCallback((next: Bounds) => setBounds(next), []);
 
   function resetFilters() {
     setSearch("");
-    setStatus("");
-    setCategoryId("");
-    setSort("newest");
-    setPage(1);
     setBounds(null);
+    setParams(new URLSearchParams(), { replace: true });
   }
 
+  const categoryName = (categoryData?.categories ?? []).find(
+    (category) => String(category.id) === categoryId,
+  )?.name;
+
   const filtered = q !== "" || status !== "" || categoryId !== "";
-  const narrowed = bounds !== null && visible.length !== reports.length;
+  const narrowed = inView && bounds !== null && visible.length !== reports.length;
+  const total = data?.total ?? 0;
+  const firstLoad = loading && !data;
+
+  // What the visitor is looking at, in their words rather than the query string's.
+  const describing = [
+    categoryName,
+    status ? STATUS_LABEL[status] : null,
+    q ? `“${q}”` : null,
+    narrowed ? "in this map view" : null,
+  ].filter((part): part is string => Boolean(part));
+
+  const shown =
+    visible.length === total
+      ? `${total} report${total === 1 ? "" : "s"}`
+      : `${visible.length} of ${total}`;
+
+  const summary = firstLoad
+    ? "Loading the board…"
+    : [`Showing ${shown}`, ...describing, loading ? "updating…" : null]
+        .filter(Boolean)
+        .join(" · ");
 
   return (
     <div className="flex flex-col gap-6">
@@ -93,8 +167,11 @@ export function BoardPage() {
         </p>
       </header>
 
-      {/* Counts come from /api/public/stats, which reads the same view as the list,
-          so they can never claim more than the board itself can show. */}
+      {/* Counts come from /api/public/stats, which reads the same view as the list, so
+          they can never claim more than the board itself can show. They stay the whole
+          board on purpose: the headline a transparency board exists to publish should
+          not move because a visitor picked a category. What the filter matched is
+          reported over the list instead. */}
       <div className="grid grid-cols-2 md:grid-cols-4 border-2 border-divider">
         <Stat label="All" value={stats?.total} />
         {PUBLIC_STATUSES.map((key) => (
@@ -106,8 +183,11 @@ export function BoardPage() {
         <Field label="Search" htmlFor="q">
           <Input
             id="q"
+            name="q"
             type="search"
-            placeholder="Pothole, streetlight, barangay hall..."
+            autoComplete="off"
+            spellCheck={false}
+            placeholder="Pothole, streetlight, barangay hall…"
             value={search}
             onChange={(event) => setSearch(event.target.value)}
           />
@@ -117,10 +197,7 @@ export function BoardPage() {
           <Select
             id="status"
             value={status}
-            onChange={(event) => {
-              setStatus(event.target.value);
-              setPage(1);
-            }}
+            onChange={(event) => update({ status: event.target.value || null, page: null })}
           >
             <option value="">Any status</option>
             {PUBLIC_STATUSES.map((key) => (
@@ -135,10 +212,7 @@ export function BoardPage() {
           <Select
             id="category"
             value={categoryId}
-            onChange={(event) => {
-              setCategoryId(event.target.value);
-              setPage(1);
-            }}
+            onChange={(event) => update({ category: event.target.value || null, page: null })}
           >
             <option value="">Any category</option>
             {(categoryData?.categories ?? [])
@@ -155,10 +229,11 @@ export function BoardPage() {
           <Select
             id="sort"
             value={sort}
-            onChange={(event) => {
-              setSort(event.target.value as Sort);
-              setPage(1);
-            }}
+            onChange={(event) =>
+              // The default is left out of the URL, so a shared link carries only what
+              // the sender actually chose.
+              update({ sort: event.target.value === "newest" ? null : event.target.value, page: null })
+            }
           >
             {SORTS.map((key) => (
               <option key={key} value={key}>
@@ -176,6 +251,7 @@ export function BoardPage() {
         <div className="h-[320px] lg:h-[560px] border-2 border-divider">
           <ReportMap
             reports={reports}
+            fitKey={fitKey}
             selectedId={selectedId}
             onSelect={setSelectedId}
             onMove={handleMove}
@@ -183,14 +259,23 @@ export function BoardPage() {
         </div>
 
         <div className="flex flex-col gap-3 lg:max-h-[560px] lg:overflow-y-auto">
-          <div className="flex items-baseline justify-between gap-2">
-            <h6>Reports in view</h6>
-            <span className="text-muted font-mono text-[11px]">
-              {visible.length} shown{narrowed ? " in this part of the map" : ""}
-            </span>
-          </div>
+          <div className="flex flex-col gap-2 border-b-2 border-divider pb-2">
+            <label className="flex cursor-pointer touch-manipulation select-none items-center gap-2 text-[12px]">
+              <input
+                type="checkbox"
+                checked={inView}
+                onChange={(event) => update({ view: event.target.checked ? "map" : null })}
+                className="size-4 accent-accent"
+              />
+              Only show reports in this map view
+            </label>
 
-          {loading && <Loading label="Loading the board" />}
+            {/* One live region for the list. The single thing a visitor needs told when
+                a filter changes is how much it matched. */}
+            <p aria-live="polite" className="text-muted font-mono text-[11px]">
+              {summary}
+            </p>
+          </div>
 
           {!loading && visible.length === 0 && (
             <EmptyState
@@ -198,7 +283,11 @@ export function BoardPage() {
             >
               {filtered || narrowed ? (
                 <div className="flex flex-col items-start gap-3">
-                  <p>Widen the map, clear the filters, or try a different word.</p>
+                  <p>
+                    {narrowed
+                      ? "Nothing in this part of the map matches. Pan the map, untick the map-view filter, or clear the filters."
+                      : "Try a different word, or clear the filters."}
+                  </p>
                   <Button type="button" onClick={resetFilters}>
                     Clear filters
                   </Button>
@@ -212,51 +301,65 @@ export function BoardPage() {
             </EmptyState>
           )}
 
-          {visible.map((report) => {
-            const selected = report.id === selectedId;
-            return (
-              <button
-                key={report.id}
-                type="button"
-                aria-expanded={selected}
-                onClick={() => setSelectedId(selected ? null : report.id)}
-                className={selected ? "card p-3 text-left flex flex-col gap-1 border-accent" : "card p-3 text-left flex flex-col gap-1"}
-              >
-                <span className="flex items-center justify-between gap-2">
-                  <span className="font-mono text-[10px] text-muted">{report.reference_code}</span>
-                  <StatusBadge status={report.status} />
-                </span>
-                <span className="card-title">{report.title}</span>
-                <span className="text-muted text-[11px]">
-                  {report.category} &middot; {formatDate(report.submitted_at)}
-                  {report.photos.length > 0 ? " · photo" : ""}
-                </span>
-
-                {selected && (
-                  <span className="flex flex-col gap-2 pt-2">
-                    <span className="text-[13px]">{report.description}</span>
-                    {report.address_text && (
-                      <span className="text-muted text-[11px]">{report.address_text}</span>
-                    )}
-                    {report.photos[0] && (
-                      <span className="grayscale block">
-                        <img
-                          src={report.photos[0].url}
-                          alt=""
-                          loading="lazy"
-                          className="max-h-48 w-full object-cover"
-                        />
-                      </span>
-                    )}
+          {/* Results already in hand stay put while the next set loads, dimmed and inert
+              rather than yanked away, so the list never collapses and re-expands under a
+              visitor who only changed a dropdown. */}
+          <div
+            aria-busy={loading || undefined}
+            className={`flex flex-col gap-3 transition-opacity duration-150 motion-reduce:transition-none ${
+              loading && !firstLoad ? "pointer-events-none opacity-50" : ""
+            }`}
+          >
+            {visible.map((report) => {
+              const selected = report.id === selectedId;
+              return (
+                <button
+                  key={report.id}
+                  type="button"
+                  aria-expanded={selected}
+                  onClick={() => setSelectedId(selected ? null : report.id)}
+                  className={selected ? "card p-3 text-left flex flex-col gap-1 border-accent" : "card p-3 text-left flex flex-col gap-1"}
+                >
+                  <span className="flex items-center justify-between gap-2">
+                    <span className="font-mono text-[10px] text-muted">{report.reference_code}</span>
+                    <StatusBadge status={report.status} />
                   </span>
-                )}
-              </button>
-            );
-          })}
+                  <span className="card-title">{report.title}</span>
+                  <span className="text-muted text-[11px]">
+                    {report.category} &middot; {formatDate(report.submitted_at)}
+                    {report.photos.length > 0 ? " · photo" : ""}
+                  </span>
+
+                  {selected && (
+                    <span className="flex flex-col gap-2 pt-2">
+                      <span className="text-[13px]">{report.description}</span>
+                      {report.address_text && (
+                        <span className="text-muted text-[11px]">{report.address_text}</span>
+                      )}
+                      {report.photos[0] && (
+                        <PhotoFrame
+                          src={report.photos[0].url}
+                          alt={`Photo of the issue reported as ${report.title}`}
+                          imageClassName="h-48"
+                        />
+                      )}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
         </div>
       </div>
 
-      {data && <Pagination page={data.page} perPage={data.per_page} total={data.total} onPage={setPage} />}
+      {data && (
+        <Pagination
+          page={data.page}
+          perPage={data.per_page}
+          total={data.total}
+          onPage={(next) => update({ page: next === 1 ? null : next }, { push: true })}
+        />
+      )}
 
       <p className="text-muted font-mono text-[10px]">
         Map data &copy; OpenStreetMap contributors, rendered with Leaflet. &middot;{" "}
@@ -270,7 +373,7 @@ function Stat({ label, value }: { label: string; value?: number }) {
   return (
     <div className="p-3 flex flex-col gap-0.5 border-r border-b border-divider last:border-r-0">
       <span className="font-mono text-[10px] uppercase tracking-wider text-muted">{label}</span>
-      <span className="text-2xl font-extrabold">{value ?? "—"}</span>
+      <span className="text-2xl font-extrabold tabular-nums">{value ?? "—"}</span>
     </div>
   );
 }

@@ -88,33 +88,51 @@ export function StaffQueuePage() {
         </EmptyState>
       )}
 
-      <div className="flex flex-col gap-3">
-        {reports.map((report) => (
-          <article key={report.id} className="card p-4 flex flex-col gap-2">
-            <div className="flex items-center justify-between gap-3 flex-wrap">
-              <span className="font-mono text-[10px] text-muted">{report.reference_code}</span>
-              <StatusBadge status={report.status} />
-            </div>
-
-            <h5>
-              <Link to={`/staff/reports/${report.id}`}>{report.title}</Link>
-            </h5>
-
-            <p className="text-muted text-[13px] line-clamp-2">{report.description}</p>
-
-            <div className="flex items-center justify-between gap-3 flex-wrap pt-1">
-              <span className="text-muted font-mono text-[11px]">
-                {report.category?.name ?? "Uncategorised"} &middot; filed {formatDate(report.submitted_at)}
-              </span>
-
-              {/* The row action is whatever the one legal next step is. */}
-              <Link to={`/staff/reports/${report.id}`} className="btn btn-primary">
-                {NEXT_STATUS_LABEL[report.status] ?? "Open"}
-              </Link>
-            </div>
-          </article>
-        ))}
-      </div>
+      {/* A queue is a worklist, so it reads as one: oldest at the top, one row each,
+          and the row's action is the single legal next step rather than a menu. */}
+      {reports.length > 0 && (
+        <div className="overflow-x-auto">
+          <table className="table w-full">
+            <caption className="sr-only">
+              Reports assigned to you, oldest first, {data?.total ?? 0} in total.
+            </caption>
+            <thead>
+              <tr>
+                <th scope="col">Reference</th>
+                <th scope="col">Title</th>
+                <th scope="col">Category</th>
+                <th scope="col">Status</th>
+                <th scope="col">Filed</th>
+                <th scope="col">
+                  <span className="sr-only">Next step</span>
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {reports.map((report) => (
+                <tr key={report.id}>
+                  <td className="font-mono text-[11px] whitespace-nowrap">{report.reference_code}</td>
+                  <td className="max-w-[32ch] min-w-[16ch]">
+                    <Link to={`/staff/reports/${report.id}`} className="block truncate" title={report.title}>
+                      {report.title}
+                    </Link>
+                  </td>
+                  <td className="text-[13px] whitespace-nowrap">{report.category?.name ?? "Uncategorised"}</td>
+                  <td>
+                    <StatusBadge status={report.status} />
+                  </td>
+                  <td className="font-mono text-[11px] whitespace-nowrap">{formatDate(report.submitted_at)}</td>
+                  <td>
+                    <Link to={`/staff/reports/${report.id}`} className="btn btn-primary whitespace-nowrap">
+                      {NEXT_STATUS_LABEL[report.status] ?? "Open"}
+                    </Link>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
 
       {data && <Pagination page={data.page} perPage={data.per_page} total={data.total} onPage={setPage} />}
     </div>

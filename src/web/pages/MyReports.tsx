@@ -118,34 +118,53 @@ export function MyReportsPage() {
         </EmptyState>
       )}
 
-      <div className="flex flex-col gap-3">
-        {reports.map((report) => (
-          <article key={report.id} className="card p-4 flex flex-col gap-2">
-            <div className="flex items-center justify-between gap-3 flex-wrap">
-              <span className="font-mono text-[10px] text-muted">{report.reference_code}</span>
-              <StatusBadge status={report.status} />
-            </div>
-
-            <h5>
-              <Link to={`/reports/${report.id}`}>{report.title}</Link>
-            </h5>
-
-            <p className="text-muted text-[13px] line-clamp-2">{report.description}</p>
-
-            <div className="flex items-center justify-between gap-3 flex-wrap pt-1">
-              <span className="text-muted font-mono text-[11px]">
-                {report.category?.name ?? "Uncategorised"} &middot; {formatDate(report.submitted_at)}
-              </span>
-
-              {/* Only a pending report is still the citizen's to change; once staff
-                  pick it up they may already be acting on what it says. */}
-              {report.status === "pending" && (
-                <CancelButton reportId={report.id} onDone={reload} />
-              )}
-            </div>
-          </article>
-        ))}
-      </div>
+      {/* One row per report, scrolling sideways rather than reflowing: a citizen
+          comparing their own reports is comparing the same field down a column. */}
+      {reports.length > 0 && (
+        <div className="overflow-x-auto">
+          <table className="table w-full">
+            <caption className="sr-only">
+              Reports you have filed, {data?.total ?? 0} in total.
+            </caption>
+            <thead>
+              <tr>
+                <th scope="col">Reference</th>
+                <th scope="col">Title</th>
+                <th scope="col">Category</th>
+                <th scope="col">Status</th>
+                <th scope="col">Filed</th>
+                <th scope="col">
+                  <span className="sr-only">Actions</span>
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {reports.map((report) => (
+                <tr key={report.id}>
+                  <td className="font-mono text-[11px] whitespace-nowrap">{report.reference_code}</td>
+                  <td className="max-w-[32ch] min-w-[16ch]">
+                    <Link to={`/reports/${report.id}`} className="block truncate" title={report.title}>
+                      {report.title}
+                    </Link>
+                  </td>
+                  <td className="text-[13px] whitespace-nowrap">{report.category?.name ?? "Uncategorised"}</td>
+                  <td>
+                    <StatusBadge status={report.status} />
+                  </td>
+                  <td className="font-mono text-[11px] whitespace-nowrap">{formatDate(report.submitted_at)}</td>
+                  <td>
+                    {/* Only a pending report is still the citizen's to change; once staff
+                        pick it up they may already be acting on what it says. */}
+                    {report.status === "pending" && (
+                      <CancelButton reportId={report.id} onDone={reload} />
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
 
       {data && <Pagination page={data.page} perPage={data.per_page} total={data.total} onPage={setPage} />}
     </div>
@@ -181,7 +200,7 @@ function CancelButton({ reportId, onDone }: { reportId: string; onDone: () => vo
           if (cancelled) onDone();
         }}
       >
-        {pending ? "Cancelling..." : "Yes, cancel"}
+        {pending ? "Cancelling…" : "Yes, cancel"}
       </Button>
 
       <Button type="button" onClick={() => setConfirming(false)}>

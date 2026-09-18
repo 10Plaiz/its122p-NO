@@ -1,12 +1,13 @@
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { MapContainer, Marker, TileLayer } from "react-leaflet";
+import { ALLOWED_TYPES, MAX_PHOTO_BYTES, PhotoPicker } from "../components/PhotoPicker.js";
 import {
   Alert,
   Button,
   Field,
-  Input,
   Loading,
+  PhotoFrame,
   StatusBadge,
   Textarea,
   formatDateTime,
@@ -16,9 +17,6 @@ import { TILE_ATTRIBUTION, TILE_URL, pinFor } from "../lib/leaflet.js";
 import { useAction, useApi } from "../lib/useApi.js";
 import { NEXT_STATUS, NEXT_STATUS_LABEL, STATUS_LABEL } from "../lib/types.js";
 import type { Report, ReportUpdate } from "../lib/types.js";
-
-const MAX_PHOTO_BYTES = 3 * 1024 * 1024;
-const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
 
 // Wireframe 1m: working a single report. Staff advance the status, leave remarks and
 // upload proof of repair. Everything here is also checked server-side by
@@ -90,12 +88,25 @@ export function StaffReportPage() {
             <section className="flex flex-col gap-2 border-t border-divider pt-3">
               <h6>Photos</h6>
               <div className="grid grid-cols-2 gap-2">
-                {report.photos.map((photo) => (
-                  <a key={photo.id} href={photo.url} target="_blank" rel="noreferrer" className="grayscale block">
-                    <img src={photo.url} alt="" loading="lazy" className="w-full h-32 object-cover" />
-                    <span className="font-mono text-[9px] uppercase text-muted">{photo.kind}</span>
-                  </a>
-                ))}
+                {report.photos.map((photo) => {
+                  // `kind` is the API's word for it; the screen says what it means.
+                  const kindLabel = photo.kind === "resolution" ? "Proof of repair" : "Evidence";
+                  return (
+                    <a
+                      key={photo.id}
+                      href={photo.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="block"
+                    >
+                      <PhotoFrame
+                        src={photo.url}
+                        alt={`${kindLabel} photo for report ${report.reference_code}`}
+                      />
+                      <span className="font-mono text-[9px] uppercase text-muted">{kindLabel}</span>
+                    </a>
+                  );
+                })}
               </div>
             </section>
           )}
@@ -204,7 +215,7 @@ function AdvanceStatus({ report, onDone }: { report: Report; onDone: () => void 
           }
         }}
       >
-        {pending ? "Saving..." : label}
+        {pending ? "Saving…" : label}
       </Button>
     </section>
   );
@@ -255,7 +266,7 @@ function AddRemark({ reportId, onDone }: { reportId: string; onDone: () => void 
           }
         }}
       >
-        {pending ? "Saving..." : "Save remark"}
+        {pending ? "Saving…" : "Save remark"}
       </Button>
     </section>
   );
@@ -292,18 +303,17 @@ function UploadResolution({
     <section className="border-2 border-divider p-4 flex flex-col gap-3">
       <h6>Upload proof of repair</h6>
 
-      <Field label="Photo" htmlFor="resolution-photo" hint="JPG, PNG or WebP, up to 3 MB." error={localError}>
-        <Input
-          id="resolution-photo"
-          type="file"
-          accept={ALLOWED_TYPES.join(",")}
-          onChange={(event) => {
-            const chosen = event.target.files?.[0] ?? null;
-            setFile(chosen);
-            setLocalError(chosen ? check(chosen) : undefined);
-          }}
-        />
-      </Field>
+      <PhotoPicker
+        id="resolution-photo"
+        label="Photo"
+        purpose="Show the repair as it now stands. The citizen sees this on their report."
+        error={localError}
+        value={file}
+        onChange={(chosen) => {
+          setFile(chosen);
+          setLocalError(chosen ? check(chosen) : undefined);
+        }}
+      />
 
       {error && <Alert title="Could not upload the photo">{error.message}</Alert>}
 
@@ -324,7 +334,7 @@ function UploadResolution({
           }
         }}
       >
-        {pending ? "Uploading..." : "Upload photo"}
+        {pending ? "Uploading…" : "Upload photo"}
       </Button>
     </section>
   );

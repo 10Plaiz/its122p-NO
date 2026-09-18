@@ -146,3 +146,40 @@ export function formatDateTime(value: string | null) {
     minute: "2-digit",
   });
 }
+
+// How the system mounts a photo: a 2px rule and a surface mat, so evidence reads as
+// something deliberately presented rather than an image that bled into the page.
+// Colour is the point — a citizen judges a pothole, and staff judge a repair, by what
+// it actually looks like, so nothing here desaturates it.
+//
+// Built from <span>s: the board renders a frame inside a <button>, where a <div>
+// would be invalid markup.
+export function PhotoFrame({
+  src,
+  alt,
+  width = 320,
+  height = 240,
+  className = "",
+  imageClassName = "h-32",
+}: {
+  src: string;
+  alt: string;
+  width?: number;
+  height?: number;
+  className?: string;
+  imageClassName?: string;
+}) {
+  return (
+    <span className={`block border-2 border-divider bg-surface p-1.5 ${className}`.trim()}>
+      <img
+        src={src}
+        alt={alt}
+        width={width}
+        height={height}
+        loading="lazy"
+        decoding="async"
+        className={`block w-full object-cover bg-neutral-200 ${imageClassName}`.trim()}
+      />
+    </span>
+  );
+}

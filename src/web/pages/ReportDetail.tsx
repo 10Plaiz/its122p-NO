@@ -1,6 +1,6 @@
 import { Link, useParams } from "react-router-dom";
 import { MapContainer, Marker, TileLayer } from "react-leaflet";
-import { Alert, Loading, StatusBadge, formatDateTime } from "../components/ui.js";
+import { Alert, Loading, PhotoFrame, StatusBadge, formatDateTime } from "../components/ui.js";
 import { TILE_ATTRIBUTION, TILE_URL, pinFor } from "../lib/leaflet.js";
 import { useApi } from "../lib/useApi.js";
 import { STATUS_LABEL } from "../lib/types.js";
@@ -66,9 +66,18 @@ export function ReportDetailPage() {
             <section className="flex flex-col gap-2 border-t border-divider pt-3">
               <h6>Evidence</h6>
               <div className="grid grid-cols-2 gap-2">
-                {initial.map((photo) => (
-                  <a key={photo.id} href={photo.url} target="_blank" rel="noreferrer" className="grayscale block">
-                    <img src={photo.url} alt="" loading="lazy" className="w-full h-32 object-cover" />
+                {initial.map((photo, index) => (
+                  <a
+                    key={photo.id}
+                    href={photo.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="block"
+                  >
+                    <PhotoFrame
+                      src={photo.url}
+                      alt={`Evidence photo ${index + 1} for report ${report.reference_code}`}
+                    />
                   </a>
                 ))}
               </div>
@@ -79,9 +88,18 @@ export function ReportDetailPage() {
             <section className="flex flex-col gap-2 border-t border-divider pt-3">
               <h6>Proof of repair</h6>
               <div className="grid grid-cols-2 gap-2">
-                {resolution.map((photo) => (
-                  <a key={photo.id} href={photo.url} target="_blank" rel="noreferrer" className="grayscale block">
-                    <img src={photo.url} alt="" loading="lazy" className="w-full h-32 object-cover" />
+                {resolution.map((photo, index) => (
+                  <a
+                    key={photo.id}
+                    href={photo.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="block"
+                  >
+                    <PhotoFrame
+                      src={photo.url}
+                      alt={`Proof of repair photo ${index + 1} for report ${report.reference_code}`}
+                    />
                   </a>
                 ))}
               </div>
