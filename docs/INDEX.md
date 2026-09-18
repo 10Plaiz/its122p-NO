@@ -12,8 +12,10 @@ Use this page to find the document that owns the information you need.
 | [KAMOTI proposal](Final_Project.md) | Intended features, roles, architecture, and technology choices |
 | [Architecture](ARCHITECTURE.md) | Code boundaries, request path, and deployment layout |
 | [API guide](API.md) | Supabase setup, endpoints, access rules, and example requests |
+| [API documentation](API_Documentation.md) | Which APIs the project uses, what they return, and how each was integrated |
 
 The course guide and phase instructions own submission requirements. The
 proposal owns intended behavior and technology choices. The architecture guide
-owns code boundaries. The API guide owns API usage. Source code and tests show
-what is implemented.
+owns code boundaries. The API guide owns API usage, and the API documentation is
+the Phase 3 write-up of that same surface. Source code and tests show what is
+implemented.

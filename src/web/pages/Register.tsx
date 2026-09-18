@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { ChangeEvent, FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { ContactNumberField, validateContactNumber } from "../components/ContactNumberField.js";
 import { Alert, Button, Field, Input } from "../components/ui.js";
 import { useAuth } from "../lib/auth.js";
 import { useAction } from "../lib/useApi.js";
@@ -14,10 +15,8 @@ function validate(values: { name: string; email: string; password: string; conta
   if (!/^\S+@\S+\.\S+$/.test(values.email.trim())) errors.email = "Enter a valid email address.";
   if (values.password.length < 8) errors.password = "Use at least 8 characters.";
 
-  const contact = values.contact.trim();
-  if (contact && (contact.length < 7 || contact.length > 20)) {
-    errors.contact_number = "Enter between 7 and 20 characters, or leave this blank.";
-  }
+  const contactError = validateContactNumber(values.contact);
+  if (contactError) errors.contact_number = contactError;
 
   return errors;
 }
@@ -70,14 +69,13 @@ export function RegisterPage() {
           <Input id="email" name="email" type="email" autoComplete="email" value={values.email} onChange={set("email")} />
         </Field>
 
-        <Field
-          label="Contact number"
-          htmlFor="contact"
-          hint="Optional. Staff use this only if they need to reach you about the report."
+        <ContactNumberField
+          id="contact"
+          hint="Optional. 11 digits starting 09. Staff use this only if they need to reach you about the report."
           error={shown.contact_number}
-        >
-          <Input id="contact" name="contact" inputMode="tel" autoComplete="tel" value={values.contact} onChange={set("contact")} />
-        </Field>
+          value={values.contact}
+          onChange={(contact) => setValues((current) => ({ ...current, contact }))}
+        />
 
         <Field label="Password" htmlFor="password" hint="At least 8 characters" error={shown.password}>
           <Input

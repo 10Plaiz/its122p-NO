@@ -2,7 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { db } from "../config/supabase.js";
 import { badRequest, notFound, orThrow } from "../lib/errors.js";
-import { parse } from "../lib/validate.js";
+import { contactNumber, parse } from "../lib/validate.js";
 import { requireAuth, requireRole } from "../middleware/auth.js";
 import { logActivity } from "../lib/activity.js";
 import { currentUser } from "../middleware/auth.js";
@@ -17,13 +17,13 @@ const createUserSchema = z.object({
   email: z.email(),
   password: z.string().min(8, "Use at least 8 characters."),
   role: z.enum(ROLES),
-  contact_number: z.string().trim().min(7).max(20).optional(),
+  contact_number: contactNumber.optional(),
 });
 
 const updateUserSchema = z.object({
   name: z.string().trim().min(2).optional(),
   role: z.enum(ROLES).optional(),
-  contact_number: z.string().trim().min(7).max(20).optional(),
+  contact_number: contactNumber.optional(),
   is_active: z.boolean().optional(),
 });
 

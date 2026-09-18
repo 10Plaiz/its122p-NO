@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { ContactNumberField, validateContactNumber } from "../components/ContactNumberField.js";
 import { Alert, Button, Field, Input, Loading, Select, formatDate } from "../components/ui.js";
 import { api } from "../lib/api.js";
 import { useAction, useApi } from "../lib/useApi.js";
@@ -166,6 +167,9 @@ function CreateUser({ onDone }: { onDone: () => void }) {
   if (!/^\S+@\S+\.\S+$/.test(values.email.trim())) errors.email = "Enter a valid email address.";
   if (values.password.length < 8) errors.password = "Use at least 8 characters.";
 
+  const contactError = validateContactNumber(values.contact_number);
+  if (contactError) errors.contact_number = contactError;
+
   const shown = { ...(touched ? errors : {}), ...(error?.fieldErrors ?? {}) };
 
   return (
@@ -199,14 +203,12 @@ function CreateUser({ onDone }: { onDone: () => void }) {
           />
         </Field>
 
-        <Field label="Contact number" htmlFor="new-contact" hint="Optional" error={shown.contact_number}>
-          <Input
-            id="new-contact"
-            inputMode="tel"
-            value={values.contact_number}
-            onChange={(event) => setValues((v) => ({ ...v, contact_number: event.target.value }))}
-          />
-        </Field>
+        <ContactNumberField
+          id="new-contact"
+          error={shown.contact_number}
+          value={values.contact_number}
+          onChange={(contact_number) => setValues((v) => ({ ...v, contact_number }))}
+        />
 
         <Field label="Role" htmlFor="new-role" error={shown.role}>
           <Select

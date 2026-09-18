@@ -2,7 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { auth, db } from "../config/supabase.js";
 import { badRequest, orThrow, unauthorized } from "../lib/errors.js";
-import { parse } from "../lib/validate.js";
+import { contactNumber, parse } from "../lib/validate.js";
 import { requireAuth } from "../middleware/auth.js";
 import { logActivity } from "../lib/activity.js";
 
@@ -12,7 +12,7 @@ const registerSchema = z.object({
   name: z.string().trim().min(2, "Enter your full name."),
   email: z.email("Enter a valid email address."),
   password: z.string().min(8, "Use at least 8 characters."),
-  contact_number: z.string().trim().min(7).max(20).optional(),
+  contact_number: contactNumber.optional(),
 });
 
 const loginSchema = z.object({
