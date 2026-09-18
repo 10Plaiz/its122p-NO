@@ -1,10 +1,17 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
-import App from "./App.js";
-import "./style.css";
+import { BrowserRouter } from "react-router-dom";
+import { AuthProvider } from "./lib/auth.js";
+import { AppRoutes } from "./routes.js";
+import "leaflet/dist/leaflet.css";
+import "./styles/app.css";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <App />
+    <BrowserRouter>
+      <AuthProvider>
+        <AppRoutes />
+      </AuthProvider>
+    </BrowserRouter>
   </StrictMode>,
 );
