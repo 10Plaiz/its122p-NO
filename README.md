@@ -24,7 +24,7 @@ bun run dev
 
 Open `http://localhost:5173`. Vite forwards `/api/*` requests to the
 Express server on port 4000. Before using data routes, apply the Supabase
-migrations as described in the [API guide](docs/API.md#setup).
+migrations to the linked project as described in the [API guide](docs/API.md#setup).
 
 | Command | Purpose |
 | :--- | :--- |
@@ -36,3 +36,11 @@ migrations as described in the [API guide](docs/API.md#setup).
 The web app is a small starter. Phase 3 screens are still to be built.
 See the [documentation index](docs/INDEX.md) for the proposal, architecture,
 API reference, and course instructions.
+
+## Working together
+
+Use GitHub Issues to track work and separate branches for parallel changes.
+Before opening a PR, validate the linked issue's completion criteria and record
+the results in the [PR template](.github/pull_request_template.md). CI runs the
+typecheck and build commands above on PRs and pushes to `main`; add a test step
+when the project has an automated test script.
