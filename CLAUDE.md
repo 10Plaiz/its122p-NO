@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 KAMOTI (Key Alert and Monitoring for Online Tracking of Infrastructures) — an ITS122 Group 4 final project: a citizen infrastructure-reporting system for an LGU. Three roles: `citizen`, `staff`, `admin`.
 
-Only the backend exists. `backend/` is an Express 5 REST API over Supabase; `supabase/migrations/` is the schema. There is no frontend — every endpoint is exercised with curl/Postman. `Wireframe Screens Project/` holds design-canvas wireframes (`.dc.html`) for the not-yet-built UI.
+Only the backend exists. `backend/` is an Express 5 REST API over Supabase; `supabase/migrations/` is the schema. There is no frontend — every endpoint is exercised with curl/Postman. The UI is wireframed but unbuilt, and it is the next graded deliverable: see **The frontend deliverable (Phase 3)** below before starting it.
 
 ## Commands
 
@@ -83,11 +83,32 @@ Multipart fields arrive as strings, so create/edit schemas use `z.coerce` for nu
 
 ESM throughout (`"type": "module"`) — relative imports need the `.js` extension. Plain JavaScript, no TypeScript, no build step. Routes stay thin; anything involving permissions, the status machine, or history belongs in `services/reports.service.js`. `REPORT_FIELDS` is the one shared select string for reports — change it there, not per query. Existing comments explain *why* a decision was made rather than restating the code; match that.
 
-## Reference docs
+## The frontend deliverable (Phase 3)
 
-- `backend/README.md` — endpoint table, auth flow, setup, curl examples. Keep it current when routes change.
-- `docs/backend-explained.md` — plain-language walkthrough written for presenting to the instructor.
-- `docs/wireframe-api-review.md` — audit of the wireframes against the API, with a tiered list of known bugs and missing endpoints (unscoped `GET /api/reports/:id` for staff, unpaginated admin queries hitting Supabase's 1000-row cap, no token refresh, missing filter/sort/search params). Read this before adding features — it is the current backlog.
-- Also not built: email notifications, password reset, login rate limiting.
+`docs/Phase3-Required-Student-Submission.md` is the graded spec for the UI that does not exist yet. It requires: a responsive site, JavaScript interactivity, a live API integration, `fetch`/AJAX, form validation, and **search/filter**. Submission is one complete project folder that runs, plus API notes and screenshots.
+
+Three of those collide with the API as written — check before promising a screen:
+
+- **Search/filter has no server support.** `GET /api/reports` accepts only `status`, `category_id`, `page`, `per_page`; `/api/public/reports` accepts only `status`. There is no `q=`, no `sort=`, no `assigned_staff_id=`. Client-side filtering is capped at the `per_page` ceiling (50 authenticated, 100 public).
+- **No token refresh.** Login returns a `refresh_token` that no route consumes and there is no `/api/auth/refresh`. Supabase access tokens expire in ~1 hour, so a long form silently 401s on submit.
+- **Two admin reads are unpaginated** — `GET /api/admin/users` and `GET /api/admin/analytics` select every row and hit Supabase's 1000-row cap silently, so counts understate with no error.
+
+Also known: `assertCanView` returns early for *any* staff or admin, so `GET /api/reports/:id` returns 200 for a report not assigned to that staff member — only the list is role-scoped. `REPORT_FIELDS` returns `assigned_staff.email` to every viewer, including the citizen.
+
+Not built at all: email notifications, password reset, login rate limiting.
+
+## Design source
+
+`Wireframe Screens Project/` holds 19 wireframed screens (`1a`–`1s`) covering public, citizen, staff and admin roles. `github.md` inside it maps every screen to the `backend/src/**` files it was drawn from — start there when building a screen.
+
+- `KAMOTI Wireframes.dc.html` — canvas source. Loads `_ds/<uuid>/styles.css` and `_ds_bundle.js` by relative path, so `_ds/` must stay its sibling.
+- `KAMOTI Wireframes.html` — self-contained render, no external refs. The portable copy.
+- `_ds/modernist-<uuid>/styles.css` — the design tokens the frontend should consume. Treat this file as the design system; the bundle is a **partial export**, so its `_ds_manifest.json` and `readme.md` reference `components/`, `foundations/`, `templates/` and `theme.json` that are not on disk.
+
+`docs/repo-structure-plan.md` proposes renaming this folder to `design/` (spaces at repo root break unquoted shell and workspace globs). Not yet applied — verify the path before relying on it.
+
+## Repo notes
+
+Both copies of the proposal PDF are tracked (root and `Wireframe Screens Project/uploads/`), byte-identical. The root `.gitignore` lists the PDF by name, but `.gitignore` does not apply to already-tracked files — that line is a no-op, not protection.
 
 Note: `.claude/skills/diagram-architect/` describes a different project (a milk bank system) and does not apply here.
