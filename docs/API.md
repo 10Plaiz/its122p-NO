@@ -26,8 +26,16 @@ only the access each database role needs. The project ref appears in the
 dashboard URL. Complete CLI login in the same environment where you run the
 commands above; keep access tokens and database passwords private.
 
-For a **fresh project**, or after a reviewed migration is merged, one teammate
-applies pending migrations:
+## Database migrations
+
+Any contributor may add a migration to a feature branch, but the shared
+Supabase project has one designated migration owner. Only that owner applies
+migrations after the pull request has been reviewed and merged. Other
+contributors may inspect migration status but must not push feature-branch
+migrations to the shared project.
+
+For a **fresh project**, or after a reviewed migration is merged, the migration
+owner runs:
 
 ```bash
 bunx supabase db push --dry-run
@@ -36,16 +44,20 @@ bunx supabase db push --skip-vault
 bunx supabase migration list
 ```
 
-Do not push feature-branch migrations to the shared database before review.
-The `--skip-vault` flag keeps this command focused on SQL migrations.
+The owner confirms the dry-run output before applying anything. The
+`--skip-vault` flag keeps the command focused on SQL migrations. CI does not
+receive Supabase secrets and never runs `supabase db push`.
 
 The five timestamped SQL files in `supabase/migrations/` are applied in order.
 They create the schema, access rules, reference categories, photo bucket, and
 inspection records. The CLI tracks which migrations have reached the linked
 project. Use a fresh project for this baseline; an older database built from
 earlier copies of the schema needs its history reconciled before `db push`.
-Keep the secret key in the ignored local `.env` and add it separately to the
-Vercel project's environment when deployment is ready.
+Keep the publishable and secret keys in the ignored local `.env`. The secret key
+is required by the local Express API and must stay server-only. Add a separate
+production secret key to the Vercel project's server environment when
+deployment is ready. Keep the database password and Supabase CLI access token
+with the migration owner.
 
 The inspection table stores staff assessments, but inspection API routes and
 screens are planned for Phase 3.

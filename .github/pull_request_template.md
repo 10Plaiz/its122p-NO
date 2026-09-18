@@ -17,6 +17,16 @@ mark an unverified criterion complete. -->
 | :--- | :--- |
 |  |  |
 
+## Database and Supabase changes
+
+<!-- Select the applicable option. Migration changes require the migration
+owner to apply them after this PR is merged. Never include keys or passwords. -->
+
+- [ ] This PR does not change migrations, RLS, storage, or Supabase setup.
+- [ ] This PR changes migrations or Supabase access; the migration files and
+      expected dry-run result are described above or in the linked issue.
+- [ ] No Supabase key, database password, or CLI token is included in this PR.
+
 ## Checks
 
 | Check | Result |

@@ -40,7 +40,9 @@ API reference, and course instructions.
 ## Working together
 
 Use GitHub Issues to track work and separate branches for parallel changes.
-Before opening a PR, validate the linked issue's completion criteria and record
-the results in the [PR template](.github/pull_request_template.md). CI runs the
-typecheck and build commands above on PRs and pushes to `main`; add a test step
-when the project has an automated test script.
+Read [CONTRIBUTING.md](CONTRIBUTING.md) for ownership, environment safety,
+migration responsibility, and the pull request workflow. Before opening a PR,
+validate the linked issue's completion criteria and record the results in the
+[PR template](.github/pull_request_template.md). CI runs the typecheck and
+build commands above on PRs and pushes to `main`; add a test step when the
+project has an automated test script.
