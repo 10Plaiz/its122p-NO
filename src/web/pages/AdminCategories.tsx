@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { Alert, Button, Field, Input, Loading } from "../components/ui.js";
+import { Alert, Button, Field, Input, Loading, focusFirstError } from "../components/ui.js";
+import { useToast } from "../components/Toast.js";
 import { api } from "../lib/api.js";
 import { useAction, useApi } from "../lib/useApi.js";
 import type { Analytics, Category } from "../lib/types.js";
@@ -65,9 +66,11 @@ function CategoryRow({
   count: number;
   onDone: () => void;
 }) {
+  const toast = useToast();
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(category.name);
   const [description, setDescription] = useState(category.description ?? "");
+  const [nameError, setNameError] = useState<string | undefined>();
 
   const update = useAction((body: Record<string, unknown>) =>
     api.patch<{ category: Category }>(`/categories/${category.id}`, body),
@@ -77,10 +80,17 @@ function CategoryRow({
   const retire = useAction(() => api.delete<{ ok: true }>(`/categories/${category.id}`));
 
   async function save() {
-    if (name.trim().length === 0) return;
+    // Was a bare `return`, so Save looked broken rather than wrong.
+    if (name.trim().length < 2) {
+      setNameError("Enter a category name of at least 2 characters.");
+      return;
+    }
+
+    setNameError(undefined);
     const done = await update.run({ name: name.trim(), description: description.trim() || null });
     if (done) {
       setEditing(false);
+      toast("Category saved.");
       onDone();
     }
   }
@@ -89,14 +99,31 @@ function CategoryRow({
     <tr>
       <td className="text-[13px]">
         {editing ? (
-          <Input value={name} onChange={(event) => setName(event.target.value)} />
+          <span className="flex flex-col gap-1">
+            <Input
+              aria-label="Category name"
+              maxLength={60}
+              value={name}
+              onChange={(event) => setName(event.target.value)}
+            />
+            {nameError && (
+              <span role="alert" className="text-[11px] text-accent-700">
+                {nameError}
+              </span>
+            )}
+          </span>
         ) : (
           category.name
         )}
       </td>
       <td className="text-[13px]">
         {editing ? (
-          <Input value={description} onChange={(event) => setDescription(event.target.value)} />
+          <Input
+            aria-label="Category description"
+            maxLength={300}
+            value={description}
+            onChange={(event) => setDescription(event.target.value)}
+          />
         ) : (
           (category.description ?? "—")
         )}
@@ -163,6 +190,7 @@ function CategoryRow({
 }
 
 function CreateCategory({ onDone }: { onDone: () => void }) {
+  const toast = useToast();
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [touched, setTouched] = useState(false);
@@ -171,18 +199,38 @@ function CreateCategory({ onDone }: { onDone: () => void }) {
     api.post<{ category: Category }>("/categories", body),
   );
 
-  const nameError = touched && name.trim().length === 0 ? "Give the category a name." : undefined;
+  // Matches the server's min(2) rather than merely checking for blank, so a
+  // single-character name is caught here instead of coming back as a 400.
+  const nameError =
+    touched && name.trim().length < 2 ? "Enter a category name of at least 2 characters." : undefined;
 
   return (
     <section className="border-2 border-divider p-4 flex flex-col gap-3">
       <h6>Add a category</h6>
 
       <div className="grid gap-3 md:grid-cols-2">
-        <Field label="Name" htmlFor="cat-name" error={error?.fieldErrors?.name ?? nameError}>
-          <Input id="cat-name" value={name} onChange={(event) => setName(event.target.value)} />
+        <Field
+          label="Name"
+          htmlFor="cat-name"
+          error={error?.fieldErrors?.name ?? nameError}
+          count={name.length}
+          max={60}
+        >
+          <Input
+            id="cat-name"
+            maxLength={60}
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+          />
         </Field>
 
-        <Field label="Description" htmlFor="cat-desc" hint="Optional. Shown to citizens as a hint.">
+        <Field
+          label="Description"
+          htmlFor="cat-desc"
+          hint="Optional. Shown to citizens as a hint."
+          count={description.length}
+          max={300}
+        >
           <Input
             id="cat-desc"
             value={description}
@@ -200,7 +248,10 @@ function CreateCategory({ onDone }: { onDone: () => void }) {
         disabled={pending}
         onClick={async () => {
           setTouched(true);
-          if (name.trim().length === 0) return;
+          if (name.trim().length < 2) {
+            focusFirstError({ name: "" }, { name: "cat-name" });
+            return;
+          }
 
           const done = await run({
             name: name.trim(),
@@ -210,11 +261,12 @@ function CreateCategory({ onDone }: { onDone: () => void }) {
             setName("");
             setDescription("");
             setTouched(false);
+            toast("Category added.");
             onDone();
           }
         }}
       >
-        {pending ? "Adding..." : "Add category"}
+        {pending ? "Adding…" : "Add category"}
       </Button>
     </section>
   );

@@ -12,6 +12,7 @@ import {
   StatusBadge,
   formatDate,
 } from "../components/ui.js";
+import { useToast } from "../components/Toast.js";
 import { api } from "../lib/api.js";
 import { useAction, useApi } from "../lib/useApi.js";
 import { STATUSES, STATUS_LABEL } from "../lib/types.js";
@@ -52,6 +53,7 @@ export function MyReportsPage() {
           <Input
             id="q"
             type="search"
+            maxLength={100}
             placeholder="Search your reports"
             value={search}
             onChange={(event) => {
@@ -174,6 +176,7 @@ export function MyReportsPage() {
 // A cancelled report is kept, never deleted, so its history survives — but it is
 // still a one-way door for the citizen, hence the inline confirm.
 function CancelButton({ reportId, onDone }: { reportId: string; onDone: () => void }) {
+  const toast = useToast();
   const [confirming, setConfirming] = useState(false);
   const { run, pending, error } = useAction(() =>
     api.post<{ report: Report }>(`/reports/${reportId}/cancel`),
@@ -197,7 +200,10 @@ function CancelButton({ reportId, onDone }: { reportId: string; onDone: () => vo
         disabled={pending}
         onClick={async () => {
           const cancelled = await run();
-          if (cancelled) onDone();
+          if (cancelled) {
+            toast("Report cancelled. Its history is kept.");
+            onDone();
+          }
         }}
       >
         {pending ? "Cancelling…" : "Yes, cancel"}

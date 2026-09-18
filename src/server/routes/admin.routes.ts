@@ -13,15 +13,18 @@ const router = Router();
 router.use(requireAuth, requireRole("admin"));
 
 const createUserSchema = z.object({
-  name: z.string().trim().min(2),
-  email: z.email(),
-  password: z.string().min(8, "Use at least 8 characters."),
+  name: z.string().trim().min(2).max(80, "Keep the name under 80 characters."),
+  email: z.email().max(254, "That email address is too long."),
+  password: z
+    .string()
+    .min(8, "Use at least 8 characters.")
+    .max(72, "Keep the password under 72 characters."),
   role: z.enum(ROLES),
   contact_number: contactNumber.optional(),
 });
 
 const updateUserSchema = z.object({
-  name: z.string().trim().min(2).optional(),
+  name: z.string().trim().min(2).max(80, "Keep the name under 80 characters.").optional(),
   role: z.enum(ROLES).optional(),
   contact_number: contactNumber.optional(),
   is_active: z.boolean().optional(),

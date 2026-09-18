@@ -9,9 +9,14 @@ import { logActivity } from "../lib/activity.js";
 const router = Router();
 
 const registerSchema = z.object({
-  name: z.string().trim().min(2, "Enter your full name."),
-  email: z.email("Enter a valid email address."),
-  password: z.string().min(8, "Use at least 8 characters."),
+  name: z.string().trim().min(2, "Enter your full name.").max(80, "Keep the name under 80 characters."),
+  email: z.email("Enter a valid email address.").max(254, "That email address is too long."),
+  // 72 is where the password hash stops reading, so anything past it is not
+  // actually part of the password.
+  password: z
+    .string()
+    .min(8, "Use at least 8 characters.")
+    .max(72, "Keep the password under 72 characters."),
   contact_number: contactNumber.optional(),
 });
 

@@ -19,6 +19,7 @@ import {
   changeStatus,
   editReport,
   findReport,
+  notifyNewReport,
   type Report,
 } from "../services/reports.service.js";
 
@@ -36,7 +37,11 @@ function present(report: Report) {
 // Multipart form fields arrive as strings, so numbers are coerced here.
 const createSchema = z.object({
   title: z.string().trim().min(3).max(150),
-  description: z.string().trim().min(10, "Describe the problem in at least 10 characters."),
+  description: z
+    .string()
+    .trim()
+    .min(10, "Describe the problem in at least 10 characters.")
+    .max(1000, "Keep the description under 1000 characters."),
   category_id: z.coerce.number().int().positive(),
   latitude: z.coerce.number().min(-90).max(90),
   longitude: z.coerce.number().min(-180).max(180),
@@ -114,7 +119,10 @@ router.post("/", requireRole("citizen"), photoUpload.single("photo"), async (req
     });
   }
 
-  res.status(201).json({ report: present(await findReport(created.id)) });
+  const report = await findReport(created.id);
+  await notifyNewReport(report);
+
+  res.status(201).json({ report: present(report) });
 });
 
 router.get("/:id", async (req, res) => {

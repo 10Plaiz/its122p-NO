@@ -1,11 +1,26 @@
 import { Link } from "react-router-dom";
 import { Alert, Button, EmptyState, Loading, formatDateTime } from "../components/ui.js";
 import { api } from "../lib/api.js";
+import { useAuth } from "../lib/auth.js";
 import { useAction, useApi } from "../lib/useApi.js";
-import type { Notification } from "../lib/types.js";
+import type { Notification, Role } from "../lib/types.js";
 
 // Wireframe 1k. Every role has notifications; the server scopes them to the caller.
+//
+// What each role is told differs, so what this page promises differs too. A staff
+// member reading the citizen's wording would be waiting for updates on reports
+// they never filed.
+const EMPTY_TEXT: Record<Role, string> = {
+  citizen:
+    "You will hear from us whenever one of your reports changes status — from review through to repair.",
+  staff:
+    "You will hear from us when a report is assigned to you, and when anything changes on one you are working on.",
+  admin:
+    "You will hear from us when a citizen files a report that needs assigning, and when work moves on reports you are watching.",
+};
+
 export function NotificationsPage() {
+  const { user } = useAuth();
   const { data, error, loading, reload } = useApi<{ notifications: Notification[]; unread: number }>(
     "/notifications",
   );
@@ -43,7 +58,7 @@ export function NotificationsPage() {
               if (done) reload();
             }}
           >
-            {markAll.pending ? "Marking..." : "Mark all as read"}
+            {markAll.pending ? "Marking…" : "Mark all as read"}
           </Button>
         )}
       </header>
@@ -54,8 +69,7 @@ export function NotificationsPage() {
 
       {!loading && notifications.length === 0 && (
         <EmptyState title="No notifications yet">
-          You will hear from us whenever one of your reports changes status &mdash; from review
-          through to repair.
+          {user ? EMPTY_TEXT[user.role] : EMPTY_TEXT.citizen}
         </EmptyState>
       )}
 
@@ -91,7 +105,17 @@ export function NotificationsPage() {
                 {formatDateTime(notification.created_at)}
               </span>
               {notification.report_id && (
-                <Link to={`/reports/${notification.report_id}`} className="text-[12px]">
+                // A notification about work should land where the work can be done:
+                // staff and admins act on a report from the staff view, while a
+                // citizen only reads their own.
+                <Link
+                  to={
+                    user && user.role !== "citizen"
+                      ? `/staff/reports/${notification.report_id}`
+                      : `/reports/${notification.report_id}`
+                  }
+                  className="text-[12px]"
+                >
                   Open the report
                 </Link>
               )}

@@ -48,6 +48,7 @@ export function StaffQueuePage() {
           <Input
             id="q"
             type="search"
+            maxLength={100}
             placeholder="Search your queue"
             value={search}
             onChange={(event) => {

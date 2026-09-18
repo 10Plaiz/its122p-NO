@@ -1,8 +1,128 @@
 # API guide
 
 Express REST API for KAMOTI (Key Alert and Monitoring for Online Tracking of Infrastructures).
-Data lives in Supabase. The current React page is a starter; every endpoint
-below can also be exercised with `curl` or Postman.
+Data lives in Supabase. Every endpoint below is used by the React app and can
+also be exercised with `curl` or Postman.
+
+---
+
+## API used
+
+KAMOTI builds one API and consumes three. The browser only ever talks to two of
+them directly — the KAMOTI API, and Nominatim.
+
+| API | Provider | Kind | Authentication |
+| :--- | :--- | :--- | :--- |
+| **KAMOTI REST API** | Built by the team — Express 5 on Node.js, TypeScript | First-party, internal | Supabase Auth bearer token |
+| **Supabase** — Auth, Data API, Storage | Supabase Inc. | Third-party platform | Publishable key for sign-in; secret key server-only |
+| **Nominatim reverse geocoding** | OpenStreetMap Foundation | Third-party, public, free | None — governed by a usage policy |
+| **OpenStreetMap raster tiles** | OpenStreetMap Foundation | Third-party, public, free | None — attribution required |
+
+Supabase is reached **through** the KAMOTI API and never from the page, because
+the key that reads protected data must not leave the server.
+
+## API purpose
+
+**KAMOTI REST API** carries every piece of application behaviour: registration
+and sign-in, filing a report with a photo and a map pin, the staff queue and the
+status workflow, admin account and category management, analytics, activity
+logs, and the login-free public transparency board. It exists as its own layer
+rather than letting the page query the database because permission decisions
+have to happen somewhere the user cannot edit.
+
+**Supabase** provides three services behind one project. *Auth* owns passwords
+and issues the JWT, so the application never stores a password. *PostgreSQL*,
+reached through the Data API, holds the eight application tables. *Storage*
+holds report photos as files.
+
+**Nominatim** turns the coordinates of a dropped pin into a readable address, so
+a citizen standing next to a broken drain does not have to type where they are
+and the crew sent to fix it gets a street name rather than two decimal numbers.
+
+**OpenStreetMap tiles** are the map imagery under every pin.
+
+## Data retrieved from the API
+
+Every list endpoint returns the same envelope: rows under a named key, plus the
+paging numbers needed to draw the pager. `GET /api/public/reports` returns:
+
+```json
+{
+  "reports": [
+    {
+      "id": "8f3b1c22-0a77-4e51-9d2a-71c4e0b93f10",
+      "reference_code": "KMT-2026-000042",
+      "title": "Pothole on Rizal Street",
+      "description": "Deep pothole near the corner, cars swerve around it.",
+      "category": "Road",
+      "category_id": 1,
+      "latitude": 14.554700,
+      "longitude": 121.024400,
+      "address_text": "Rizal Street, Poblacion, Makati, Metro Manila",
+      "status": "in_progress",
+      "submitted_at": "2026-09-14T02:15:11.402Z",
+      "resolved_at": null,
+      "photos": [{ "kind": "initial", "storage_path": "8f3b1c22.../initial-4d07.jpg", "url": "https://<project>.supabase.co/storage/v1/object/public/report-photos/..." }]
+    }
+  ],
+  "page": 1,
+  "per_page": 50,
+  "total": 47
+}
+```
+
+`reference_code` is the number a citizen quotes. `address_text` is what
+Nominatim supplied, still editable by the reporter. `total` is the count before
+paging. **Absent by design:** no citizen id, name, email or contact number, and
+no `pending` or `cancelled` report — this endpoint reads the `public_reports`
+view, which cannot return those columns or rows at all.
+
+`POST /api/auth/login` returns the caller's profile plus `access_token`,
+`refresh_token` and `expires_at`. Failures share one shape:
+
+```json
+{
+  "error": "Some fields are invalid. Fix them and try again.",
+  "details": [{ "field": "email", "message": "Enter a valid email address." }]
+}
+```
+
+`400` invalid input · `401` not signed in · `403` signed in but not allowed ·
+`404` not found · `500` server fault.
+
+From **Nominatim**, KAMOTI reads exactly one field of the response,
+`display_name`, truncated to 255 characters.
+
+## How the API is integrated into the website
+
+- **One wrapper.** Every request goes through `src/web/lib/api.ts`, so the token
+  header, query encoding and error shape are defined once rather than at each
+  call site.
+- **Relative URLs.** The browser calls `/api/...`, never an absolute host. Vite
+  proxies that to Express on port 4000 in development; Vercel rewrites it to the
+  Node function in production. The same build works in both because it never
+  learns where the API is.
+- **Token, not password.** The `access_token` is read from `localStorage` per
+  request; a `401` or `403` clears it and ends the session.
+- **No page reloads.** Screens use `useApi` for reads — which tracks loading and
+  error state and abandons superseded requests with `AbortController` — and
+  `useAction` for writes. Uploads send `FormData` with `Content-Type` left unset
+  so the browser can write its own multipart boundary.
+- **Request pipeline.** Each route validates with zod (`400` listing the exact
+  fields, which is what draws the red text under a form control), then
+  `requireAuth`, then `requireRole` and the finer service-level checks, and only
+  then queries Supabase. That order is the security model — see
+  [How authentication works](#how-authentication-works).
+- **Nominatim.** Called from `src/web/lib/leaflet.ts` as `reverseGeocode()`, used
+  by the report wizard. Debounced 700 ms to respect the one-request-per-second
+  policy, cancelled with `AbortController` when the pin moves again, and silent
+  on failure — the address field stays empty and typeable, so a rate-limited
+  lookup costs the citizen nothing. Every report can be filed without it.
+
+The full write-up, with field tables and the request-pipeline diagram, is in the
+[API documentation](API_Documentation.md).
+
+---
 
 ## Setup
 
@@ -48,19 +168,20 @@ The owner confirms the dry-run output before applying anything. The
 `--skip-vault` flag keeps the command focused on SQL migrations. CI does not
 receive Supabase secrets and never runs `supabase db push`.
 
-The five timestamped SQL files in `supabase/migrations/` are applied in order.
-They create the schema, access rules, reference categories, photo bucket, and
-inspection records. The CLI tracks which migrations have reached the linked
-project. Use a fresh project for this baseline; an older database built from
-earlier copies of the schema needs its history reconciled before `db push`.
+The six timestamped SQL files in `supabase/migrations/` are applied in order.
+They create the schema, access rules, reference categories, photo bucket,
+inspection records, and the public board's category filter. The CLI tracks which
+migrations have reached the linked project. Use a fresh project for this
+baseline; an older database built from earlier copies of the schema needs its
+history reconciled before `db push`.
 Keep the publishable and secret keys in the ignored local `.env`. The secret key
 is required by the local Express API and must stay server-only. Add a separate
 production secret key to the Vercel project's server environment when
 deployment is ready. Keep the database password and Supabase CLI access token
 with the migration owner.
 
-The inspection table stores staff assessments, but inspection API routes and
-screens are planned for Phase 3.
+The inspection table stores staff assessments, but no inspection API routes or
+screens are implemented yet.
 
 ## How authentication works
 
@@ -88,13 +209,14 @@ psql "$TEST_DATABASE_URL" -X -v ON_ERROR_STOP=1 -f supabase/tests/api_access.sql
 
 The test uses synthetic records inside a transaction and rolls them back.
 
-## Endpoints
+## API endpoints
 
 | Method | Route | Who can call it |
 | --- | --- | --- |
 | `GET` | `/api/health` | anyone |
 | `POST` | `/api/auth/register` | anyone — always creates a **citizen** |
 | `POST` | `/api/auth/login` | anyone |
+| `POST` | `/api/auth/logout` | signed in — records the sign-out in the activity log |
 | `GET` | `/api/auth/me` | signed in |
 | `GET` | `/api/categories` | anyone |
 | `POST` `PATCH` `DELETE` | `/api/categories[/:id]` | admin |
@@ -114,8 +236,16 @@ The test uses synthetic records inside a transaction and rolls them back.
 | `GET` | `/api/admin/analytics` | admin |
 | `GET` | `/api/admin/logs` | admin |
 | `GET` | `/api/public/reports` | **anyone, no login** |
+| `GET` | `/api/public/stats` | **anyone, no login** — counts above the board |
 
-`GET /api/reports` is a single handler that filters by role: a citizen sees only their own reports, a staff member sees only reports assigned to them, an admin sees all. Query parameters: `status`, `category_id`, `page`, `per_page`.
+`GET /api/reports` is a single handler that filters by role: a citizen sees only their own reports, a staff member sees only reports assigned to them, an admin sees all. Query parameters: `q`, `status`, `category_id`, `from`, `to`, `sort`, `page`, `per_page`. `GET /api/public/reports` takes the same set, except that `status` accepts only the three the board can show.
+
+The third-party endpoint, called from the browser rather than from this API:
+
+```
+GET https://nominatim.openstreetmap.org/reverse
+      ?format=jsonv2&lat=14.554700&lon=121.024400&zoom=18&addressdetails=1
+```
 
 ## Status flow
 
@@ -136,7 +266,7 @@ curl http://localhost:4000/api/health
 
 curl -X POST http://localhost:4000/api/auth/register \
   -H "Content-Type: application/json" \
-  -d '{"name":"Juan Dela Cruz","email":"juan@example.com","password":"password123"}'
+  -d '{"name":"Juan Dela Cruz","email":"juan@example.com","password":"password123","contact_number":"09171234567"}'
 
 curl -X POST http://localhost:4000/api/auth/login \
   -H "Content-Type: application/json" \
@@ -151,6 +281,9 @@ curl -X POST http://localhost:4000/api/reports \
   -F "longitude=121.0244" \
   -F "photo=@pothole.jpg"
 ```
+
+`contact_number` is optional, and when given must be an 11-digit mobile number
+starting `09`.
 
 ## Making the first admin
 
@@ -167,3 +300,4 @@ After that, create staff accounts through `POST /api/admin/users`.
 - Email notifications (in-app only for now; the proposal marks email optional)
 - Password reset
 - Rate limiting on login
+- Inspection routes and screens for the `report_inspections` table

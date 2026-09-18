@@ -2,7 +2,7 @@ import { useState } from "react";
 import type { ChangeEvent, FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { ContactNumberField, validateContactNumber } from "../components/ContactNumberField.js";
-import { Alert, Button, Field, Input } from "../components/ui.js";
+import { Alert, Button, Field, Input, focusFirstError } from "../components/ui.js";
 import { useAuth } from "../lib/auth.js";
 import { useAction } from "../lib/useApi.js";
 
@@ -41,7 +41,10 @@ export function RegisterPage() {
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
     setTouched(true);
-    if (Object.keys(errors).length > 0) return;
+    if (Object.keys(errors).length > 0) {
+      focusFirstError(errors, { contact_number: "contact" });
+      return;
+    }
 
     const contact = values.contact.trim();
     const created = await run({
@@ -61,12 +64,12 @@ export function RegisterPage() {
       <p className="text-muted text-[13px]">Public sign-up always creates a citizen account.</p>
 
       <form className="flex flex-col gap-4" onSubmit={handleSubmit} noValidate>
-        <Field label="Full name" htmlFor="name" error={shown.name}>
-          <Input id="name" name="name" autoComplete="name" value={values.name} onChange={set("name")} />
+        <Field label="Full name" htmlFor="name" error={shown.name} count={values.name.length} max={80}>
+          <Input id="name" name="name" autoComplete="name" maxLength={80} value={values.name} onChange={set("name")} />
         </Field>
 
-        <Field label="Email" htmlFor="email" error={shown.email}>
-          <Input id="email" name="email" type="email" autoComplete="email" value={values.email} onChange={set("email")} />
+        <Field label="Email" htmlFor="email" error={shown.email} count={values.email.length} max={254}>
+          <Input id="email" name="email" type="email" autoComplete="email" maxLength={254} spellCheck={false} value={values.email} onChange={set("email")} />
         </Field>
 
         <ContactNumberField
@@ -77,21 +80,23 @@ export function RegisterPage() {
           onChange={(contact) => setValues((current) => ({ ...current, contact }))}
         />
 
+        {/* Capped but not counted: a length readout on a secret is not worth showing. */}
         <Field label="Password" htmlFor="password" hint="At least 8 characters" error={shown.password}>
           <Input
             id="password"
             name="password"
             type="password"
             autoComplete="new-password"
+            maxLength={72}
             value={values.password}
             onChange={set("password")}
           />
         </Field>
 
-        {error && <Alert title="Error state">{error.message}</Alert>}
+        {error && <Alert title="Could not create your account">{error.message}</Alert>}
 
         <Button type="submit" variant="primary" block disabled={pending}>
-          {pending ? "Creating account..." : "Create account"}
+          {pending ? "Creating account…" : "Create account"}
         </Button>
       </form>
 

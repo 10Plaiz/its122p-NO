@@ -25,23 +25,53 @@ export function Field({
   hint,
   error,
   htmlFor,
+  count,
+  max,
   children,
 }: {
   label: string;
   hint?: string;
   error?: string;
   htmlFor?: string;
+  /** Current length. With `max`, draws a character count beside the hint. */
+  count?: number;
+  max?: number;
   children: ReactNode;
 }) {
+  // Hidden while the field is empty: a row of "0 / 150" under every untouched
+  // control is noise, and the count only means anything once there is something
+  // to count.
+  const showCount = max !== undefined && count !== undefined && count > 0;
+  const note = error ?? hint;
+
   return (
     <div className="field flex flex-col gap-1.5">
       <label htmlFor={htmlFor}>{label}</label>
       {children}
-      {hint && !error && <span className="text-muted text-[11px]">{hint}</span>}
-      {error && (
-        <span role="alert" className="text-[11px] text-accent-700">
-          {error}
-        </span>
+
+      {(note || showCount) && (
+        <div className="flex items-baseline justify-between gap-3">
+          {note ? (
+            <span
+              role={error ? "alert" : undefined}
+              className={error ? "text-[11px] text-accent-700" : "text-muted text-[11px]"}
+            >
+              {note}
+            </span>
+          ) : (
+            <span />
+          )}
+
+          {showCount && (
+            <span
+              className={`shrink-0 font-mono text-[10px] tabular-nums ${
+                count === max ? "text-accent" : "text-muted"
+              }`}
+            >
+              {count} / {max}
+            </span>
+          )}
+        </div>
       )}
     </div>
   );
@@ -182,4 +212,17 @@ export function PhotoFrame({
       />
     </span>
   );
+}
+
+// Sends focus to the first control a form rejected. On a short form the message is
+// already in view, but on the two-column admin forms the rejected field can sit
+// above the fold with nothing but the banner at the bottom to hint at it.
+//
+// Key order follows the order the validator checks fields in, which is the order
+// they appear on screen. `ids` maps an error key to its control id where the two
+// differ.
+export function focusFirstError(errors: Record<string, string>, ids: Record<string, string> = {}) {
+  const [first] = Object.keys(errors);
+  if (!first) return;
+  document.getElementById(ids[first] ?? first)?.focus();
 }

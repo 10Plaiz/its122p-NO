@@ -98,3 +98,15 @@
 @media (width >= 48rem) {
   .nav-toggle { display: none; }
 }
+
+/* The toast's entrance. Kept in CSS rather than on the element so the reduced-motion
+   preference is honoured by the stylesheet itself: with the preference set, no
+   animation is ever declared, instead of one being declared and then cancelled. */
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: none; }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .toast-enter { animation: toast-in 150ms ease-out; }
+}

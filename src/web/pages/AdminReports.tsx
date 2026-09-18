@@ -52,6 +52,7 @@ export function AdminReportsPage() {
           <Input
             id="q"
             type="search"
+            maxLength={100}
             placeholder="Search all reports"
             value={search}
             onChange={(event) => {

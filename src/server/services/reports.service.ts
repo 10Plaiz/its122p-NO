@@ -6,6 +6,7 @@ export type ReportStatus = "pending" | "under_review" | "in_progress" | "resolve
 export type Report = {
   id: string;
   reference_code: string;
+  title: string;
   status: ReportStatus;
   is_public: boolean;
   citizen: { id: string };
@@ -75,11 +76,23 @@ export function assertCanEdit(report: Report, user: AuthUser) {
   }
 }
 
-// Records a history entry and notifies the citizen who filed the report.
+// Staff work many reports at once, so their notifications name the job rather than
+// only its code. The text is stored as it was sent: a title edited later does not
+// rewrite a notification already delivered.
+function reportLabel(report: Report) {
+  return `${report.reference_code} “${report.title}”`;
+}
+
+// Who to tell about a change. The citizen and the assigned staff member get
+// different wording for the same event, because they need different things from
+// it: one is following their report, the other is being handed work.
+type Notice = { userId: string | undefined; message: string };
+
+// Records a history entry and tells everyone the change concerns.
 // Written as separate statements for readability; if partial writes ever become
-// a problem, move these three into a single Postgres function and call it here.
-type UpdateInput = { report: Report; actorId: string; updateType: string; previousStatus?: ReportStatus; newStatus?: ReportStatus; details?: string; message?: string };
-async function recordUpdate({ report, actorId, updateType, previousStatus, newStatus, details, message }: UpdateInput) {
+// a problem, move these into a single Postgres function and call it here.
+type UpdateInput = { report: Report; actorId: string; updateType: string; previousStatus?: ReportStatus; newStatus?: ReportStatus; details?: string; notify?: Notice[] };
+async function recordUpdate({ report, actorId, updateType, previousStatus, newStatus, details, notify }: UpdateInput) {
   throwIfFailed(
     await db.from("report_updates").insert({
       report_id: report.id,
@@ -92,16 +105,25 @@ async function recordUpdate({ report, actorId, updateType, previousStatus, newSt
     "The report changed but its history could not be saved.",
   );
 
-  if (message) {
-    throwIfFailed(
-      await db.from("notifications").insert({
-        user_id: report.citizen.id,
+  // Nobody is told about their own action, and an unassigned report has no staff
+  // member to tell.
+  const recipients = (notify ?? []).filter(
+    (notice): notice is { userId: string; message: string } =>
+      Boolean(notice.userId) && notice.userId !== actorId,
+  );
+
+  if (recipients.length === 0) return;
+
+  throwIfFailed(
+    await db.from("notifications").insert(
+      recipients.map((notice) => ({
+        user_id: notice.userId,
         report_id: report.id,
-        message,
-      }),
-      "The report changed but the citizen could not be notified.",
-    );
-  }
+        message: notice.message,
+      })),
+    ),
+    "The report changed but someone could not be notified.",
+  );
 }
 
 export async function changeStatus({ report, user, newStatus, details }: { report: Report; user: AuthUser; newStatus: ReportStatus; details?: string }) {
@@ -136,7 +158,12 @@ export async function changeStatus({ report, user, newStatus, details }: { repor
     previousStatus: report.status,
     newStatus,
     details,
-    message: `Report ${report.reference_code} is now "${newStatus}".`,
+    notify: [
+      { userId: report.citizen.id, message: `Report ${report.reference_code} is now "${newStatus}".` },
+      // Only reaches the assignee when somebody else moved it — an admin acting on
+      // a report that is somebody's job.
+      { userId: report.assigned_staff?.id, message: `${reportLabel(report)} was moved to "${newStatus}".` },
+    ],
   });
 
   return updated as unknown as Report;
@@ -179,6 +206,14 @@ export async function cancelReport({ report, user, details }: { report: Report; 
     previousStatus: report.status,
     newStatus: "cancelled",
     details: details ?? "Cancelled by the reporter.",
+    // A report can be assigned while it is still pending, so a withdrawal can land
+    // on somebody already treating it as their job.
+    notify: [
+      {
+        userId: report.assigned_staff?.id,
+        message: `${reportLabel(report)} was cancelled by the reporter.`,
+      },
+    ],
   });
 
   return updated as unknown as Report;
@@ -193,6 +228,11 @@ export async function assignStaff({ report, user, staffId }: { report: Report; u
 
   if (!staff || staff.role !== "staff") throw badRequest("That user is not a staff member.");
   if (!staff.is_active) throw badRequest("That staff account is deactivated.");
+
+  // Read before the row is overwritten. Left undefined when the report is simply
+  // being assigned again to the same person, who should not be told they lost it.
+  const previousStaffId =
+    report.assigned_staff?.id === staff.id ? undefined : report.assigned_staff?.id;
 
   const updated = orThrow(
     await db
@@ -209,7 +249,19 @@ export async function assignStaff({ report, user, staffId }: { report: Report; u
     actorId: user.id,
     updateType: "assignment",
     details: `Assigned to ${staff.name}.`,
-    message: `Report ${report.reference_code} has been assigned to a staff member.`,
+    notify: [
+      {
+        userId: report.citizen.id,
+        message: `Report ${report.reference_code} has been assigned to a staff member.`,
+      },
+      { userId: staff.id, message: `${reportLabel(report)} has been assigned to you.` },
+      // The previous holder loses it from their queue; being told beats it simply
+      // disappearing.
+      {
+        userId: previousStaffId,
+        message: `${reportLabel(report)} has been reassigned to someone else.`,
+      },
+    ],
   });
 
   return updated as unknown as Report;
@@ -221,8 +273,47 @@ export async function addRemark({ report, user, details }: { report: Report; use
     actorId: user.id,
     updateType: "remark",
     details,
-    message: `There is a new update on report ${report.reference_code}.`,
+    notify: [
+      {
+        userId: report.citizen.id,
+        message: `There is a new update on report ${report.reference_code}.`,
+      },
+      // Reaches the assignee only when an admin left the remark, never when they
+      // left it themselves.
+      { userId: report.assigned_staff?.id, message: `A remark was added to ${reportLabel(report)}.` },
+    ],
   });
+}
+
+// A new report has nobody assigned to it, so the only people who can act on it are
+// the administrators who do the assigning. Without this nothing announces that work
+// has arrived, and a report sits in `pending` until someone thinks to look.
+//
+// Failure is logged and swallowed rather than thrown: the citizen's report is
+// already saved, and a notification that did not send is no reason to tell them
+// their submission failed.
+export async function notifyNewReport(report: Report) {
+  const { data: admins, error: lookupFailed } = await db
+    .from("profiles")
+    .select("id")
+    .eq("role", "admin")
+    .eq("is_active", true);
+
+  if (lookupFailed) {
+    console.error("Could not look up admins to notify:", lookupFailed.message);
+    return;
+  }
+  if (!admins?.length) return;
+
+  const { error } = await db.from("notifications").insert(
+    admins.map((admin) => ({
+      user_id: admin.id,
+      report_id: report.id,
+      message: `${reportLabel(report)} was filed and is waiting to be assigned.`,
+    })),
+  );
+
+  if (error) console.error("Could not notify admins of a new report:", error.message);
 }
 
 export { REPORT_FIELDS };

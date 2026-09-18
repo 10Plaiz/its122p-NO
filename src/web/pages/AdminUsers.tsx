@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { ContactNumberField, validateContactNumber } from "../components/ContactNumberField.js";
-import { Alert, Button, Field, Input, Loading, Select, formatDate } from "../components/ui.js";
+import { useToast } from "../components/Toast.js";
+import { Alert, Button, Field, Input, Loading, Select, focusFirstError, formatDate } from "../components/ui.js";
 import { api } from "../lib/api.js";
 import { useAction, useApi } from "../lib/useApi.js";
 import { ROLES } from "../lib/types.js";
@@ -81,6 +82,7 @@ export function AdminUsersPage() {
 }
 
 function UserRow({ user, onDone }: { user: Profile; onDone: () => void }) {
+  const toast = useToast();
   const [editing, setEditing] = useState(false);
   const [role, setRole] = useState<Role>(user.role);
   const active = user.is_active !== false;
@@ -89,10 +91,13 @@ function UserRow({ user, onDone }: { user: Profile; onDone: () => void }) {
     api.patch<{ user: Profile }>(`/admin/users/${user.id}`, body),
   );
 
-  async function save(body: Record<string, unknown>) {
+  // Deactivating and reactivating rewrite the Status column in plain sight, so they
+  // pass no confirmation; a role change only swaps a small tag, so it says so.
+  async function save(body: Record<string, unknown>, confirmation?: string) {
     const done = await run(body);
     if (done) {
       setEditing(false);
+      if (confirmation) toast(confirmation);
       onDone();
     }
   }
@@ -121,7 +126,7 @@ function UserRow({ user, onDone }: { user: Profile; onDone: () => void }) {
         <div className="flex gap-2 flex-wrap">
           {editing ? (
             <>
-              <Button type="button" variant="primary" disabled={pending} onClick={() => save({ role })}>
+              <Button type="button" variant="primary" disabled={pending} onClick={() => save({ role }, "Role updated.")}>
                 Save
               </Button>
               <Button type="button" onClick={() => setEditing(false)}>
@@ -148,6 +153,7 @@ function UserRow({ user, onDone }: { user: Profile; onDone: () => void }) {
 }
 
 function CreateUser({ onDone }: { onDone: () => void }) {
+  const toast = useToast();
   const [values, setValues] = useState({
     name: "",
     email: "",
@@ -177,27 +183,32 @@ function CreateUser({ onDone }: { onDone: () => void }) {
       <h6>New account</h6>
 
       <div className="grid gap-3 md:grid-cols-2">
-        <Field label="Full name" htmlFor="new-name" error={shown.name}>
+        <Field label="Full name" htmlFor="new-name" error={shown.name} count={values.name.length} max={80}>
           <Input
             id="new-name"
+            maxLength={80}
             value={values.name}
             onChange={(event) => setValues((v) => ({ ...v, name: event.target.value }))}
           />
         </Field>
 
-        <Field label="Email" htmlFor="new-email" error={shown.email}>
+        <Field label="Email" htmlFor="new-email" error={shown.email} count={values.email.length} max={254}>
           <Input
             id="new-email"
             type="email"
+            maxLength={254}
+            spellCheck={false}
             value={values.email}
             onChange={(event) => setValues((v) => ({ ...v, email: event.target.value }))}
           />
         </Field>
 
+        {/* Capped but not counted: a length readout on a secret is not worth showing. */}
         <Field label="Password" htmlFor="new-password" hint="At least 8 characters" error={shown.password}>
           <Input
             id="new-password"
             type="password"
+            maxLength={72}
             value={values.password}
             onChange={(event) => setValues((v) => ({ ...v, password: event.target.value }))}
           />
@@ -233,7 +244,15 @@ function CreateUser({ onDone }: { onDone: () => void }) {
         disabled={pending}
         onClick={async () => {
           setTouched(true);
-          if (Object.keys(errors).length > 0) return;
+          if (Object.keys(errors).length > 0) {
+            focusFirstError(errors, {
+              name: "new-name",
+              email: "new-email",
+              password: "new-password",
+              contact_number: "new-contact",
+            });
+            return;
+          }
 
           const contact = values.contact_number.trim();
           const done = await run({
@@ -243,10 +262,17 @@ function CreateUser({ onDone }: { onDone: () => void }) {
             role: values.role,
             ...(contact ? { contact_number: contact } : {}),
           });
-          if (done) onDone();
+          if (done) {
+            // Was left filled in, so the new account's password stayed on screen and a
+            // second click would try to create it again.
+            setValues({ name: "", email: "", password: "", contact_number: "", role: "staff" });
+            setTouched(false);
+            toast(`Account created for ${done.user.name}.`);
+            onDone();
+          }
         }}
       >
-        {pending ? "Creating..." : "Create account"}
+        {pending ? "Creating…" : "Create account"}
       </Button>
     </section>
   );

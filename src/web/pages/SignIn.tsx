@@ -1,7 +1,7 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Alert, Button, Field, Input } from "../components/ui.js";
+import { Alert, Button, Field, Input, focusFirstError } from "../components/ui.js";
 import { homePathFor, useAuth } from "../lib/auth.js";
 import { useAction } from "../lib/useApi.js";
 
@@ -23,7 +23,13 @@ export function SignInPage() {
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
     setTouched(true);
-    if (!email.trim() || !password) return;
+    if (!email.trim() || !password) {
+      focusFirstError({
+        ...(email.trim() ? {} : { email: "" }),
+        ...(password ? {} : { password: "" }),
+      });
+      return;
+    }
 
     const user = await run(email.trim(), password);
     if (!user) return;
@@ -60,10 +66,10 @@ export function SignInPage() {
           />
         </Field>
 
-        {error && <Alert title="Error state">{error.message}</Alert>}
+        {error && <Alert title="Could not sign you in">{error.message}</Alert>}
 
         <Button type="submit" variant="primary" block disabled={pending}>
-          {pending ? "Signing in..." : "Sign in"}
+          {pending ? "Signing in…" : "Sign in"}
         </Button>
       </form>
 

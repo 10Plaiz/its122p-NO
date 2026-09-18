@@ -27,9 +27,11 @@ function validateStep(step: number, values: Values): Record<string, string> {
     const title = values.title.trim();
     if (title.length < 3) errors.title = "Give the report a title of at least 3 characters.";
     if (title.length > 150) errors.title = "Keep the title under 150 characters.";
-    if (values.description.trim().length < 10) {
+    const description = values.description.trim();
+    if (description.length < 10) {
       errors.description = "Describe the problem in at least 10 characters.";
     }
+    if (description.length > 1000) errors.description = "Keep the description under 1000 characters.";
     if (!values.categoryId) errors.category_id = "Choose the category that fits best.";
     if (values.address.length > 255) errors.address_text = "Keep the address under 255 characters.";
   }
@@ -220,6 +222,8 @@ export function NewReportPage() {
                 : "Optional. A landmark helps the crew find it."
             }
             error={shown.address_text}
+            count={values.address.length}
+            max={255}
           >
             <Input
               id="address"
@@ -254,7 +258,14 @@ export function NewReportPage() {
             </Select>
           </Field>
 
-          <Field label="Title" htmlFor="title" hint="A short summary, like a headline." error={shown.title}>
+          <Field
+            label="Title"
+            htmlFor="title"
+            hint="A short summary, like a headline."
+            error={shown.title}
+            count={values.title.length}
+            max={150}
+          >
             <Input
               id="title"
               value={values.title}
@@ -268,10 +279,13 @@ export function NewReportPage() {
             htmlFor="description"
             hint="What is wrong, how bad is it, and is anyone at risk?"
             error={shown.description}
+            count={values.description.length}
+            max={1000}
           >
             <Textarea
               id="description"
               rows={5}
+              maxLength={1000}
               value={values.description}
               onChange={(event) =>
                 setValues((current) => ({ ...current, description: event.target.value }))

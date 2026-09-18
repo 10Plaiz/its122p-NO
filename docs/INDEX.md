@@ -11,8 +11,8 @@ Use this page to find the document that owns the information you need.
 | [Phase 4 instructions](Phase4_Instructions.md) | Testing and security submission requirements |
 | [KAMOTI proposal](Final_Project.md) | Intended features, roles, architecture, and technology choices |
 | [Architecture](ARCHITECTURE.md) | Code boundaries, request path, and deployment layout |
-| [API guide](API.md) | Supabase setup, endpoints, access rules, and example requests |
-| [API documentation](API_Documentation.md) | Which APIs the project uses, what they return, and how each was integrated |
+| [API guide](API.md) | Which APIs are used and why, the endpoint table, Supabase setup, access rules, and example requests |
+| [API documentation](API_Documentation.md) | The long-form version of the same five points: response shapes, field tables, and the request pipeline |
 
 The course guide and phase instructions own submission requirements. The
 proposal owns intended behavior and technology choices. The architecture guide

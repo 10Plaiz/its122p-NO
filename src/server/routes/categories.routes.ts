@@ -10,7 +10,11 @@ const router = Router();
 const adminOnly = [requireAuth, requireRole("admin")];
 
 const categorySchema = z.object({
-  name: z.string().trim().min(2, "Enter a category name."),
+  name: z
+    .string()
+    .trim()
+    .min(2, "Enter a category name.")
+    .max(60, "Keep the category name under 60 characters."),
   description: z.string().trim().max(300).optional(),
   is_active: z.boolean().optional(),
 });

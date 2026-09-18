@@ -187,6 +187,7 @@ export function BoardPage() {
             type="search"
             autoComplete="off"
             spellCheck={false}
+            maxLength={100}
             placeholder="Pothole, streetlight, barangay hall…"
             value={search}
             onChange={(event) => setSearch(event.target.value)}

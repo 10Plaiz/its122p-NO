@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { MapContainer, Marker, TileLayer } from "react-leaflet";
 import { ALLOWED_TYPES, MAX_PHOTO_BYTES, PhotoPicker } from "../components/PhotoPicker.js";
+import { useToast } from "../components/Toast.js";
 import {
   Alert,
   Button,
@@ -165,6 +166,7 @@ export function StaffReportPage() {
 // Offers the one legal next step and nothing else, so there is no way to pick an
 // illegal transition and be rejected for it.
 function AdvanceStatus({ report, onDone }: { report: Report; onDone: () => void }) {
+  const toast = useToast();
   const [details, setDetails] = useState("");
   const next = NEXT_STATUS[report.status];
   const label = NEXT_STATUS_LABEL[report.status];
@@ -191,7 +193,13 @@ function AdvanceStatus({ report, onDone }: { report: Report; onDone: () => void 
         {STATUS_LABEL[report.status]} &rarr; <strong>{STATUS_LABEL[next]}</strong>
       </p>
 
-      <Field label="Note" htmlFor="status-details" hint="Optional. The citizen sees this.">
+      <Field
+        label="Note"
+        htmlFor="status-details"
+        hint="Optional. The citizen sees this."
+        count={details.length}
+        max={500}
+      >
         <Textarea
           id="status-details"
           rows={3}
@@ -211,6 +219,7 @@ function AdvanceStatus({ report, onDone }: { report: Report; onDone: () => void 
           const done = await run({ status: next, ...(details.trim() ? { details: details.trim() } : {}) });
           if (done) {
             setDetails("");
+            toast(`Report is now ${STATUS_LABEL[next].toLowerCase()}.`);
             onDone();
           }
         }}
@@ -223,6 +232,7 @@ function AdvanceStatus({ report, onDone }: { report: Report; onDone: () => void 
 
 // A note that does not move the report. Required, or there is nothing to record.
 function AddRemark({ reportId, onDone }: { reportId: string; onDone: () => void }) {
+  const toast = useToast();
   const [details, setDetails] = useState("");
   const [touched, setTouched] = useState(false);
 
@@ -240,6 +250,8 @@ function AddRemark({ reportId, onDone }: { reportId: string; onDone: () => void 
         label="Remark"
         htmlFor="remark"
         error={touched && invalid ? "Write the remark before saving it." : undefined}
+        count={details.length}
+        max={500}
       >
         <Textarea
           id="remark"
@@ -262,6 +274,7 @@ function AddRemark({ reportId, onDone }: { reportId: string; onDone: () => void 
           if (done) {
             setDetails("");
             setTouched(false);
+            toast("Remark saved.");
             onDone();
           }
         }}
@@ -283,6 +296,7 @@ function UploadResolution({
   status: Report["status"];
   onDone: () => void;
 }) {
+  const toast = useToast();
   const [file, setFile] = useState<File | null>(null);
   const [localError, setLocalError] = useState<string | undefined>();
 
@@ -330,6 +344,7 @@ function UploadResolution({
           const done = await run(formData);
           if (done) {
             setFile(null);
+            toast("Photo uploaded.");
             onDone();
           }
         }}
