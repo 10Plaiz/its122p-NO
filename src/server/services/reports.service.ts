@@ -1,5 +1,5 @@
 import { db } from "../config/supabase.js";
-import { badRequest, forbidden, notFound, orThrow } from "../lib/errors.js";
+import { badRequest, forbidden, notFound, orThrow, throwIfFailed } from "../lib/errors.js";
 import type { AuthUser } from "../types/auth.js";
 
 export type ReportStatus = "pending" | "under_review" | "in_progress" | "resolved" | "cancelled";
@@ -29,6 +29,12 @@ export const STATUSES = ["pending", "under_review", "in_progress", "resolved", "
 
 // The subset staff and admins can set. Only a citizen cancels their own report.
 export const STAFF_STATUSES = ["under_review", "in_progress", "resolved"] as const;
+
+// The only statuses the public board can show: a report appears once it leaves
+// `pending`, and a cancelled one never appears. Identical to STAFF_STATUSES today
+// by coincidence — these answer "what can be seen", not "what can be set" — so the
+// two are kept apart deliberately.
+export const PUBLIC_STATUSES = ["under_review", "in_progress", "resolved"] as const;
 
 // Every column the API returns for a report, with its related rows joined in.
 const REPORT_FIELDS = `
@@ -74,7 +80,7 @@ export function assertCanEdit(report: Report, user: AuthUser) {
 // a problem, move these three into a single Postgres function and call it here.
 type UpdateInput = { report: Report; actorId: string; updateType: string; previousStatus?: ReportStatus; newStatus?: ReportStatus; details?: string; message?: string };
 async function recordUpdate({ report, actorId, updateType, previousStatus, newStatus, details, message }: UpdateInput) {
-  orThrow(
+  throwIfFailed(
     await db.from("report_updates").insert({
       report_id: report.id,
       updated_by: actorId,
@@ -87,7 +93,7 @@ async function recordUpdate({ report, actorId, updateType, previousStatus, newSt
   );
 
   if (message) {
-    orThrow(
+    throwIfFailed(
       await db.from("notifications").insert({
         user_id: report.citizen.id,
         report_id: report.id,

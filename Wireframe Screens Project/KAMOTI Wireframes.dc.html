@@ -1,0 +1,817 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics><meta name="design_doc_mode" content="canvas">
+<link rel="stylesheet" href="_ds/modernist-b5da8c15-4911-4de7-be4d-17127ee9a4ee/styles.css">
+<script src="_ds/modernist-b5da8c15-4911-4de7-be4d-17127ee9a4ee/_ds_bundle.js"></script>
+<style>
+body{margin:0;background:#f3f2f2;font-family:var(--font-body,Archivo),system-ui,sans-serif;color:#201e1d}
+a{color:#201e1d}a:hover{color:#ec3013}
+.dv-turn{padding:44px 48px 36px;border-bottom:2px solid #201e1d;scroll-margin-top:16px}
+.dv-thd{display:flex;align-items:baseline;gap:10px;margin:0 0 6px}
+.dv-tid{font:600 10px ui-monospace,Menlo,monospace;padding:3px 7px;background:#201e1d;color:#fff;text-decoration:none}
+.dv-tname{font:600 13px/1.2 var(--font-heading,Archivo),sans-serif;letter-spacing:.02em}
+.dv-opts{display:flex;flex-wrap:wrap;gap:34px;align-items:flex-start}
+.dv-opt{flex:none;display:flex;flex-direction:column;gap:9px;scroll-margin-top:16px;max-width:100%}
+.dv-oid{font:600 10.5px ui-monospace,Menlo,monospace;padding:3px 7px;background:rgba(32,30,29,.09);color:#201e1d;text-decoration:none}
+.dv-olabel{display:flex;align-items:baseline;gap:8px;font:400 11px/1.3 var(--font-body,Archivo),sans-serif;color:rgba(32,30,29,.6)}
+.dv-card{max-width:100%;background:#fff;border:1px solid rgba(32,30,29,.22);overflow:hidden}
+.dv-opt:target .dv-oid{background:#ec3013;color:#fff}
+.dv-next{margin:26px 0 0;font:12px/1.6 var(--font-body,Archivo),sans-serif;color:rgba(32,30,29,.6)}
+.api{font:400 9.5px/1.5 ui-monospace,Menlo,monospace;color:rgba(32,30,29,.5);max-width:100%}
+</style></helmet>
+
+<section class="dv-turn" id="t1">
+<div class="dv-thd"><a class="dv-tid" href="#t1">1</a><span class="dv-tname">KAMOTI — first pass at all screens</span></div>
+<p style="margin:0 0 26px;font:400 12px/1.6 var(--font-body,Archivo),sans-serif;color:rgba(32,30,29,.6);max-width:620px">Wireframe fidelity: structure, hierarchy and flow only. Gray bars are copy, gray boxes are photos, hatched blocks are the Leaflet map. Mono notes under each screen name the backend route each control hits. Citizen screens drawn at 390px, staff and admin at desk width.</p>
+<div class="dv-opts">
+
+<!-- ============ 1a submit: one long form ============ -->
+<div class="dv-opt" id="1a"><div class="dv-olabel"><a class="dv-oid" href="#1a">1a</a>Submit a report — one long form</div>
+<div class="dv-card" style="width:390px">
+  <div style="height:52px;border-bottom:2px solid #201e1d;display:flex;align-items:center;justify-content:space-between;padding:0 14px">
+    <div style="display:flex;align-items:center;gap:10px"><span style="font:400 16px ui-monospace,monospace">&#8592;</span><span style="font:600 13px var(--font-heading,Archivo);letter-spacing:.02em">New report</span></div>
+    <span style="font:600 10px ui-monospace,monospace;color:rgba(32,30,29,.45)">DRAFT</span>
+  </div>
+  <div style="padding:16px 14px;display:flex;flex-direction:column;gap:18px">
+    <div style="display:flex;flex-direction:column;gap:7px">
+      <span style="font:600 9.5px var(--font-body,Archivo);letter-spacing:.09em;text-transform:uppercase;color:#8a8785">Category</span>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px">
+        <div style="border:2px solid #201e1d;height:52px;display:flex;align-items:flex-end;padding:6px;font:600 10px var(--font-body,Archivo)">Road</div>
+        <div style="border:1px solid #c9c6c3;height:52px;display:flex;align-items:flex-end;padding:6px;font:400 10px var(--font-body,Archivo);color:#8a8785">Streetlight</div>
+        <div style="border:1px solid #c9c6c3;height:52px;display:flex;align-items:flex-end;padding:6px;font:400 10px var(--font-body,Archivo);color:#8a8785">Drainage</div>
+        <div style="border:1px solid #c9c6c3;height:52px;display:flex;align-items:flex-end;padding:6px;font:400 10px var(--font-body,Archivo);color:#8a8785">Signage</div>
+        <div style="border:1px solid #c9c6c3;height:52px;display:flex;align-items:flex-end;padding:6px;font:400 10px var(--font-body,Archivo);color:#8a8785">Sidewalk</div>
+        <div style="border:1px solid #c9c6c3;height:52px;display:flex;align-items:flex-end;padding:6px;font:400 10px var(--font-body,Archivo);color:#8a8785">Other</div>
+      </div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:7px">
+      <span style="font:600 9.5px var(--font-body,Archivo);letter-spacing:.09em;text-transform:uppercase;color:#8a8785">Title</span>
+      <div style="border:1px solid #c9c6c3;height:38px;display:flex;align-items:center;padding:0 10px;font:400 11.5px var(--font-body,Archivo);color:#a5a2a0">Short summary, 3&#8211;150 characters</div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:7px">
+      <span style="font:600 9.5px var(--font-body,Archivo);letter-spacing:.09em;text-transform:uppercase;color:#8a8785">What is wrong</span>
+      <div style="border:1px solid #c9c6c3;height:82px;padding:9px 10px;display:flex;flex-direction:column;gap:7px">
+        <div style="height:8px;background:#e0dedc;width:88%"></div><div style="height:8px;background:#e0dedc;width:74%"></div><div style="height:8px;background:#e0dedc;width:40%"></div>
+      </div>
+      <span style="font:400 9.5px ui-monospace,monospace;color:#a5a2a0">min. 10 characters</span>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:7px">
+      <span style="font:600 9.5px var(--font-body,Archivo);letter-spacing:.09em;text-transform:uppercase;color:#8a8785">Location</span>
+      <div style="height:150px;border:1px solid #c9c6c3;background:repeating-linear-gradient(90deg,#eceae8 0 23px,#e2e0de 23px 24px),repeating-linear-gradient(0deg,transparent 0 23px,#e2e0de 23px 24px);position:relative">
+        <div style="position:absolute;left:50%;top:50%;width:13px;height:13px;background:#ec3013;transform:translate(-50%,-100%)"></div>
+        <div style="position:absolute;left:8px;top:8px;background:#fff;border:1px solid #c9c6c3;padding:4px 6px;font:600 9px ui-monospace,monospace">USE MY LOCATION</div>
+        <div style="position:absolute;right:8px;bottom:8px;background:#fff;border:1px solid #c9c6c3;padding:4px 6px;font:400 9px ui-monospace,monospace;color:#8a8785">drag pin</div>
+      </div>
+      <div style="border:1px solid #c9c6c3;height:34px;display:flex;align-items:center;padding:0 10px;font:400 10.5px ui-monospace,monospace;color:#8a8785">14.599512, 120.984222 &#183; address_text</div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:7px">
+      <span style="font:600 9.5px var(--font-body,Archivo);letter-spacing:.09em;text-transform:uppercase;color:#8a8785">Photo &#183; optional, 1 file</span>
+      <div style="height:96px;border:1px dashed #b6b3b0;background:#f0eeec;display:flex;align-items:center;justify-content:center;font:600 10px ui-monospace,monospace;color:#8a8785">TAP TO ADD PHOTO</div>
+    </div>
+    <div style="border-top:2px solid #201e1d;padding-top:14px;display:flex;flex-direction:column;gap:9px">
+      <div style="background:#ec3013;height:44px;display:flex;align-items:center;padding:0 14px;color:#fff;font:600 12px var(--font-body,Archivo);letter-spacing:.04em">SUBMIT REPORT</div>
+      <div style="border:1px solid #c9c6c3;height:40px;display:flex;align-items:center;padding:0 14px;font:600 11px var(--font-body,Archivo);color:#5c5956">Cancel</div>
+    </div>
+  </div>
+</div>
+<div class="api" style="width:390px">POST /api/reports (multipart: title, description, category_id, latitude, longitude, address_text, photo)<br>GET /api/categories &#8594; the six seeded categories</div>
+</div>
+
+<!-- ============ 1b submit: wizard ============ -->
+<div class="dv-opt" id="1b"><div class="dv-olabel"><a class="dv-oid" href="#1b">1b</a>Submit a report — 3-step wizard</div>
+<div style="display:flex;gap:12px">
+  <div class="dv-card" style="width:300px">
+    <div style="height:52px;border-bottom:2px solid #201e1d;display:flex;align-items:center;padding:0 12px;gap:9px"><span style="font:400 15px ui-monospace,monospace">&#8592;</span><span style="font:600 12px var(--font-heading,Archivo)">Step 1 of 3</span></div>
+    <div style="display:flex;height:4px"><div style="flex:1;background:#ec3013"></div><div style="flex:1;background:#e0dedc"></div><div style="flex:1;background:#e0dedc"></div></div>
+    <div style="padding:16px 12px;display:flex;flex-direction:column;gap:14px">
+      <div style="font:600 15px/1.25 var(--font-heading,Archivo)">Where is it?</div>
+      <div style="height:190px;border:1px solid #c9c6c3;background:repeating-linear-gradient(90deg,#eceae8 0 23px,#e2e0de 23px 24px),repeating-linear-gradient(0deg,transparent 0 23px,#e2e0de 23px 24px);position:relative">
+        <div style="position:absolute;left:50%;top:50%;width:13px;height:13px;background:#ec3013;transform:translate(-50%,-100%)"></div>
+        <div style="position:absolute;left:8px;top:8px;background:#fff;border:1px solid #c9c6c3;padding:4px 6px;font:600 9px ui-monospace,monospace">USE MY LOCATION</div>
+      </div>
+      <div style="border:1px solid #c9c6c3;height:32px;display:flex;align-items:center;padding:0 9px;font:400 10px ui-monospace,monospace;color:#8a8785">14.599512, 120.984222</div>
+      <div style="background:#ec3013;height:42px;display:flex;align-items:center;padding:0 13px;color:#fff;font:600 11.5px var(--font-body,Archivo);letter-spacing:.04em">NEXT &#8212; DESCRIBE IT</div>
+    </div>
+  </div>
+  <div class="dv-card" style="width:300px">
+    <div style="height:52px;border-bottom:2px solid #201e1d;display:flex;align-items:center;padding:0 12px;gap:9px"><span style="font:400 15px ui-monospace,monospace">&#8592;</span><span style="font:600 12px var(--font-heading,Archivo)">Step 2 of 3</span></div>
+    <div style="display:flex;height:4px"><div style="flex:1;background:#ec3013"></div><div style="flex:1;background:#ec3013"></div><div style="flex:1;background:#e0dedc"></div></div>
+    <div style="padding:16px 12px;display:flex;flex-direction:column;gap:14px">
+      <div style="font:600 15px/1.25 var(--font-heading,Archivo)">What is wrong?</div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px">
+        <div style="border:2px solid #201e1d;padding:6px 9px;font:600 10px var(--font-body,Archivo)">Road</div>
+        <div style="border:1px solid #c9c6c3;padding:6px 9px;font:400 10px var(--font-body,Archivo);color:#8a8785">Streetlight</div>
+        <div style="border:1px solid #c9c6c3;padding:6px 9px;font:400 10px var(--font-body,Archivo);color:#8a8785">Drainage</div>
+        <div style="border:1px solid #c9c6c3;padding:6px 9px;font:400 10px var(--font-body,Archivo);color:#8a8785">Signage</div>
+        <div style="border:1px solid #c9c6c3;padding:6px 9px;font:400 10px var(--font-body,Archivo);color:#8a8785">Sidewalk</div>
+        <div style="border:1px solid #c9c6c3;padding:6px 9px;font:400 10px var(--font-body,Archivo);color:#8a8785">Other</div>
+      </div>
+      <div style="border:1px solid #c9c6c3;height:34px;display:flex;align-items:center;padding:0 9px;font:400 11px var(--font-body,Archivo);color:#a5a2a0">Title</div>
+      <div style="border:1px solid #c9c6c3;height:76px;padding:9px;display:flex;flex-direction:column;gap:7px"><div style="height:8px;background:#e0dedc;width:86%"></div><div style="height:8px;background:#e0dedc;width:66%"></div><div style="height:8px;background:#e0dedc;width:34%"></div></div>
+      <div style="background:#ec3013;height:42px;display:flex;align-items:center;padding:0 13px;color:#fff;font:600 11.5px var(--font-body,Archivo);letter-spacing:.04em">NEXT &#8212; ADD PROOF</div>
+    </div>
+  </div>
+  <div class="dv-card" style="width:300px">
+    <div style="height:52px;border-bottom:2px solid #201e1d;display:flex;align-items:center;padding:0 12px;gap:9px"><span style="font:400 15px ui-monospace,monospace">&#8592;</span><span style="font:600 12px var(--font-heading,Archivo)">Step 3 of 3</span></div>
+    <div style="display:flex;height:4px"><div style="flex:1;background:#ec3013"></div><div style="flex:1;background:#ec3013"></div><div style="flex:1;background:#ec3013"></div></div>
+    <div style="padding:16px 12px;display:flex;flex-direction:column;gap:14px">
+      <div style="font:600 15px/1.25 var(--font-heading,Archivo)">Add a photo, then review</div>
+      <div style="height:110px;border:1px dashed #b6b3b0;background:#f0eeec;display:flex;align-items:center;justify-content:center;font:600 10px ui-monospace,monospace;color:#8a8785">TAP TO ADD PHOTO</div>
+      <div style="border:1px solid #c9c6c3;padding:11px;display:flex;flex-direction:column;gap:8px">
+        <span style="font:600 9px ui-monospace,monospace;color:#8a8785">REVIEW</span>
+        <div style="height:8px;background:#e0dedc;width:70%"></div>
+        <div style="height:8px;background:#e0dedc;width:90%"></div>
+        <div style="height:8px;background:#e0dedc;width:52%"></div>
+        <span style="font:600 9px ui-monospace,monospace;color:#ec3013">EDIT ANY STEP</span>
+      </div>
+      <div style="background:#ec3013;height:42px;display:flex;align-items:center;padding:0 13px;color:#fff;font:600 11.5px var(--font-body,Archivo);letter-spacing:.04em">SUBMIT REPORT</div>
+    </div>
+  </div>
+</div>
+<div class="api" style="width:924px">Same single POST /api/reports at the end. Location first means the GPS permission prompt fires while intent is highest, and a citizen who abandons has given up nothing typed.</div>
+</div>
+
+<!-- ============ 1c board list-led ============ -->
+<div class="dv-opt" id="1c"><div class="dv-olabel"><a class="dv-oid" href="#1c">1c</a>Transparency board — list-led, map as side panel</div>
+<div class="dv-card" style="width:1080px">
+  <div style="height:58px;border-bottom:2px solid #201e1d;display:flex;align-items:center;justify-content:space-between;padding:0 22px">
+    <div style="display:flex;align-items:baseline;gap:18px"><span style="font:700 15px var(--font-heading,Archivo);letter-spacing:.04em">KAMOTI</span><span style="font:400 11px var(--font-body,Archivo);color:#8a8785">Public transparency board &#183; no sign-in</span></div>
+    <div style="display:flex;gap:9px"><div style="border:1px solid #c9c6c3;padding:8px 12px;font:600 10.5px var(--font-body,Archivo)">Sign in</div><div style="background:#ec3013;padding:8px 12px;color:#fff;font:600 10.5px var(--font-body,Archivo);letter-spacing:.04em">REPORT AN ISSUE</div></div>
+  </div>
+  <div style="display:flex;border-bottom:1px solid #ddd9d6;padding:12px 22px;gap:8px;align-items:center">
+    <span style="font:600 9.5px ui-monospace,monospace;color:#8a8785;margin-right:6px">STATUS</span>
+    <div style="border:2px solid #201e1d;padding:6px 10px;font:600 10px var(--font-body,Archivo)">All</div>
+    <div style="border:1px solid #c9c6c3;padding:6px 10px;font:400 10px var(--font-body,Archivo);color:#8a8785">Under review</div>
+    <div style="border:1px solid #c9c6c3;padding:6px 10px;font:400 10px var(--font-body,Archivo);color:#8a8785">In progress</div>
+    <div style="border:1px solid #c9c6c3;padding:6px 10px;font:400 10px var(--font-body,Archivo);color:#8a8785">Resolved</div>
+    <div style="width:2px;height:22px;background:#e0dedc;margin:0 8px"></div>
+    <span style="font:600 9.5px ui-monospace,monospace;color:#8a8785;margin-right:6px">CATEGORY</span>
+    <div style="border:1px solid #c9c6c3;padding:6px 10px;font:400 10px var(--font-body,Archivo);color:#8a8785">All categories &#9662;</div>
+    <div style="margin-left:auto;font:400 10px ui-monospace,monospace;color:#8a8785">248 reviewed reports</div>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 330px">
+    <div style="border-right:2px solid #201e1d">
+      <div style="display:flex;gap:14px;padding:16px 22px;border-bottom:1px solid #ddd9d6">
+        <div style="width:96px;height:70px;background:#e6e4e2;display:flex;align-items:center;justify-content:center;font:600 8.5px ui-monospace,monospace;color:#8a8785;flex:none">PHOTO</div>
+        <div style="flex:1;display:flex;flex-direction:column;gap:7px">
+          <div style="display:flex;align-items:center;gap:9px"><span style="font:600 10px ui-monospace,monospace;color:#ec3013">KMT-2026-000248</span><span style="border:1px solid #201e1d;padding:2px 6px;font:600 8.5px ui-monospace,monospace">IN PROGRESS</span><span style="font:400 9.5px ui-monospace,monospace;color:#a5a2a0">Road</span></div>
+          <div style="font:600 13px var(--font-heading,Archivo)">Deep pothole near the barangay hall</div>
+          <div style="height:8px;background:#e0dedc;width:78%"></div>
+          <div style="font:400 9.5px ui-monospace,monospace;color:#a5a2a0">P. Burgos St. &#183; submitted 2 days ago</div>
+        </div>
+      </div>
+      <div style="display:flex;gap:14px;padding:16px 22px;border-bottom:1px solid #ddd9d6">
+        <div style="width:96px;height:70px;background:#e6e4e2;display:flex;align-items:center;justify-content:center;font:600 8.5px ui-monospace,monospace;color:#8a8785;flex:none">PHOTO</div>
+        <div style="flex:1;display:flex;flex-direction:column;gap:7px">
+          <div style="display:flex;align-items:center;gap:9px"><span style="font:600 10px ui-monospace,monospace;color:#ec3013">KMT-2026-000247</span><span style="border:1px solid #201e1d;padding:2px 6px;font:600 8.5px ui-monospace,monospace">RESOLVED</span><span style="font:400 9.5px ui-monospace,monospace;color:#a5a2a0">Streetlight</span></div>
+          <div style="font:600 13px var(--font-heading,Archivo)">Three lamps unlit along the highway service road</div>
+          <div style="height:8px;background:#e0dedc;width:64%"></div>
+          <div style="font:400 9.5px ui-monospace,monospace;color:#a5a2a0">Resolved in 4 days</div>
+        </div>
+      </div>
+      <div style="display:flex;gap:14px;padding:16px 22px;border-bottom:1px solid #ddd9d6">
+        <div style="width:96px;height:70px;background:#e6e4e2;display:flex;align-items:center;justify-content:center;font:600 8.5px ui-monospace,monospace;color:#8a8785;flex:none">PHOTO</div>
+        <div style="flex:1;display:flex;flex-direction:column;gap:7px">
+          <div style="display:flex;align-items:center;gap:9px"><span style="font:600 10px ui-monospace,monospace;color:#ec3013">KMT-2026-000245</span><span style="border:1px solid #201e1d;padding:2px 6px;font:600 8.5px ui-monospace,monospace">UNDER REVIEW</span><span style="font:400 9.5px ui-monospace,monospace;color:#a5a2a0">Drainage</span></div>
+          <div style="font:600 13px var(--font-heading,Archivo)">Open manhole cover at the market corner</div>
+          <div style="height:8px;background:#e0dedc;width:82%"></div>
+          <div style="font:400 9.5px ui-monospace,monospace;color:#a5a2a0">Rizal Ave. &#183; submitted 5 days ago</div>
+        </div>
+      </div>
+      <div style="display:flex;gap:14px;padding:16px 22px;border-bottom:1px solid #ddd9d6;opacity:.55">
+        <div style="width:96px;height:70px;background:#e6e4e2;flex:none"></div>
+        <div style="flex:1;display:flex;flex-direction:column;gap:7px"><div style="height:9px;background:#e0dedc;width:30%"></div><div style="height:11px;background:#dedcda;width:70%"></div><div style="height:8px;background:#e6e4e2;width:55%"></div></div>
+      </div>
+      <div style="padding:14px 22px;display:flex;gap:7px;align-items:center">
+        <div style="border:1px solid #c9c6c3;padding:6px 10px;font:600 10px ui-monospace,monospace">1</div>
+        <div style="border:1px solid #eae7e5;padding:6px 10px;font:400 10px ui-monospace,monospace;color:#8a8785">2</div>
+        <div style="border:1px solid #eae7e5;padding:6px 10px;font:400 10px ui-monospace,monospace;color:#8a8785">3</div>
+        <span style="font:400 9.5px ui-monospace,monospace;color:#a5a2a0;margin-left:8px">50 per page</span>
+      </div>
+    </div>
+    <div style="padding:0">
+      <div style="height:300px;background:repeating-linear-gradient(90deg,#eceae8 0 25px,#e2e0de 25px 26px),repeating-linear-gradient(0deg,transparent 0 25px,#e2e0de 25px 26px);position:relative;border-bottom:1px solid #ddd9d6">
+        <div style="position:absolute;left:34%;top:30%;width:12px;height:12px;background:#ec3013"></div>
+        <div style="position:absolute;left:58%;top:52%;width:12px;height:12px;background:#201e1d"></div>
+        <div style="position:absolute;left:44%;top:70%;width:12px;height:12px;background:#201e1d"></div>
+        <div style="position:absolute;left:10px;top:10px;background:#fff;border:1px solid #c9c6c3;padding:5px 7px;font:600 9px ui-monospace,monospace">MAP OF THIS PAGE</div>
+      </div>
+      <div style="padding:16px 18px;display:flex;flex-direction:column;gap:12px">
+        <span style="font:600 9.5px var(--font-body,Archivo);letter-spacing:.09em;text-transform:uppercase;color:#8a8785">This month</span>
+        <div style="display:flex;justify-content:space-between;border-bottom:1px solid #ececea;padding-bottom:8px"><span style="font:400 11px var(--font-body,Archivo)">Reports filed</span><span style="font:700 13px ui-monospace,monospace">248</span></div>
+        <div style="display:flex;justify-content:space-between;border-bottom:1px solid #ececea;padding-bottom:8px"><span style="font:400 11px var(--font-body,Archivo)">Resolved</span><span style="font:700 13px ui-monospace,monospace">171</span></div>
+        <div style="display:flex;justify-content:space-between"><span style="font:400 11px var(--font-body,Archivo)">Avg. resolution</span><span style="font:700 13px ui-monospace,monospace">6.2 d</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="api" style="width:1080px">GET /api/public/reports?status=&amp;page= &#8212; reads the public_reports view: reviewed reports only, no citizen name, email or contact number anywhere on this screen.</div>
+</div>
+
+<!-- ============ 1d board split map ============ -->
+<div class="dv-opt" id="1d"><div class="dv-olabel"><a class="dv-oid" href="#1d">1d</a>Transparency board — map and list side by side</div>
+<div class="dv-card" style="width:1080px">
+  <div style="height:58px;border-bottom:2px solid #201e1d;display:flex;align-items:center;justify-content:space-between;padding:0 22px">
+    <div style="display:flex;align-items:baseline;gap:18px"><span style="font:700 15px var(--font-heading,Archivo);letter-spacing:.04em">KAMOTI</span><span style="font:400 11px var(--font-body,Archivo);color:#8a8785">Public transparency board</span></div>
+    <div style="display:flex;gap:9px"><div style="border:1px solid #c9c6c3;padding:8px 12px;font:600 10.5px var(--font-body,Archivo)">Sign in</div><div style="background:#ec3013;padding:8px 12px;color:#fff;font:600 10.5px var(--font-body,Archivo);letter-spacing:.04em">REPORT AN ISSUE</div></div>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 400px;height:470px">
+    <div style="position:relative;background:repeating-linear-gradient(90deg,#eceae8 0 28px,#e2e0de 28px 29px),repeating-linear-gradient(0deg,transparent 0 28px,#e2e0de 28px 29px);border-right:2px solid #201e1d">
+      <div style="position:absolute;left:16px;top:16px;display:flex;gap:7px">
+        <div style="background:#fff;border:2px solid #201e1d;padding:6px 10px;font:600 10px var(--font-body,Archivo)">All 248</div>
+        <div style="background:#fff;border:1px solid #c9c6c3;padding:6px 10px;font:400 10px var(--font-body,Archivo);color:#8a8785">Under review</div>
+        <div style="background:#fff;border:1px solid #c9c6c3;padding:6px 10px;font:400 10px var(--font-body,Archivo);color:#8a8785">In progress</div>
+        <div style="background:#fff;border:1px solid #c9c6c3;padding:6px 10px;font:400 10px var(--font-body,Archivo);color:#8a8785">Resolved</div>
+      </div>
+      <div style="position:absolute;left:30%;top:38%;width:15px;height:15px;background:#ec3013"></div>
+      <div style="position:absolute;left:52%;top:26%;width:15px;height:15px;background:#201e1d"></div>
+      <div style="position:absolute;left:63%;top:58%;width:15px;height:15px;background:#201e1d"></div>
+      <div style="position:absolute;left:41%;top:71%;width:15px;height:15px;background:#201e1d"></div>
+      <div style="position:absolute;left:24%;top:56%;width:32px;height:32px;border:2px solid #201e1d;background:#fff;display:flex;align-items:center;justify-content:center;font:700 11px ui-monospace,monospace">12</div>
+      <div style="position:absolute;left:30%;top:38%;transform:translate(20px,-6px);background:#fff;border:2px solid #201e1d;width:210px;padding:10px">
+        <div style="font:600 9.5px ui-monospace,monospace;color:#ec3013;margin-bottom:5px">KMT-2026-000248 &#183; IN PROGRESS</div>
+        <div style="font:600 11.5px/1.3 var(--font-heading,Archivo);margin-bottom:6px">Deep pothole near the barangay hall</div>
+        <div style="height:52px;background:#e6e4e2;display:flex;align-items:center;justify-content:center;font:600 8.5px ui-monospace,monospace;color:#8a8785">PHOTO</div>
+      </div>
+      <div style="position:absolute;right:16px;bottom:16px;background:#fff;border:1px solid #c9c6c3;padding:7px 9px;font:400 9px ui-monospace,monospace;color:#8a8785">Leaflet &#183; OpenStreetMap</div>
+    </div>
+    <div style="overflow:hidden">
+      <div style="padding:12px 16px;border-bottom:1px solid #ddd9d6;display:flex;justify-content:space-between;align-items:center"><span style="font:600 9.5px var(--font-body,Archivo);letter-spacing:.09em;text-transform:uppercase;color:#8a8785">Reports in view</span><span style="font:400 9.5px ui-monospace,monospace;color:#a5a2a0">newest first &#9662;</span></div>
+      <div style="padding:13px 16px;border-bottom:1px solid #ddd9d6;border-left:3px solid #ec3013;display:flex;flex-direction:column;gap:5px">
+        <div style="display:flex;gap:8px;align-items:center"><span style="font:600 9.5px ui-monospace,monospace;color:#ec3013">KMT-2026-000248</span><span style="border:1px solid #201e1d;padding:2px 5px;font:600 8px ui-monospace,monospace">IN PROGRESS</span></div>
+        <div style="font:600 12px var(--font-heading,Archivo)">Deep pothole near the barangay hall</div>
+        <div style="font:400 9.5px ui-monospace,monospace;color:#a5a2a0">Road &#183; 2 days ago</div>
+      </div>
+      <div style="padding:13px 16px;border-bottom:1px solid #ddd9d6;display:flex;flex-direction:column;gap:5px">
+        <div style="display:flex;gap:8px;align-items:center"><span style="font:600 9.5px ui-monospace,monospace;color:#8a8785">KMT-2026-000247</span><span style="border:1px solid #c9c6c3;padding:2px 5px;font:600 8px ui-monospace,monospace;color:#8a8785">RESOLVED</span></div>
+        <div style="font:600 12px var(--font-heading,Archivo)">Three lamps unlit along the service road</div>
+        <div style="font:400 9.5px ui-monospace,monospace;color:#a5a2a0">Streetlight &#183; 6 days ago</div>
+      </div>
+      <div style="padding:13px 16px;border-bottom:1px solid #ddd9d6;display:flex;flex-direction:column;gap:5px">
+        <div style="display:flex;gap:8px;align-items:center"><span style="font:600 9.5px ui-monospace,monospace;color:#8a8785">KMT-2026-000245</span><span style="border:1px solid #c9c6c3;padding:2px 5px;font:600 8px ui-monospace,monospace;color:#8a8785">UNDER REVIEW</span></div>
+        <div style="font:600 12px var(--font-heading,Archivo)">Open manhole cover at the market corner</div>
+        <div style="font:400 9.5px ui-monospace,monospace;color:#a5a2a0">Drainage &#183; 5 days ago</div>
+      </div>
+      <div style="padding:13px 16px;border-bottom:1px solid #ddd9d6;display:flex;flex-direction:column;gap:6px;opacity:.55"><div style="height:8px;background:#e0dedc;width:44%"></div><div style="height:10px;background:#dedcda;width:80%"></div><div style="height:8px;background:#e6e4e2;width:34%"></div></div>
+      <div style="padding:13px 16px;display:flex;flex-direction:column;gap:6px;opacity:.35"><div style="height:8px;background:#e0dedc;width:44%"></div><div style="height:10px;background:#dedcda;width:72%"></div></div>
+    </div>
+  </div>
+</div>
+<div class="api" style="width:1080px">Map and list read the same GET /api/public/reports payload; panning the map filters the list client-side. Cluster badge = many pins at one zoom.</div>
+</div>
+
+<!-- ============ 1e board card grid ============ -->
+<div class="dv-opt" id="1e"><div class="dv-olabel"><a class="dv-oid" href="#1e">1e</a>Transparency board — card grid, evidence forward</div>
+<div class="dv-card" style="width:1080px">
+  <div style="height:58px;border-bottom:2px solid #201e1d;display:flex;align-items:center;justify-content:space-between;padding:0 22px">
+    <div style="display:flex;align-items:baseline;gap:18px"><span style="font:700 15px var(--font-heading,Archivo);letter-spacing:.04em">KAMOTI</span><span style="font:400 11px var(--font-body,Archivo);color:#8a8785">Public transparency board</span></div>
+    <div style="display:flex;gap:9px"><div style="border:1px solid #c9c6c3;padding:8px 12px;font:600 10.5px var(--font-body,Archivo)">Sign in</div><div style="background:#ec3013;padding:8px 12px;color:#fff;font:600 10.5px var(--font-body,Archivo);letter-spacing:.04em">REPORT AN ISSUE</div></div>
+  </div>
+  <div style="padding:22px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:1px;background:#ddd9d6;border-bottom:2px solid #201e1d">
+    <div style="background:#fff;padding:14px 16px"><div style="font:400 9.5px ui-monospace,monospace;color:#8a8785;margin-bottom:6px">TOTAL REPORTS</div><div style="font:700 26px var(--font-heading,Archivo)">248</div></div>
+    <div style="background:#fff;padding:14px 16px"><div style="font:400 9.5px ui-monospace,monospace;color:#8a8785;margin-bottom:6px">RESOLVED</div><div style="font:700 26px var(--font-heading,Archivo)">171</div></div>
+    <div style="background:#fff;padding:14px 16px"><div style="font:400 9.5px ui-monospace,monospace;color:#8a8785;margin-bottom:6px">AVG. RESOLUTION</div><div style="font:700 26px var(--font-heading,Archivo)">6.2 days</div></div>
+  </div>
+  <div style="display:flex;gap:8px;padding:14px 22px;border-bottom:1px solid #ddd9d6;align-items:center">
+    <div style="border:2px solid #201e1d;padding:6px 10px;font:600 10px var(--font-body,Archivo)">All</div>
+    <div style="border:1px solid #c9c6c3;padding:6px 10px;font:400 10px var(--font-body,Archivo);color:#8a8785">Under review</div>
+    <div style="border:1px solid #c9c6c3;padding:6px 10px;font:400 10px var(--font-body,Archivo);color:#8a8785">In progress</div>
+    <div style="border:1px solid #c9c6c3;padding:6px 10px;font:400 10px var(--font-body,Archivo);color:#8a8785">Resolved</div>
+    <div style="margin-left:auto;border:1px solid #c9c6c3;padding:6px 10px;font:400 10px var(--font-body,Archivo);color:#8a8785">Open map view</div>
+  </div>
+  <div style="padding:22px;display:grid;grid-template-columns:repeat(3,1fr);gap:20px">
+    <div style="border:1px solid #ddd9d6">
+      <div style="height:130px;background:#e6e4e2;display:flex;align-items:center;justify-content:center;font:600 9px ui-monospace,monospace;color:#8a8785">PHOTO</div>
+      <div style="padding:13px;display:flex;flex-direction:column;gap:7px;border-top:1px solid #ddd9d6">
+        <div style="display:flex;justify-content:space-between;align-items:center"><span style="font:600 9.5px ui-monospace,monospace;color:#ec3013">KMT-2026-000248</span><span style="border:1px solid #201e1d;padding:2px 5px;font:600 8px ui-monospace,monospace">IN PROGRESS</span></div>
+        <div style="font:600 12.5px/1.3 var(--font-heading,Archivo)">Deep pothole near the barangay hall</div>
+        <div style="height:8px;background:#e0dedc;width:90%"></div><div style="height:8px;background:#e0dedc;width:55%"></div>
+        <div style="font:400 9px ui-monospace,monospace;color:#a5a2a0;margin-top:2px">Road &#183; P. Burgos St. &#183; 2d</div>
+      </div>
+    </div>
+    <div style="border:1px solid #ddd9d6">
+      <div style="height:130px;background:#e6e4e2;display:flex;align-items:center;justify-content:center;font:600 9px ui-monospace,monospace;color:#8a8785">BEFORE / AFTER</div>
+      <div style="padding:13px;display:flex;flex-direction:column;gap:7px;border-top:1px solid #ddd9d6">
+        <div style="display:flex;justify-content:space-between;align-items:center"><span style="font:600 9.5px ui-monospace,monospace;color:#8a8785">KMT-2026-000247</span><span style="border:1px solid #c9c6c3;padding:2px 5px;font:600 8px ui-monospace,monospace;color:#8a8785">RESOLVED</span></div>
+        <div style="font:600 12.5px/1.3 var(--font-heading,Archivo)">Three lamps unlit along the service road</div>
+        <div style="height:8px;background:#e0dedc;width:84%"></div><div style="height:8px;background:#e0dedc;width:44%"></div>
+        <div style="font:400 9px ui-monospace,monospace;color:#a5a2a0;margin-top:2px">Streetlight &#183; resolved in 4d</div>
+      </div>
+    </div>
+    <div style="border:1px solid #ddd9d6">
+      <div style="height:130px;background:#e6e4e2;display:flex;align-items:center;justify-content:center;font:600 9px ui-monospace,monospace;color:#8a8785">PHOTO</div>
+      <div style="padding:13px;display:flex;flex-direction:column;gap:7px;border-top:1px solid #ddd9d6">
+        <div style="display:flex;justify-content:space-between;align-items:center"><span style="font:600 9.5px ui-monospace,monospace;color:#8a8785">KMT-2026-000245</span><span style="border:1px solid #c9c6c3;padding:2px 5px;font:600 8px ui-monospace,monospace;color:#8a8785">UNDER REVIEW</span></div>
+        <div style="font:600 12.5px/1.3 var(--font-heading,Archivo)">Open manhole cover at the market corner</div>
+        <div style="height:8px;background:#e0dedc;width:88%"></div><div style="height:8px;background:#e0dedc;width:62%"></div>
+        <div style="font:400 9px ui-monospace,monospace;color:#a5a2a0;margin-top:2px">Drainage &#183; Rizal Ave. &#183; 5d</div>
+      </div>
+    </div>
+    <div style="border:1px solid #ddd9d6;opacity:.5"><div style="height:130px;background:#e6e4e2"></div><div style="padding:13px;display:flex;flex-direction:column;gap:7px;border-top:1px solid #ddd9d6"><div style="height:8px;background:#e0dedc;width:40%"></div><div style="height:11px;background:#dedcda;width:85%"></div><div style="height:8px;background:#e6e4e2;width:60%"></div></div></div>
+    <div style="border:1px solid #ddd9d6;opacity:.35"><div style="height:130px;background:#e6e4e2"></div><div style="padding:13px;display:flex;flex-direction:column;gap:7px;border-top:1px solid #ddd9d6"><div style="height:8px;background:#e0dedc;width:40%"></div><div style="height:11px;background:#dedcda;width:70%"></div><div style="height:8px;background:#e6e4e2;width:50%"></div></div></div>
+    <div style="border:1px solid #ddd9d6;opacity:.22"><div style="height:130px;background:#e6e4e2"></div><div style="padding:13px;display:flex;flex-direction:column;gap:7px;border-top:1px solid #ddd9d6"><div style="height:8px;background:#e0dedc;width:40%"></div><div style="height:11px;background:#dedcda;width:78%"></div></div></div>
+  </div>
+</div>
+<div class="api" style="width:1080px">The stat row needs numbers the public endpoint does not return today &#8212; either a small public /api/public/stats, or drop the row.</div>
+</div>
+
+<!-- ============ 1f landing ============ -->
+<div class="dv-opt" id="1f"><div class="dv-olabel"><a class="dv-oid" href="#1f">1f</a>Entry screen — the one page a citizen lands on</div>
+<div class="dv-card" style="width:390px">
+  <div style="height:52px;border-bottom:2px solid #201e1d;display:flex;align-items:center;justify-content:space-between;padding:0 14px"><span style="font:700 14px var(--font-heading,Archivo);letter-spacing:.05em">KAMOTI</span><span style="font:600 10.5px var(--font-body,Archivo)">Sign in</span></div>
+  <div style="padding:22px 14px;border-bottom:2px solid #201e1d">
+    <div style="font:400 9.5px ui-monospace,monospace;color:#8a8785;margin-bottom:12px">KEY ALERT AND MONITORING FOR ONLINE<br>TRACKING OF INFRASTRUCTURES</div>
+    <div style="font:700 27px/1.1 var(--font-heading,Archivo);margin-bottom:12px">Report broken infrastructure. Watch it get fixed.</div>
+    <div style="height:9px;background:#e0dedc;width:92%;margin-bottom:6px"></div><div style="height:9px;background:#e0dedc;width:64%"></div>
+    <div style="display:flex;flex-direction:column;gap:9px;margin-top:18px">
+      <div style="background:#ec3013;height:46px;display:flex;align-items:center;padding:0 14px;color:#fff;font:600 12px var(--font-body,Archivo);letter-spacing:.04em">REPORT AN ISSUE</div>
+      <div style="border:1px solid #201e1d;height:44px;display:flex;align-items:center;padding:0 14px;font:600 11.5px var(--font-body,Archivo)">Browse the public board</div>
+    </div>
+  </div>
+  <div style="padding:18px 14px;display:flex;flex-direction:column;gap:14px">
+    <span style="font:600 9.5px var(--font-body,Archivo);letter-spacing:.09em;text-transform:uppercase;color:#8a8785">How it works</span>
+    <div style="display:flex;gap:11px"><span style="font:700 13px ui-monospace,monospace;color:#ec3013">01</span><div style="flex:1"><div style="font:600 11.5px var(--font-body,Archivo);margin-bottom:4px">Drop a pin, add a photo</div><div style="height:7px;background:#e0dedc;width:80%"></div></div></div>
+    <div style="display:flex;gap:11px"><span style="font:700 13px ui-monospace,monospace;color:#ec3013">02</span><div style="flex:1"><div style="font:600 11.5px var(--font-body,Archivo);margin-bottom:4px">Staff review and dispatch</div><div style="height:7px;background:#e0dedc;width:68%"></div></div></div>
+    <div style="display:flex;gap:11px"><span style="font:700 13px ui-monospace,monospace;color:#ec3013">03</span><div style="flex:1"><div style="font:600 11.5px var(--font-body,Archivo);margin-bottom:4px">You get notified at every step</div><div style="height:7px;background:#e0dedc;width:74%"></div></div></div>
+    <div style="border-top:2px solid #201e1d;padding-top:14px;display:flex;justify-content:space-between;align-items:center"><span style="font:400 10.5px var(--font-body,Archivo);color:#5c5956">248 reports on the board</span><span style="font:600 10.5px ui-monospace,monospace;color:#ec3013">VIEW &#8594;</span></div>
+  </div>
+</div>
+<div class="api" style="width:390px">No auth needed to reach the board. &#8220;Report an issue&#8221; sends a signed-out visitor to sign-in first &#8212; POST /api/reports requires the citizen role.</div>
+</div>
+
+<!-- ============ 1g auth ============ -->
+<div class="dv-opt" id="1g"><div class="dv-olabel"><a class="dv-oid" href="#1g">1g</a>Sign in &amp; register</div>
+<div style="display:flex;gap:12px">
+  <div class="dv-card" style="width:300px">
+    <div style="height:52px;border-bottom:2px solid #201e1d;display:flex;align-items:center;padding:0 14px"><span style="font:700 13px var(--font-heading,Archivo);letter-spacing:.05em">KAMOTI</span></div>
+    <div style="padding:20px 14px;display:flex;flex-direction:column;gap:16px">
+      <div style="font:700 19px var(--font-heading,Archivo)">Sign in</div>
+      <div style="display:flex;flex-direction:column;gap:6px"><span style="font:600 9.5px var(--font-body,Archivo);letter-spacing:.09em;text-transform:uppercase;color:#8a8785">Email</span><div style="border:1px solid #c9c6c3;height:38px"></div></div>
+      <div style="display:flex;flex-direction:column;gap:6px"><span style="font:600 9.5px var(--font-body,Archivo);letter-spacing:.09em;text-transform:uppercase;color:#8a8785">Password</span><div style="border:1px solid #c9c6c3;height:38px"></div></div>
+      <div style="border:1px solid #ec3013;padding:9px 11px;display:flex;flex-direction:column;gap:4px"><span style="font:600 9.5px ui-monospace,monospace;color:#ec3013">ERROR STATE</span><span style="font:400 10.5px/1.4 var(--font-body,Archivo)">That email and password do not match.</span></div>
+      <div style="background:#ec3013;height:44px;display:flex;align-items:center;padding:0 14px;color:#fff;font:600 12px var(--font-body,Archivo);letter-spacing:.04em">SIGN IN</div>
+      <div style="font:400 10.5px var(--font-body,Archivo);color:#5c5956">No account yet? <span style="font-weight:600;color:#ec3013">Register</span></div>
+      <div style="border-top:1px solid #e0dedc;padding-top:12px;font:400 10px/1.5 ui-monospace,monospace;color:#a5a2a0">One form for all three roles. The JWT&#8217;s role decides which shell loads after sign-in.</div>
+    </div>
+  </div>
+  <div class="dv-card" style="width:300px">
+    <div style="height:52px;border-bottom:2px solid #201e1d;display:flex;align-items:center;padding:0 14px"><span style="font:700 13px var(--font-heading,Archivo);letter-spacing:.05em">KAMOTI</span></div>
+    <div style="padding:20px 14px;display:flex;flex-direction:column;gap:14px">
+      <div style="font:700 19px var(--font-heading,Archivo)">Register</div>
+      <div style="font:400 10.5px/1.5 var(--font-body,Archivo);color:#5c5956">Public sign-up always creates a citizen account.</div>
+      <div style="display:flex;flex-direction:column;gap:6px"><span style="font:600 9.5px var(--font-body,Archivo);letter-spacing:.09em;text-transform:uppercase;color:#8a8785">Full name</span><div style="border:1px solid #c9c6c3;height:36px"></div></div>
+      <div style="display:flex;flex-direction:column;gap:6px"><span style="font:600 9.5px var(--font-body,Archivo);letter-spacing:.09em;text-transform:uppercase;color:#8a8785">Email</span><div style="border:1px solid #c9c6c3;height:36px"></div></div>
+      <div style="display:flex;flex-direction:column;gap:6px"><span style="font:600 9.5px var(--font-body,Archivo);letter-spacing:.09em;text-transform:uppercase;color:#8a8785">Contact number &#183; optional</span><div style="border:1px solid #c9c6c3;height:36px"></div></div>
+      <div style="display:flex;flex-direction:column;gap:6px"><span style="font:600 9.5px var(--font-body,Archivo);letter-spacing:.09em;text-transform:uppercase;color:#8a8785">Password</span><div style="border:1px solid #c9c6c3;height:36px"></div><span style="font:400 9.5px ui-monospace,monospace;color:#a5a2a0">at least 8 characters</span></div>
+      <div style="background:#ec3013;height:44px;display:flex;align-items:center;padding:0 14px;color:#fff;font:600 12px var(--font-body,Archivo);letter-spacing:.04em">CREATE ACCOUNT</div>
+    </div>
+  </div>
+</div>
+<div class="api" style="width:612px">POST /api/auth/login &#8594; {user, access_token} &#183; POST /api/auth/register (citizen only) &#183; GET /api/auth/me on reload. Deactivated accounts are refused at login.</div>
+</div>
+
+<!-- ============ 1h citizen home ============ -->
+<div class="dv-opt" id="1h"><div class="dv-olabel"><a class="dv-oid" href="#1h">1h</a>Citizen home — my reports</div>
+<div class="dv-card" style="width:390px">
+  <div style="height:52px;border-bottom:2px solid #201e1d;display:flex;align-items:center;justify-content:space-between;padding:0 14px">
+    <span style="font:700 14px var(--font-heading,Archivo);letter-spacing:.05em">KAMOTI</span>
+    <div style="display:flex;align-items:center;gap:12px"><span style="font:400 15px ui-monospace,monospace;position:relative">&#9633;<span style="position:absolute;top:-3px;right:-6px;background:#ec3013;color:#fff;font:600 8px ui-monospace,monospace;padding:1px 4px">3</span></span><span style="font:600 10.5px var(--font-body,Archivo)">JJ</span></div>
+  </div>
+  <div style="padding:16px 14px;border-bottom:1px solid #ddd9d6">
+    <div style="font:700 18px var(--font-heading,Archivo);margin-bottom:3px">My reports</div>
+    <div style="font:400 10.5px ui-monospace,monospace;color:#8a8785">4 filed &#183; 1 in progress &#183; 2 resolved</div>
+  </div>
+  <div style="display:flex;gap:7px;padding:12px 14px;border-bottom:1px solid #ddd9d6;overflow:hidden">
+    <div style="border:2px solid #201e1d;padding:5px 9px;font:600 10px var(--font-body,Archivo);flex:none">All</div>
+    <div style="border:1px solid #c9c6c3;padding:5px 9px;font:400 10px var(--font-body,Archivo);color:#8a8785;flex:none">Pending</div>
+    <div style="border:1px solid #c9c6c3;padding:5px 9px;font:400 10px var(--font-body,Archivo);color:#8a8785;flex:none">In progress</div>
+    <div style="border:1px solid #c9c6c3;padding:5px 9px;font:400 10px var(--font-body,Archivo);color:#8a8785;flex:none">Resolved</div>
+  </div>
+  <div style="padding:14px;border-bottom:1px solid #ddd9d6;display:flex;gap:12px">
+    <div style="width:64px;height:64px;background:#e6e4e2;flex:none;display:flex;align-items:center;justify-content:center;font:600 8px ui-monospace,monospace;color:#8a8785">PHOTO</div>
+    <div style="flex:1;display:flex;flex-direction:column;gap:6px">
+      <div style="display:flex;align-items:center;gap:7px"><span style="font:600 9.5px ui-monospace,monospace;color:#ec3013">KMT-2026-000248</span></div>
+      <div style="font:600 12.5px/1.3 var(--font-heading,Archivo)">Deep pothole near the barangay hall</div>
+      <div style="display:flex;gap:3px;align-items:center;margin-top:2px">
+        <div style="height:5px;flex:1;background:#201e1d"></div><div style="height:5px;flex:1;background:#201e1d"></div><div style="height:5px;flex:1;background:#ec3013"></div><div style="height:5px;flex:1;background:#e0dedc"></div>
+      </div>
+      <div style="font:600 9px ui-monospace,monospace;color:#5c5956">IN PROGRESS &#183; STEP 3 OF 4</div>
+    </div>
+  </div>
+  <div style="padding:14px;border-bottom:1px solid #ddd9d6;display:flex;gap:12px">
+    <div style="width:64px;height:64px;background:#e6e4e2;flex:none;display:flex;align-items:center;justify-content:center;font:600 8px ui-monospace,monospace;color:#8a8785">PHOTO</div>
+    <div style="flex:1;display:flex;flex-direction:column;gap:6px">
+      <span style="font:600 9.5px ui-monospace,monospace;color:#8a8785">KMT-2026-000221</span>
+      <div style="font:600 12.5px/1.3 var(--font-heading,Archivo)">Flooded canal behind the school</div>
+      <div style="display:flex;gap:3px;align-items:center;margin-top:2px"><div style="height:5px;flex:1;background:#201e1d"></div><div style="height:5px;flex:1;background:#201e1d"></div><div style="height:5px;flex:1;background:#201e1d"></div><div style="height:5px;flex:1;background:#201e1d"></div></div>
+      <div style="font:600 9px ui-monospace,monospace;color:#5c5956">RESOLVED IN 4 DAYS</div>
+    </div>
+  </div>
+  <div style="padding:14px;border-bottom:1px solid #ddd9d6;display:flex;gap:12px">
+    <div style="width:64px;height:64px;background:#e6e4e2;flex:none"></div>
+    <div style="flex:1;display:flex;flex-direction:column;gap:6px">
+      <span style="font:600 9.5px ui-monospace,monospace;color:#8a8785">KMT-2026-000255</span>
+      <div style="font:600 12.5px/1.3 var(--font-heading,Archivo)">Faded pedestrian crossing</div>
+      <div style="display:flex;gap:3px;align-items:center;margin-top:2px"><div style="height:5px;flex:1;background:#ec3013"></div><div style="height:5px;flex:1;background:#e0dedc"></div><div style="height:5px;flex:1;background:#e0dedc"></div><div style="height:5px;flex:1;background:#e0dedc"></div></div>
+      <div style="display:flex;gap:7px;align-items:center"><span style="font:600 9px ui-monospace,monospace;color:#5c5956">PENDING</span><span style="font:600 9px ui-monospace,monospace;color:#ec3013">&#183; EDIT</span><span style="font:600 9px ui-monospace,monospace;color:#8a8785">&#183; CANCEL</span></div>
+    </div>
+  </div>
+  <div style="padding:14px;display:flex;justify-content:flex-start"><div style="background:#ec3013;height:44px;display:flex;align-items:center;padding:0 16px;color:#fff;font:600 12px var(--font-body,Archivo);letter-spacing:.04em">+ NEW REPORT</div></div>
+  <div style="height:56px;border-top:2px solid #201e1d;display:grid;grid-template-columns:repeat(4,1fr)">
+    <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font:600 8.5px ui-monospace,monospace">&#9645;<span>MINE</span></div>
+    <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font:600 8.5px ui-monospace,monospace;color:#a5a2a0">&#9634;<span>BOARD</span></div>
+    <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font:600 8.5px ui-monospace,monospace;color:#a5a2a0">&#9671;<span>ALERTS</span></div>
+    <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font:600 8.5px ui-monospace,monospace;color:#a5a2a0">&#9678;<span>ME</span></div>
+  </div>
+</div>
+<div class="api" style="width:390px">GET /api/reports &#8212; the same route staff and admins call; the server scopes it to citizen_id. Edit and Cancel appear only while status is pending (PATCH /api/reports/:id, POST /api/reports/:id/cancel).</div>
+</div>
+
+<!-- ============ 1i empty state ============ -->
+<div class="dv-opt" id="1i"><div class="dv-olabel"><a class="dv-oid" href="#1i">1i</a>Citizen home — empty state</div>
+<div class="dv-card" style="width:390px">
+  <div style="height:52px;border-bottom:2px solid #201e1d;display:flex;align-items:center;justify-content:space-between;padding:0 14px"><span style="font:700 14px var(--font-heading,Archivo);letter-spacing:.05em">KAMOTI</span><span style="font:600 10.5px var(--font-body,Archivo)">JJ</span></div>
+  <div style="padding:16px 14px;border-bottom:1px solid #ddd9d6"><div style="font:700 18px var(--font-heading,Archivo)">My reports</div></div>
+  <div style="padding:40px 14px;border-bottom:2px solid #201e1d;display:flex;flex-direction:column;gap:14px">
+    <div style="width:56px;height:56px;border:2px solid #201e1d;display:flex;align-items:center;justify-content:center;font:400 22px ui-monospace,monospace">&#9645;</div>
+    <div style="font:700 17px/1.25 var(--font-heading,Archivo)">You have not filed anything yet</div>
+    <div style="font:400 11.5px/1.55 var(--font-body,Archivo);color:#5c5956;max-width:280px">A report takes about a minute: pick a category, drop a pin where the problem is, and add one photo.</div>
+    <div style="background:#ec3013;height:46px;display:flex;align-items:center;padding:0 16px;color:#fff;font:600 12px var(--font-body,Archivo);letter-spacing:.04em;align-self:flex-start">FILE MY FIRST REPORT</div>
+  </div>
+  <div style="padding:16px 14px;display:flex;flex-direction:column;gap:11px">
+    <span style="font:600 9.5px var(--font-body,Archivo);letter-spacing:.09em;text-transform:uppercase;color:#8a8785">Recently fixed nearby</span>
+    <div style="display:flex;gap:10px;align-items:center"><div style="width:44px;height:44px;background:#e6e4e2;flex:none"></div><div style="flex:1"><div style="font:600 11px var(--font-body,Archivo);margin-bottom:4px">Three lamps unlit along the service road</div><div style="height:7px;background:#e0dedc;width:50%"></div></div></div>
+    <div style="display:flex;gap:10px;align-items:center"><div style="width:44px;height:44px;background:#e6e4e2;flex:none"></div><div style="flex:1"><div style="font:600 11px var(--font-body,Archivo);margin-bottom:4px">Open manhole cover at the market</div><div style="height:7px;background:#e0dedc;width:42%"></div></div></div>
+  </div>
+</div>
+<div class="api" style="width:390px">Empty list &#8594; borrow the public board (GET /api/public/reports) so the screen still proves the system works.</div>
+</div>
+
+<!-- ============ 1j report detail ============ -->
+<div class="dv-opt" id="1j"><div class="dv-olabel"><a class="dv-oid" href="#1j">1j</a>Report detail &amp; status timeline</div>
+<div class="dv-card" style="width:390px">
+  <div style="height:52px;border-bottom:2px solid #201e1d;display:flex;align-items:center;gap:10px;padding:0 14px"><span style="font:400 16px ui-monospace,monospace">&#8592;</span><span style="font:600 11px ui-monospace,monospace">KMT-2026-000248</span></div>
+  <div style="padding:16px 14px;border-bottom:1px solid #ddd9d6">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><span style="border:1px solid #201e1d;padding:3px 7px;font:600 9px ui-monospace,monospace">IN PROGRESS</span><span style="font:400 9.5px ui-monospace,monospace;color:#8a8785">Road</span></div>
+    <div style="font:700 17px/1.25 var(--font-heading,Archivo);margin-bottom:9px">Deep pothole near the barangay hall</div>
+    <div style="height:8px;background:#e0dedc;width:94%;margin-bottom:5px"></div><div style="height:8px;background:#e0dedc;width:88%;margin-bottom:5px"></div><div style="height:8px;background:#e0dedc;width:46%"></div>
+  </div>
+  <div style="display:flex;align-items:stretch;border-bottom:1px solid #ddd9d6">
+    <div style="flex:1;padding:12px 14px;border-right:1px solid #ddd9d6"><div style="font:400 9px ui-monospace,monospace;color:#8a8785;margin-bottom:4px">SUBMITTED</div><div style="font:600 11px var(--font-body,Archivo)">08 Sep 2026</div></div>
+    <div style="flex:1;padding:12px 14px"><div style="font:400 9px ui-monospace,monospace;color:#8a8785;margin-bottom:4px">ASSIGNED TO</div><div style="font:600 11px var(--font-body,Archivo)">Maintenance crew B</div></div>
+  </div>
+  <div style="height:140px;background:repeating-linear-gradient(90deg,#eceae8 0 23px,#e2e0de 23px 24px),repeating-linear-gradient(0deg,transparent 0 23px,#e2e0de 23px 24px);position:relative;border-bottom:1px solid #ddd9d6">
+    <div style="position:absolute;left:50%;top:50%;width:13px;height:13px;background:#ec3013;transform:translate(-50%,-100%)"></div>
+    <div style="position:absolute;left:8px;bottom:8px;background:#fff;border:1px solid #c9c6c3;padding:4px 6px;font:400 9px ui-monospace,monospace;color:#5c5956">P. Burgos St. &#183; 14.5995, 120.9842</div>
+  </div>
+  <div style="padding:14px;border-bottom:2px solid #201e1d;display:flex;gap:9px">
+    <div style="flex:1"><div style="font:400 8.5px ui-monospace,monospace;color:#8a8785;margin-bottom:5px">REPORTED &#183; INITIAL</div><div style="height:84px;background:#e6e4e2;display:flex;align-items:center;justify-content:center;font:600 8px ui-monospace,monospace;color:#8a8785">PHOTO</div></div>
+    <div style="flex:1"><div style="font:400 8.5px ui-monospace,monospace;color:#8a8785;margin-bottom:5px">REPAIR &#183; RESOLUTION</div><div style="height:84px;border:1px dashed #b6b3b0;background:#f5f3f1;display:flex;align-items:center;justify-content:center;font:600 8px ui-monospace,monospace;color:#a5a2a0">AWAITING</div></div>
+  </div>
+  <div style="padding:16px 14px">
+    <span style="font:600 9.5px var(--font-body,Archivo);letter-spacing:.09em;text-transform:uppercase;color:#8a8785">History</span>
+    <div style="margin-top:14px;display:flex;flex-direction:column">
+      <div style="display:flex;gap:12px"><div style="display:flex;flex-direction:column;align-items:center;width:13px"><div style="width:13px;height:13px;background:#ec3013;flex:none"></div><div style="width:2px;flex:1;background:#201e1d"></div></div>
+        <div style="padding-bottom:18px;flex:1"><div style="font:600 11px var(--font-body,Archivo)">Marked in progress</div><div style="font:400 9.5px ui-monospace,monospace;color:#8a8785;margin:3px 0 6px">10 Sep 2026 &#183; R. Conejos, staff</div><div style="border-left:2px solid #e0dedc;padding-left:9px"><div style="height:7px;background:#e0dedc;width:80%;margin-bottom:4px"></div><div style="height:7px;background:#e0dedc;width:52%"></div></div></div></div>
+      <div style="display:flex;gap:12px"><div style="display:flex;flex-direction:column;align-items:center;width:13px"><div style="width:13px;height:13px;background:#201e1d;flex:none"></div><div style="width:2px;flex:1;background:#201e1d"></div></div>
+        <div style="padding-bottom:18px;flex:1"><div style="font:600 11px var(--font-body,Archivo)">Assigned to Maintenance crew B</div><div style="font:400 9.5px ui-monospace,monospace;color:#8a8785;margin-top:3px">09 Sep 2026 &#183; admin</div></div></div>
+      <div style="display:flex;gap:12px"><div style="display:flex;flex-direction:column;align-items:center;width:13px"><div style="width:13px;height:13px;background:#201e1d;flex:none"></div><div style="width:2px;flex:1;background:#201e1d"></div></div>
+        <div style="padding-bottom:18px;flex:1"><div style="font:600 11px var(--font-body,Archivo)">Under review</div><div style="font:400 9.5px ui-monospace,monospace;color:#8a8785;margin-top:3px">09 Sep 2026 &#183; X. Bauza, staff</div></div></div>
+      <div style="display:flex;gap:12px"><div style="width:13px"><div style="width:13px;height:13px;background:#201e1d"></div></div>
+        <div style="flex:1"><div style="font:600 11px var(--font-body,Archivo)">Report submitted</div><div style="font:400 9.5px ui-monospace,monospace;color:#8a8785;margin-top:3px">08 Sep 2026 &#183; you</div></div></div>
+    </div>
+  </div>
+</div>
+<div class="api" style="width:390px">GET /api/reports/:id + GET /api/reports/:id/updates. History rows carry update_type, previous_status, new_status, details and the author &#8212; enough to render every entry type without a second call.</div>
+</div>
+
+<!-- ============ 1k notifications ============ -->
+<div class="dv-opt" id="1k"><div class="dv-olabel"><a class="dv-oid" href="#1k">1k</a>Notifications</div>
+<div class="dv-card" style="width:390px">
+  <div style="height:52px;border-bottom:2px solid #201e1d;display:flex;align-items:center;justify-content:space-between;padding:0 14px"><span style="font:600 13px var(--font-heading,Archivo)">Alerts</span><span style="font:600 10px ui-monospace,monospace;color:#ec3013">MARK ALL READ</span></div>
+  <div style="padding:14px;border-bottom:1px solid #ddd9d6;background:#fbf0ee;display:flex;gap:11px"><div style="width:7px;height:7px;background:#ec3013;margin-top:5px;flex:none"></div><div style="flex:1"><div style="font:400 11.5px/1.45 var(--font-body,Archivo)">Report <span style="font-family:ui-monospace,monospace;font-weight:600">KMT-2026-000248</span> is now &#8220;in progress&#8221;.</div><div style="font:400 9.5px ui-monospace,monospace;color:#8a8785;margin-top:5px">2 hours ago</div></div></div>
+  <div style="padding:14px;border-bottom:1px solid #ddd9d6;background:#fbf0ee;display:flex;gap:11px"><div style="width:7px;height:7px;background:#ec3013;margin-top:5px;flex:none"></div><div style="flex:1"><div style="font:400 11.5px/1.45 var(--font-body,Archivo)">Report <span style="font-family:ui-monospace,monospace;font-weight:600">KMT-2026-000248</span> has been assigned to a staff member.</div><div style="font:400 9.5px ui-monospace,monospace;color:#8a8785;margin-top:5px">Yesterday</div></div></div>
+  <div style="padding:14px;border-bottom:1px solid #ddd9d6;display:flex;gap:11px"><div style="width:7px;height:7px;background:transparent;margin-top:5px;flex:none"></div><div style="flex:1"><div style="font:400 11.5px/1.45 var(--font-body,Archivo);color:#5c5956">There is a new update on report <span style="font-family:ui-monospace,monospace;font-weight:600">KMT-2026-000221</span>.</div><div style="font:400 9.5px ui-monospace,monospace;color:#a5a2a0;margin-top:5px">3 days ago</div></div></div>
+  <div style="padding:14px;border-bottom:1px solid #ddd9d6;display:flex;gap:11px;opacity:.55"><div style="width:7px;flex:none"></div><div style="flex:1"><div style="height:8px;background:#e0dedc;width:88%;margin-bottom:5px"></div><div style="height:8px;background:#e0dedc;width:40%"></div></div></div>
+  <div style="padding:14px;font:400 9.5px ui-monospace,monospace;color:#a5a2a0">Newest 50 &#183; tapping one opens its report</div>
+</div>
+<div class="api" style="width:390px">GET /api/notifications &#8594; {notifications, unread} drives the header badge in <a class="dv-oid" href="#1h">1h</a> &#183; PATCH /api/notifications/:id/read &#183; PATCH /api/notifications/read-all</div>
+</div>
+
+<!-- ============ 1l staff queue ============ -->
+<div class="dv-opt" id="1l"><div class="dv-olabel"><a class="dv-oid" href="#1l">1l</a>Staff — assigned queue</div>
+<div class="dv-card" style="width:1080px">
+  <div style="height:56px;border-bottom:2px solid #201e1d;display:flex;align-items:center;padding:0 20px;gap:26px">
+    <span style="font:700 14px var(--font-heading,Archivo);letter-spacing:.05em">KAMOTI</span>
+    <span style="border:1px solid #201e1d;padding:2px 7px;font:600 9px ui-monospace,monospace">STAFF</span>
+    <div style="display:flex;gap:20px;font:600 11px var(--font-body,Archivo)"><span style="border-bottom:2px solid #ec3013;padding-bottom:3px">My queue</span><span style="color:#8a8785">Board</span></div>
+    <div style="margin-left:auto;display:flex;align-items:center;gap:14px"><span style="font:400 15px ui-monospace,monospace">&#9633;</span><span style="font:400 11px var(--font-body,Archivo)">R. Conejos</span></div>
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(4,1fr);border-bottom:2px solid #201e1d">
+    <div style="padding:16px 20px;border-right:1px solid #ddd9d6"><div style="font:400 9px ui-monospace,monospace;color:#8a8785;margin-bottom:5px">ASSIGNED TO ME</div><div style="font:700 24px var(--font-heading,Archivo)">14</div></div>
+    <div style="padding:16px 20px;border-right:1px solid #ddd9d6"><div style="font:400 9px ui-monospace,monospace;color:#8a8785;margin-bottom:5px">UNDER REVIEW</div><div style="font:700 24px var(--font-heading,Archivo)">5</div></div>
+    <div style="padding:16px 20px;border-right:1px solid #ddd9d6"><div style="font:400 9px ui-monospace,monospace;color:#8a8785;margin-bottom:5px">IN PROGRESS</div><div style="font:700 24px var(--font-heading,Archivo)">7</div></div>
+    <div style="padding:16px 20px"><div style="font:400 9px ui-monospace,monospace;color:#8a8785;margin-bottom:5px">RESOLVED THIS WEEK</div><div style="font:700 24px var(--font-heading,Archivo)">9</div></div>
+  </div>
+  <div style="display:flex;gap:8px;padding:13px 20px;border-bottom:1px solid #ddd9d6;align-items:center">
+    <div style="border:2px solid #201e1d;padding:6px 10px;font:600 10px var(--font-body,Archivo)">All mine</div>
+    <div style="border:1px solid #c9c6c3;padding:6px 10px;font:400 10px var(--font-body,Archivo);color:#8a8785">Under review</div>
+    <div style="border:1px solid #c9c6c3;padding:6px 10px;font:400 10px var(--font-body,Archivo);color:#8a8785">In progress</div>
+    <div style="border:1px solid #c9c6c3;padding:6px 10px;font:400 10px var(--font-body,Archivo);color:#8a8785">Category &#9662;</div>
+    <div style="margin-left:auto;font:400 10px ui-monospace,monospace;color:#8a8785">Oldest first &#9662;</div>
+  </div>
+  <div style="display:grid;grid-template-columns:150px 1fr 150px 160px 130px;padding:10px 20px;border-bottom:2px solid #201e1d;font:600 9px ui-monospace,monospace;color:#8a8785;letter-spacing:.06em">
+    <span>REFERENCE</span><span>REPORT</span><span>CATEGORY</span><span>STATUS</span><span>ACTION</span>
+  </div>
+  <div style="display:grid;grid-template-columns:150px 1fr 150px 160px 130px;padding:14px 20px;border-bottom:1px solid #ddd9d6;align-items:center">
+    <span style="font:600 10px ui-monospace,monospace;color:#ec3013">KMT-2026-000248</span>
+    <div style="display:flex;gap:11px;align-items:center;padding-right:20px"><div style="width:46px;height:34px;background:#e6e4e2;flex:none"></div><div><div style="font:600 12px var(--font-heading,Archivo)">Deep pothole near the barangay hall</div><div style="font:400 9px ui-monospace,monospace;color:#a5a2a0;margin-top:3px">P. Burgos St. &#183; 2 days old</div></div></div>
+    <span style="font:400 10.5px var(--font-body,Archivo)">Road</span>
+    <span style="border:1px solid #201e1d;padding:3px 7px;font:600 8.5px ui-monospace,monospace;justify-self:start">IN PROGRESS</span>
+    <div style="background:#ec3013;padding:7px 10px;color:#fff;font:600 9.5px ui-monospace,monospace;justify-self:start">MARK RESOLVED</div>
+  </div>
+  <div style="display:grid;grid-template-columns:150px 1fr 150px 160px 130px;padding:14px 20px;border-bottom:1px solid #ddd9d6;align-items:center">
+    <span style="font:600 10px ui-monospace,monospace;color:#ec3013">KMT-2026-000245</span>
+    <div style="display:flex;gap:11px;align-items:center;padding-right:20px"><div style="width:46px;height:34px;background:#e6e4e2;flex:none"></div><div><div style="font:600 12px var(--font-heading,Archivo)">Open manhole cover at the market corner</div><div style="font:400 9px ui-monospace,monospace;color:#a5a2a0;margin-top:3px">Rizal Ave. &#183; 5 days old</div></div></div>
+    <span style="font:400 10.5px var(--font-body,Archivo)">Drainage</span>
+    <span style="border:1px solid #201e1d;padding:3px 7px;font:600 8.5px ui-monospace,monospace;justify-self:start">UNDER REVIEW</span>
+    <div style="background:#ec3013;padding:7px 10px;color:#fff;font:600 9.5px ui-monospace,monospace;justify-self:start">START WORK</div>
+  </div>
+  <div style="display:grid;grid-template-columns:150px 1fr 150px 160px 130px;padding:14px 20px;border-bottom:1px solid #ddd9d6;align-items:center;opacity:.55">
+    <div style="height:9px;background:#e0dedc;width:80%"></div>
+    <div style="display:flex;gap:11px;align-items:center;padding-right:20px"><div style="width:46px;height:34px;background:#e6e4e2;flex:none"></div><div style="flex:1"><div style="height:10px;background:#dedcda;width:60%"></div></div></div>
+    <div style="height:9px;background:#e0dedc;width:40%"></div><div style="height:9px;background:#e0dedc;width:55%"></div><div style="height:9px;background:#e0dedc;width:70%"></div>
+  </div>
+  <div style="padding:13px 20px;font:400 10px ui-monospace,monospace;color:#a5a2a0">14 reports &#183; page 1 of 1</div>
+</div>
+<div class="api" style="width:1080px">GET /api/reports scoped to assigned_staff_id. The row action is whatever the one legal next step is (pending&#8594;under_review&#8594;in_progress&#8594;resolved) &#8212; never a free status dropdown, because the server rejects skips.</div>
+</div>
+
+<!-- ============ 1m staff work view ============ -->
+<div class="dv-opt" id="1m"><div class="dv-olabel"><a class="dv-oid" href="#1m">1m</a>Staff — working a single report</div>
+<div class="dv-card" style="width:1080px">
+  <div style="height:56px;border-bottom:2px solid #201e1d;display:flex;align-items:center;padding:0 20px;gap:14px"><span style="font:400 15px ui-monospace,monospace">&#8592;</span><span style="font:600 11px ui-monospace,monospace;color:#ec3013">KMT-2026-000248</span><span style="border:1px solid #201e1d;padding:3px 7px;font:600 9px ui-monospace,monospace">IN PROGRESS</span><span style="margin-left:auto;font:400 11px var(--font-body,Archivo);color:#8a8785">Assigned to you &#183; 09 Sep</span></div>
+  <div style="display:grid;grid-template-columns:1fr 380px">
+    <div style="border-right:2px solid #201e1d">
+      <div style="padding:20px;border-bottom:1px solid #ddd9d6">
+        <div style="font:700 20px/1.2 var(--font-heading,Archivo);margin-bottom:10px">Deep pothole near the barangay hall</div>
+        <div style="height:8px;background:#e0dedc;width:92%;margin-bottom:5px"></div><div style="height:8px;background:#e0dedc;width:86%;margin-bottom:5px"></div><div style="height:8px;background:#e0dedc;width:44%"></div>
+        <div style="display:flex;gap:26px;margin-top:16px">
+          <div><div style="font:400 8.5px ui-monospace,monospace;color:#8a8785;margin-bottom:4px">CATEGORY</div><div style="font:600 11px var(--font-body,Archivo)">Road</div></div>
+          <div><div style="font:400 8.5px ui-monospace,monospace;color:#8a8785;margin-bottom:4px">SUBMITTED</div><div style="font:600 11px var(--font-body,Archivo)">08 Sep 2026</div></div>
+          <div><div style="font:400 8.5px ui-monospace,monospace;color:#8a8785;margin-bottom:4px">REPORTER</div><div style="font:600 11px var(--font-body,Archivo)">J. Jimenez &#183; 0917&#8230;</div></div>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;border-bottom:1px solid #ddd9d6">
+        <div style="height:190px;background:repeating-linear-gradient(90deg,#eceae8 0 24px,#e2e0de 24px 25px),repeating-linear-gradient(0deg,transparent 0 24px,#e2e0de 24px 25px);position:relative;border-right:1px solid #ddd9d6"><div style="position:absolute;left:50%;top:50%;width:14px;height:14px;background:#ec3013;transform:translate(-50%,-100%)"></div><div style="position:absolute;left:10px;bottom:10px;background:#fff;border:1px solid #c9c6c3;padding:4px 6px;font:400 9px ui-monospace,monospace">OPEN IN MAPS &#8599;</div></div>
+        <div style="padding:14px;display:flex;gap:10px">
+          <div style="flex:1"><div style="font:400 8.5px ui-monospace,monospace;color:#8a8785;margin-bottom:6px">CITIZEN EVIDENCE</div><div style="height:130px;background:#e6e4e2;display:flex;align-items:center;justify-content:center;font:600 8px ui-monospace,monospace;color:#8a8785">PHOTO</div></div>
+          <div style="flex:1"><div style="font:400 8.5px ui-monospace,monospace;color:#8a8785;margin-bottom:6px">REPAIR PROOF</div><div style="height:130px;border:1px dashed #b6b3b0;background:#f5f3f1;display:flex;align-items:center;justify-content:center;font:600 8px ui-monospace,monospace;color:#8a8785;text-align:center;padding:8px">UPLOAD<br>RESOLUTION PHOTO</div></div>
+        </div>
+      </div>
+      <div style="padding:20px">
+        <span style="font:600 9.5px var(--font-body,Archivo);letter-spacing:.09em;text-transform:uppercase;color:#8a8785">History</span>
+        <div style="margin-top:14px;display:flex;flex-direction:column;gap:14px">
+          <div style="display:flex;gap:12px"><div style="width:11px;height:11px;background:#ec3013;margin-top:3px;flex:none"></div><div><div style="font:600 11px var(--font-body,Archivo)">Status: under review &#8594; in progress</div><div style="font:400 9.5px ui-monospace,monospace;color:#8a8785;margin-top:3px">10 Sep 09:14 &#183; you</div></div></div>
+          <div style="display:flex;gap:12px"><div style="width:11px;height:11px;background:#201e1d;margin-top:3px;flex:none"></div><div><div style="font:600 11px var(--font-body,Archivo)">Remark added</div><div style="font:400 9.5px ui-monospace,monospace;color:#8a8785;margin:3px 0 5px">10 Sep 09:12 &#183; you</div><div style="height:7px;background:#e0dedc;width:260px"></div></div></div>
+          <div style="display:flex;gap:12px"><div style="width:11px;height:11px;background:#201e1d;margin-top:3px;flex:none"></div><div><div style="font:600 11px var(--font-body,Archivo)">Assigned to you by admin</div><div style="font:400 9.5px ui-monospace,monospace;color:#8a8785;margin-top:3px">09 Sep 16:40</div></div></div>
+        </div>
+      </div>
+    </div>
+    <div style="padding:20px;display:flex;flex-direction:column;gap:20px">
+      <div>
+        <span style="font:600 9.5px var(--font-body,Archivo);letter-spacing:.09em;text-transform:uppercase;color:#8a8785">Move it forward</span>
+        <div style="display:flex;flex-direction:column;gap:6px;margin-top:11px">
+          <div style="display:flex;align-items:center;gap:9px;padding:9px 11px;border:1px solid #eae7e5;opacity:.5"><span style="font:600 9px ui-monospace,monospace;color:#8a8785">DONE</span><span style="font:400 10.5px var(--font-body,Archivo)">Pending</span></div>
+          <div style="display:flex;align-items:center;gap:9px;padding:9px 11px;border:1px solid #eae7e5;opacity:.5"><span style="font:600 9px ui-monospace,monospace;color:#8a8785">DONE</span><span style="font:400 10.5px var(--font-body,Archivo)">Under review</span></div>
+          <div style="display:flex;align-items:center;gap:9px;padding:9px 11px;border:2px solid #201e1d"><span style="font:600 9px ui-monospace,monospace;color:#ec3013">CURRENT</span><span style="font:600 10.5px var(--font-body,Archivo)">In progress</span></div>
+          <div style="background:#ec3013;padding:13px 12px;color:#fff;display:flex;flex-direction:column;gap:3px"><span style="font:600 11.5px var(--font-body,Archivo);letter-spacing:.04em">MARK RESOLVED &#8594;</span><span style="font:400 9px ui-monospace,monospace;opacity:.85">the only legal next step</span></div>
+        </div>
+      </div>
+      <div style="border-top:2px solid #201e1d;padding-top:16px">
+        <span style="font:600 9.5px var(--font-body,Archivo);letter-spacing:.09em;text-transform:uppercase;color:#8a8785">Add a remark</span>
+        <div style="border:1px solid #c9c6c3;height:76px;margin-top:11px;padding:9px;display:flex;flex-direction:column;gap:6px"><div style="height:7px;background:#e0dedc;width:80%"></div><div style="height:7px;background:#e0dedc;width:52%"></div></div>
+        <div style="font:400 9px ui-monospace,monospace;color:#a5a2a0;margin-top:5px">max 500 characters &#183; visible to the reporter</div>
+        <div style="border:1px solid #201e1d;padding:11px 12px;margin-top:10px;font:600 11px var(--font-body,Archivo)">Post remark</div>
+      </div>
+      <div style="border-top:1px solid #e0dedc;padding-top:14px;font:400 9.5px/1.6 ui-monospace,monospace;color:#a5a2a0">A staff member sees this screen only for reports assigned to them. Everything else returns 403 &#8212; the queue simply never links there.</div>
+    </div>
+  </div>
+</div>
+<div class="api" style="width:1080px">PATCH /api/reports/:id/status {status, details} &#183; POST /api/reports/:id/remarks &#183; POST /api/reports/:id/photos (kind=resolution when the uploader is not the reporter). Each status change writes report_updates and notifies the citizen automatically.</div>
+</div>
+
+<!-- ============ 1n staff empty ============ -->
+<div class="dv-opt" id="1n"><div class="dv-olabel"><a class="dv-oid" href="#1n">1n</a>Staff — nothing assigned yet</div>
+<div class="dv-card" style="width:520px">
+  <div style="height:56px;border-bottom:2px solid #201e1d;display:flex;align-items:center;padding:0 20px;gap:20px"><span style="font:700 14px var(--font-heading,Archivo);letter-spacing:.05em">KAMOTI</span><span style="border:1px solid #201e1d;padding:2px 7px;font:600 9px ui-monospace,monospace">STAFF</span></div>
+  <div style="padding:44px 20px;display:flex;flex-direction:column;gap:13px">
+    <div style="width:52px;height:52px;border:2px solid #201e1d;display:flex;align-items:center;justify-content:center;font:400 20px ui-monospace,monospace">&#9645;</div>
+    <div style="font:700 19px/1.25 var(--font-heading,Archivo)">Your queue is empty</div>
+    <div style="font:400 11.5px/1.6 var(--font-body,Archivo);color:#5c5956;max-width:360px">Reports appear here once an administrator assigns them to you. You cannot pick them up yourself &#8212; assignment is admin-only by design.</div>
+    <div style="border:1px solid #201e1d;padding:11px 14px;font:600 11px var(--font-body,Archivo);align-self:flex-start">View the public board</div>
+  </div>
+</div>
+<div class="api" style="width:520px">GET /api/reports returns an empty array for staff with no assignments. Says why, not just that it is empty.</div>
+</div>
+
+<!-- ============ 1o admin dashboard ============ -->
+<div class="dv-opt" id="1o"><div class="dv-olabel"><a class="dv-oid" href="#1o">1o</a>Admin — analytics dashboard</div>
+<div class="dv-card" style="width:1080px;display:grid;grid-template-columns:190px 1fr">
+  <div style="border-right:2px solid #201e1d;padding:18px 0">
+    <div style="padding:0 16px 18px;font:700 14px var(--font-heading,Archivo);letter-spacing:.05em">KAMOTI</div>
+    <div style="padding:0 16px 14px;font:600 9px ui-monospace,monospace;color:#8a8785">ADMIN</div>
+    <div style="padding:10px 16px;border-left:3px solid #ec3013;font:600 11px var(--font-body,Archivo);background:#faf3f1">Dashboard</div>
+    <div style="padding:10px 16px;font:400 11px var(--font-body,Archivo);color:#5c5956">All reports</div>
+    <div style="padding:10px 16px;font:400 11px var(--font-body,Archivo);color:#5c5956">Users</div>
+    <div style="padding:10px 16px;font:400 11px var(--font-body,Archivo);color:#5c5956">Categories</div>
+    <div style="padding:10px 16px;font:400 11px var(--font-body,Archivo);color:#5c5956">Activity log</div>
+    <div style="margin-top:20px;border-top:1px solid #e0dedc;padding:14px 16px 0;font:400 10px var(--font-body,Archivo);color:#8a8785">M. Bautista<br><span style="font:400 9px ui-monospace,monospace">sign out</span></div>
+  </div>
+  <div>
+    <div style="height:56px;border-bottom:2px solid #201e1d;display:flex;align-items:center;justify-content:space-between;padding:0 22px"><span style="font:700 15px var(--font-heading,Archivo)">Dashboard</span><div style="display:flex;gap:8px"><div style="border:1px solid #c9c6c3;padding:6px 10px;font:400 10px ui-monospace,monospace;color:#5c5956">Last 30 days &#9662;</div><div style="border:1px solid #201e1d;padding:6px 10px;font:600 10px ui-monospace,monospace">EXPORT CSV</div></div></div>
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);border-bottom:2px solid #201e1d">
+      <div style="padding:18px 20px;border-right:1px solid #ddd9d6"><div style="font:400 9px ui-monospace,monospace;color:#8a8785;margin-bottom:6px">TOTAL REPORTS</div><div style="font:700 28px var(--font-heading,Archivo)">248</div></div>
+      <div style="padding:18px 20px;border-right:1px solid #ddd9d6"><div style="font:400 9px ui-monospace,monospace;color:#8a8785;margin-bottom:6px">OPEN</div><div style="font:700 28px var(--font-heading,Archivo)">77</div></div>
+      <div style="padding:18px 20px;border-right:1px solid #ddd9d6"><div style="font:400 9px ui-monospace,monospace;color:#8a8785;margin-bottom:6px">RESOLVED</div><div style="font:700 28px var(--font-heading,Archivo)">171</div></div>
+      <div style="padding:18px 20px"><div style="font:400 9px ui-monospace,monospace;color:#8a8785;margin-bottom:6px">AVG. RESOLUTION</div><div style="font:700 28px var(--font-heading,Archivo)">6.2<span style="font:600 13px var(--font-body,Archivo)"> days</span></div></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;border-bottom:2px solid #201e1d">
+      <div style="padding:20px;border-right:1px solid #ddd9d6">
+        <div style="font:600 9.5px var(--font-body,Archivo);letter-spacing:.09em;text-transform:uppercase;color:#8a8785;margin-bottom:16px">By status</div>
+        <div style="display:flex;flex-direction:column;gap:11px">
+          <div style="display:flex;align-items:center;gap:11px"><span style="font:400 10px var(--font-body,Archivo);width:88px">Pending</span><div style="height:16px;background:#201e1d;width:96px"></div><span style="font:700 11px ui-monospace,monospace">24</span></div>
+          <div style="display:flex;align-items:center;gap:11px"><span style="font:400 10px var(--font-body,Archivo);width:88px">Under review</span><div style="height:16px;background:#201e1d;width:74px"></div><span style="font:700 11px ui-monospace,monospace">19</span></div>
+          <div style="display:flex;align-items:center;gap:11px"><span style="font:400 10px var(--font-body,Archivo);width:88px">In progress</span><div style="height:16px;background:#ec3013;width:130px"></div><span style="font:700 11px ui-monospace,monospace">34</span></div>
+          <div style="display:flex;align-items:center;gap:11px"><span style="font:400 10px var(--font-body,Archivo);width:88px">Resolved</span><div style="height:16px;background:#201e1d;width:210px"></div><span style="font:700 11px ui-monospace,monospace">171</span></div>
+        </div>
+      </div>
+      <div style="padding:20px">
+        <div style="font:600 9.5px var(--font-body,Archivo);letter-spacing:.09em;text-transform:uppercase;color:#8a8785;margin-bottom:16px">By category</div>
+        <div style="display:flex;align-items:flex-end;gap:12px;height:120px">
+          <div style="flex:1;display:flex;flex-direction:column;align-items:stretch;gap:6px"><div style="height:96px;background:#201e1d"></div><span style="font:400 8.5px ui-monospace,monospace;color:#5c5956;text-align:center">Road</span></div>
+          <div style="flex:1;display:flex;flex-direction:column;align-items:stretch;gap:6px"><div style="height:62px;background:#201e1d"></div><span style="font:400 8.5px ui-monospace,monospace;color:#5c5956;text-align:center">Light</span></div>
+          <div style="flex:1;display:flex;flex-direction:column;align-items:stretch;gap:6px"><div style="height:48px;background:#201e1d"></div><span style="font:400 8.5px ui-monospace,monospace;color:#5c5956;text-align:center">Drain</span></div>
+          <div style="flex:1;display:flex;flex-direction:column;align-items:stretch;gap:6px"><div style="height:30px;background:#201e1d"></div><span style="font:400 8.5px ui-monospace,monospace;color:#5c5956;text-align:center">Sign</span></div>
+          <div style="flex:1;display:flex;flex-direction:column;align-items:stretch;gap:6px"><div style="height:22px;background:#201e1d"></div><span style="font:400 8.5px ui-monospace,monospace;color:#5c5956;text-align:center">Walk</span></div>
+          <div style="flex:1;display:flex;flex-direction:column;align-items:stretch;gap:6px"><div style="height:14px;background:#201e1d"></div><span style="font:400 8.5px ui-monospace,monospace;color:#5c5956;text-align:center">Other</span></div>
+        </div>
+      </div>
+    </div>
+    <div style="padding:20px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px"><span style="font:600 9.5px var(--font-body,Archivo);letter-spacing:.09em;text-transform:uppercase;color:#8a8785">Needs assignment</span><span style="font:600 10px ui-monospace,monospace;color:#ec3013">SEE ALL 24 &#8594;</span></div>
+      <div style="display:flex;flex-direction:column;gap:1px;background:#ddd9d6">
+        <div style="background:#fff;padding:11px 0;display:flex;align-items:center;gap:14px"><span style="font:600 9.5px ui-monospace,monospace;color:#ec3013;width:120px">KMT-2026-000255</span><span style="font:600 11.5px var(--font-heading,Archivo);flex:1">Faded pedestrian crossing</span><span style="font:400 9.5px ui-monospace,monospace;color:#8a8785">Sidewalk &#183; 1d</span><div style="background:#ec3013;padding:6px 10px;color:#fff;font:600 9.5px ui-monospace,monospace">ASSIGN</div></div>
+        <div style="background:#fff;padding:11px 0;display:flex;align-items:center;gap:14px"><span style="font:600 9.5px ui-monospace,monospace;color:#ec3013;width:120px">KMT-2026-000254</span><span style="font:600 11.5px var(--font-heading,Archivo);flex:1">Cracked pavement at the plaza</span><span style="font:400 9.5px ui-monospace,monospace;color:#8a8785">Road &#183; 1d</span><div style="background:#ec3013;padding:6px 10px;color:#fff;font:600 9.5px ui-monospace,monospace">ASSIGN</div></div>
+        <div style="background:#fff;padding:11px 0;display:flex;align-items:center;gap:14px;opacity:.5"><div style="height:9px;background:#e0dedc;width:110px"></div><div style="height:10px;background:#dedcda;flex:1"></div><div style="height:9px;background:#e0dedc;width:70px"></div></div>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="api" style="width:1080px">GET /api/admin/analytics returns total_reports, by_status, by_category, resolved_count, average_resolution_days &#8212; every number above except the 30-day window and CSV, which the API does not do yet.</div>
+</div>
+
+<!-- ============ 1p admin reports + assign ============ -->
+<div class="dv-opt" id="1p"><div class="dv-olabel"><a class="dv-oid" href="#1p">1p</a>Admin — all reports, with the assign dialog</div>
+<div class="dv-card" style="width:1080px;position:relative">
+  <div style="height:56px;border-bottom:2px solid #201e1d;display:flex;align-items:center;padding:0 22px;gap:24px"><span style="font:700 14px var(--font-heading,Archivo);letter-spacing:.05em">KAMOTI</span><span style="border:1px solid #201e1d;padding:2px 7px;font:600 9px ui-monospace,monospace">ADMIN</span><span style="font:700 14px var(--font-heading,Archivo);margin-left:8px">All reports</span></div>
+  <div style="display:flex;gap:8px;padding:13px 22px;border-bottom:1px solid #ddd9d6;align-items:center">
+    <div style="border:1px solid #c9c6c3;padding:6px 10px;font:400 10px var(--font-body,Archivo);color:#8a8785;min-width:180px">Search reference or title</div>
+    <div style="border:2px solid #201e1d;padding:6px 10px;font:600 10px var(--font-body,Archivo)">Unassigned 24</div>
+    <div style="border:1px solid #c9c6c3;padding:6px 10px;font:400 10px var(--font-body,Archivo);color:#8a8785">Status &#9662;</div>
+    <div style="border:1px solid #c9c6c3;padding:6px 10px;font:400 10px var(--font-body,Archivo);color:#8a8785">Category &#9662;</div>
+    <div style="border:1px solid #c9c6c3;padding:6px 10px;font:400 10px var(--font-body,Archivo);color:#8a8785">Staff &#9662;</div>
+    <span style="margin-left:auto;font:400 10px ui-monospace,monospace;color:#8a8785">248 total</span>
+  </div>
+  <div style="display:grid;grid-template-columns:140px 1fr 110px 130px 150px 110px;padding:10px 22px;border-bottom:2px solid #201e1d;font:600 9px ui-monospace,monospace;color:#8a8785;letter-spacing:.06em"><span>REFERENCE</span><span>REPORT</span><span>CATEGORY</span><span>STATUS</span><span>ASSIGNED STAFF</span><span>ACTION</span></div>
+  <div style="display:grid;grid-template-columns:140px 1fr 110px 130px 150px 110px;padding:13px 22px;border-bottom:1px solid #ddd9d6;align-items:center">
+    <span style="font:600 9.5px ui-monospace,monospace;color:#ec3013">KMT-2026-000255</span>
+    <span style="font:600 11.5px var(--font-heading,Archivo);padding-right:18px">Faded pedestrian crossing</span>
+    <span style="font:400 10px var(--font-body,Archivo)">Sidewalk</span>
+    <span style="border:1px solid #201e1d;padding:3px 6px;font:600 8.5px ui-monospace,monospace;justify-self:start">PENDING</span>
+    <span style="font:400 10px ui-monospace,monospace;color:#a5a2a0">&#8212; unassigned</span>
+    <div style="background:#ec3013;padding:6px 10px;color:#fff;font:600 9.5px ui-monospace,monospace;justify-self:start">ASSIGN</div>
+  </div>
+  <div style="display:grid;grid-template-columns:140px 1fr 110px 130px 150px 110px;padding:13px 22px;border-bottom:1px solid #ddd9d6;align-items:center">
+    <span style="font:600 9.5px ui-monospace,monospace;color:#ec3013">KMT-2026-000248</span>
+    <span style="font:600 11.5px var(--font-heading,Archivo);padding-right:18px">Deep pothole near the barangay hall</span>
+    <span style="font:400 10px var(--font-body,Archivo)">Road</span>
+    <span style="border:1px solid #201e1d;padding:3px 6px;font:600 8.5px ui-monospace,monospace;justify-self:start">IN PROGRESS</span>
+    <span style="font:400 10px var(--font-body,Archivo)">R. Conejos</span>
+    <div style="border:1px solid #c9c6c3;padding:6px 10px;font:600 9.5px ui-monospace,monospace;color:#5c5956;justify-self:start">REASSIGN</div>
+  </div>
+  <div style="display:grid;grid-template-columns:140px 1fr 110px 130px 150px 110px;padding:13px 22px;border-bottom:1px solid #ddd9d6;align-items:center">
+    <span style="font:600 9.5px ui-monospace,monospace;color:#8a8785">KMT-2026-000221</span>
+    <span style="font:600 11.5px var(--font-heading,Archivo);padding-right:18px">Flooded canal behind the school</span>
+    <span style="font:400 10px var(--font-body,Archivo)">Drainage</span>
+    <span style="border:1px solid #c9c6c3;padding:3px 6px;font:600 8.5px ui-monospace,monospace;color:#8a8785;justify-self:start">RESOLVED</span>
+    <span style="font:400 10px var(--font-body,Archivo)">X. Bauza</span>
+    <span style="font:400 9.5px ui-monospace,monospace;color:#a5a2a0">view</span>
+  </div>
+  <div style="display:grid;grid-template-columns:140px 1fr 110px 130px 150px 110px;padding:13px 22px;border-bottom:1px solid #ddd9d6;align-items:center;opacity:.45"><div style="height:9px;background:#e0dedc;width:86%"></div><div style="height:10px;background:#dedcda;width:60%"></div><div style="height:9px;background:#e0dedc;width:60%"></div><div style="height:9px;background:#e0dedc;width:70%"></div><div style="height:9px;background:#e0dedc;width:66%"></div><div style="height:9px;background:#e0dedc;width:50%"></div></div>
+  <div style="padding:13px 22px;font:400 10px ui-monospace,monospace;color:#a5a2a0">page 1 of 13 &#183; 20 per page</div>
+  <div style="position:absolute;inset:0;background:rgba(32,30,29,.45);display:flex;align-items:center;justify-content:center">
+    <div style="background:#fff;border:2px solid #201e1d;width:400px">
+      <div style="padding:16px 18px;border-bottom:2px solid #201e1d"><div style="font:700 15px var(--font-heading,Archivo)">Assign staff</div><div style="font:400 9.5px ui-monospace,monospace;color:#8a8785;margin-top:4px">KMT-2026-000255 &#183; Faded pedestrian crossing</div></div>
+      <div style="padding:16px 18px;display:flex;flex-direction:column;gap:8px">
+        <span style="font:600 9.5px var(--font-body,Archivo);letter-spacing:.09em;text-transform:uppercase;color:#8a8785">Active staff</span>
+        <div style="border:2px solid #201e1d;padding:10px 12px;display:flex;justify-content:space-between;align-items:center"><span style="font:600 11px var(--font-body,Archivo)">R. Conejos</span><span style="font:400 9.5px ui-monospace,monospace;color:#8a8785">14 open</span></div>
+        <div style="border:1px solid #c9c6c3;padding:10px 12px;display:flex;justify-content:space-between;align-items:center"><span style="font:400 11px var(--font-body,Archivo)">X. Bauza</span><span style="font:400 9.5px ui-monospace,monospace;color:#8a8785">6 open</span></div>
+        <div style="border:1px solid #c9c6c3;padding:10px 12px;display:flex;justify-content:space-between;align-items:center"><span style="font:400 11px var(--font-body,Archivo)">M. Caliliw</span><span style="font:400 9.5px ui-monospace,monospace;color:#8a8785">9 open</span></div>
+        <div style="font:400 9px ui-monospace,monospace;color:#a5a2a0;margin-top:2px">deactivated accounts are not listed</div>
+      </div>
+      <div style="padding:14px 18px;border-top:2px solid #201e1d;display:flex;gap:9px"><div style="background:#ec3013;padding:11px 14px;color:#fff;font:600 11px var(--font-body,Archivo);letter-spacing:.04em">ASSIGN</div><div style="border:1px solid #c9c6c3;padding:11px 14px;font:600 11px var(--font-body,Archivo);color:#5c5956">Cancel</div></div>
+    </div>
+  </div>
+</div>
+<div class="api" style="width:1080px">PATCH /api/reports/:id/assign {staff_id} &#8212; admin only, staff role and is_active checked server-side. The &#8220;open&#8221; counts per staff member are not in the API yet. Search and the staff filter also need new query params.</div>
+</div>
+
+<!-- ============ 1q admin users ============ -->
+<div class="dv-opt" id="1q"><div class="dv-olabel"><a class="dv-oid" href="#1q">1q</a>Admin — user accounts</div>
+<div class="dv-card" style="width:1080px">
+  <div style="height:56px;border-bottom:2px solid #201e1d;display:flex;align-items:center;padding:0 22px;gap:24px"><span style="font:700 14px var(--font-heading,Archivo);letter-spacing:.05em">KAMOTI</span><span style="border:1px solid #201e1d;padding:2px 7px;font:600 9px ui-monospace,monospace">ADMIN</span><span style="font:700 14px var(--font-heading,Archivo);margin-left:8px">Users</span><div style="margin-left:auto;background:#ec3013;padding:8px 12px;color:#fff;font:600 10.5px var(--font-body,Archivo);letter-spacing:.04em">+ CREATE STAFF OR ADMIN</div></div>
+  <div style="display:flex;gap:8px;padding:13px 22px;border-bottom:1px solid #ddd9d6;align-items:center">
+    <div style="border:2px solid #201e1d;padding:6px 10px;font:600 10px var(--font-body,Archivo)">All 1 204</div>
+    <div style="border:1px solid #c9c6c3;padding:6px 10px;font:400 10px var(--font-body,Archivo);color:#8a8785">Citizens 1 196</div>
+    <div style="border:1px solid #c9c6c3;padding:6px 10px;font:400 10px var(--font-body,Archivo);color:#8a8785">Staff 6</div>
+    <div style="border:1px solid #c9c6c3;padding:6px 10px;font:400 10px var(--font-body,Archivo);color:#8a8785">Admins 2</div>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 220px 110px 150px 130px 110px;padding:10px 22px;border-bottom:2px solid #201e1d;font:600 9px ui-monospace,monospace;color:#8a8785;letter-spacing:.06em"><span>NAME</span><span>EMAIL</span><span>ROLE</span><span>CONTACT</span><span>STATUS</span><span>ACTION</span></div>
+  <div style="display:grid;grid-template-columns:1fr 220px 110px 150px 130px 110px;padding:13px 22px;border-bottom:1px solid #ddd9d6;align-items:center">
+    <span style="font:600 11.5px var(--font-body,Archivo)">Rainier Martin Conejos</span><span style="font:400 10px ui-monospace,monospace;color:#5c5956">rmconejos@lgu.gov</span>
+    <span style="border:1px solid #201e1d;padding:3px 6px;font:600 8.5px ui-monospace,monospace;justify-self:start">STAFF</span>
+    <span style="font:400 10px ui-monospace,monospace;color:#5c5956">0917 000 0000</span>
+    <span style="font:600 9.5px ui-monospace,monospace">ACTIVE</span>
+    <span style="font:600 9.5px ui-monospace,monospace;color:#ec3013">EDIT</span>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 220px 110px 150px 130px 110px;padding:13px 22px;border-bottom:1px solid #ddd9d6;align-items:center">
+    <span style="font:600 11.5px var(--font-body,Archivo)">Justine Leee Jimenez</span><span style="font:400 10px ui-monospace,monospace;color:#5c5956">jljimenez@mail.com</span>
+    <span style="border:1px solid #c9c6c3;padding:3px 6px;font:600 8.5px ui-monospace,monospace;color:#5c5956;justify-self:start">CITIZEN</span>
+    <span style="font:400 10px ui-monospace,monospace;color:#5c5956">0918 111 1111</span>
+    <span style="font:600 9.5px ui-monospace,monospace">ACTIVE</span>
+    <span style="font:600 9.5px ui-monospace,monospace;color:#ec3013">EDIT</span>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 220px 110px 150px 130px 110px;padding:13px 22px;border-bottom:1px solid #ddd9d6;align-items:center;background:#faf9f8">
+    <span style="font:600 11.5px var(--font-body,Archivo);color:#8a8785">Jon Luigi Ariola</span><span style="font:400 10px ui-monospace,monospace;color:#a5a2a0">jlariola@mail.com</span>
+    <span style="border:1px solid #c9c6c3;padding:3px 6px;font:600 8.5px ui-monospace,monospace;color:#a5a2a0;justify-self:start">CITIZEN</span>
+    <span style="font:400 10px ui-monospace,monospace;color:#a5a2a0">&#8212;</span>
+    <span style="font:600 9.5px ui-monospace,monospace;color:#a5a2a0">DEACTIVATED</span>
+    <span style="font:600 9.5px ui-monospace,monospace;color:#ec3013">EDIT</span>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 220px 110px 150px 130px 110px;padding:13px 22px;border-bottom:1px solid #ddd9d6;align-items:center">
+    <span style="font:600 11.5px var(--font-body,Archivo)">Maylyn Bautista <span style="font:400 9.5px ui-monospace,monospace;color:#ec3013">&#183; you</span></span><span style="font:400 10px ui-monospace,monospace;color:#5c5956">mnbautista@lgu.gov</span>
+    <span style="border:1px solid #201e1d;padding:3px 6px;font:600 8.5px ui-monospace,monospace;justify-self:start">ADMIN</span>
+    <span style="font:400 10px ui-monospace,monospace;color:#5c5956">0920 222 2222</span>
+    <span style="font:600 9.5px ui-monospace,monospace">ACTIVE</span>
+    <span style="font:400 9.5px ui-monospace,monospace;color:#a5a2a0">locked</span>
+  </div>
+  <div style="padding:14px 22px;border-top:1px solid #ddd9d6;font:400 9.5px/1.6 ui-monospace,monospace;color:#a5a2a0">Row 4 shows the server rule in the UI: an admin cannot change their own role or deactivate themselves, so those controls are disabled rather than hidden.</div>
+</div>
+<div class="api" style="width:1080px">GET /api/admin/users?role= &#183; POST /api/admin/users (name, email, password, role, contact_number) &#183; PATCH /api/admin/users/:id (name, role, contact_number, is_active). Accounts are deactivated, never deleted.</div>
+</div>
+
+<!-- ============ 1r admin categories ============ -->
+<div class="dv-opt" id="1r"><div class="dv-olabel"><a class="dv-oid" href="#1r">1r</a>Admin — categories</div>
+<div class="dv-card" style="width:640px">
+  <div style="height:56px;border-bottom:2px solid #201e1d;display:flex;align-items:center;padding:0 20px;gap:16px"><span style="font:700 14px var(--font-heading,Archivo);letter-spacing:.05em">KAMOTI</span><span style="border:1px solid #201e1d;padding:2px 7px;font:600 9px ui-monospace,monospace">ADMIN</span><span style="font:700 14px var(--font-heading,Archivo)">Categories</span><div style="margin-left:auto;background:#ec3013;padding:7px 11px;color:#fff;font:600 10px var(--font-body,Archivo);letter-spacing:.04em">+ NEW</div></div>
+  <div style="display:grid;grid-template-columns:130px 1fr 90px 90px;padding:10px 20px;border-bottom:2px solid #201e1d;font:600 9px ui-monospace,monospace;color:#8a8785;letter-spacing:.06em"><span>NAME</span><span>DESCRIPTION</span><span>REPORTS</span><span>STATE</span></div>
+  <div style="display:grid;grid-template-columns:130px 1fr 90px 90px;padding:12px 20px;border-bottom:1px solid #ddd9d6;align-items:center"><span style="font:600 11.5px var(--font-body,Archivo)">Road</span><span style="font:400 10px/1.4 var(--font-body,Archivo);color:#5c5956;padding-right:14px">Potholes, cracked pavement, damaged road surface</span><span style="font:700 11px ui-monospace,monospace">96</span><span style="font:600 9.5px ui-monospace,monospace">ACTIVE</span></div>
+  <div style="display:grid;grid-template-columns:130px 1fr 90px 90px;padding:12px 20px;border-bottom:1px solid #ddd9d6;align-items:center"><span style="font:600 11.5px var(--font-body,Archivo)">Streetlight</span><span style="font:400 10px/1.4 var(--font-body,Archivo);color:#5c5956;padding-right:14px">Broken, flickering, or unlit street lamps</span><span style="font:700 11px ui-monospace,monospace">62</span><span style="font:600 9.5px ui-monospace,monospace">ACTIVE</span></div>
+  <div style="display:grid;grid-template-columns:130px 1fr 90px 90px;padding:12px 20px;border-bottom:1px solid #ddd9d6;align-items:center"><span style="font:600 11.5px var(--font-body,Archivo)">Drainage</span><span style="font:400 10px/1.4 var(--font-body,Archivo);color:#5c5956;padding-right:14px">Clogged canals, open manholes, flooding-prone drainage</span><span style="font:700 11px ui-monospace,monospace">48</span><span style="font:600 9.5px ui-monospace,monospace">ACTIVE</span></div>
+  <div style="display:grid;grid-template-columns:130px 1fr 90px 90px;padding:12px 20px;border-bottom:1px solid #ddd9d6;align-items:center"><span style="font:600 11.5px var(--font-body,Archivo)">Signage</span><span style="font:400 10px/1.4 var(--font-body,Archivo);color:#5c5956;padding-right:14px">Damaged, faded, obstructed, or missing traffic signs</span><span style="font:700 11px ui-monospace,monospace">30</span><span style="font:600 9.5px ui-monospace,monospace">ACTIVE</span></div>
+  <div style="display:grid;grid-template-columns:130px 1fr 90px 90px;padding:12px 20px;border-bottom:1px solid #ddd9d6;align-items:center;background:#faf9f8"><span style="font:600 11.5px var(--font-body,Archivo);color:#8a8785">Sidewalk</span><span style="font:400 10px/1.4 var(--font-body,Archivo);color:#a5a2a0;padding-right:14px">Broken or obstructed sidewalks and crossings</span><span style="font:700 11px ui-monospace,monospace;color:#8a8785">22</span><span style="font:600 9.5px ui-monospace,monospace;color:#a5a2a0">HIDDEN</span></div>
+  <div style="padding:14px 20px;font:400 9.5px/1.6 ui-monospace,monospace;color:#a5a2a0">Deactivating hides a category from the report form but keeps the 22 existing reports pointing at it. There is no delete.</div>
+</div>
+<div class="api" style="width:640px">GET /api/categories (public) &#183; POST, PATCH, DELETE /api/categories/:id are admin-only; DELETE sets is_active=false. Per-category counts come from /api/admin/analytics by_category.</div>
+</div>
+
+<!-- ============ 1s activity log ============ -->
+<div class="dv-opt" id="1s"><div class="dv-olabel"><a class="dv-oid" href="#1s">1s</a>Admin — system activity log</div>
+<div class="dv-card" style="width:760px">
+  <div style="height:56px;border-bottom:2px solid #201e1d;display:flex;align-items:center;padding:0 20px;gap:16px"><span style="font:700 14px var(--font-heading,Archivo);letter-spacing:.05em">KAMOTI</span><span style="border:1px solid #201e1d;padding:2px 7px;font:600 9px ui-monospace,monospace">ADMIN</span><span style="font:700 14px var(--font-heading,Archivo)">Activity log</span><div style="margin-left:auto;border:1px solid #c9c6c3;padding:6px 10px;font:400 10px ui-monospace,monospace;color:#5c5956">Action &#9662;</div></div>
+  <div style="display:grid;grid-template-columns:150px 170px 1fr;padding:10px 20px;border-bottom:2px solid #201e1d;font:600 9px ui-monospace,monospace;color:#8a8785;letter-spacing:.06em"><span>WHEN</span><span>ACTOR</span><span>ACTION</span></div>
+  <div style="display:grid;grid-template-columns:150px 170px 1fr;padding:12px 20px;border-bottom:1px solid #ddd9d6;align-items:baseline"><span style="font:400 10px ui-monospace,monospace;color:#5c5956">10 Sep 09:14</span><span style="font:400 10.5px var(--font-body,Archivo)">R. Conejos <span style="font:400 9px ui-monospace,monospace;color:#8a8785">staff</span></span><span style="font:400 10.5px var(--font-body,Archivo)"><span style="font-family:ui-monospace,monospace;font-weight:600;font-size:9.5px;color:#ec3013">report.status_changed</span> &#183; KMT-2026-000248 under_review &#8594; in_progress</span></div>
+  <div style="display:grid;grid-template-columns:150px 170px 1fr;padding:12px 20px;border-bottom:1px solid #ddd9d6;align-items:baseline"><span style="font:400 10px ui-monospace,monospace;color:#5c5956">09 Sep 16:40</span><span style="font:400 10.5px var(--font-body,Archivo)">M. Bautista <span style="font:400 9px ui-monospace,monospace;color:#8a8785">admin</span></span><span style="font:400 10.5px var(--font-body,Archivo)"><span style="font-family:ui-monospace,monospace;font-weight:600;font-size:9.5px;color:#ec3013">report.assigned</span> &#183; KMT-2026-000248 to R. Conejos</span></div>
+  <div style="display:grid;grid-template-columns:150px 170px 1fr;padding:12px 20px;border-bottom:1px solid #ddd9d6;align-items:baseline"><span style="font:400 10px ui-monospace,monospace;color:#5c5956">09 Sep 11:02</span><span style="font:400 10.5px var(--font-body,Archivo)">M. Bautista <span style="font:400 9px ui-monospace,monospace;color:#8a8785">admin</span></span><span style="font:400 10.5px var(--font-body,Archivo)"><span style="font-family:ui-monospace,monospace;font-weight:600;font-size:9.5px;color:#ec3013">user.created</span> &#183; staff account for X. Bauza</span></div>
+  <div style="display:grid;grid-template-columns:150px 170px 1fr;padding:12px 20px;border-bottom:1px solid #ddd9d6;align-items:baseline"><span style="font:400 10px ui-monospace,monospace;color:#5c5956">08 Sep 14:20</span><span style="font:400 10.5px var(--font-body,Archivo)">M. Bautista <span style="font:400 9px ui-monospace,monospace;color:#8a8785">admin</span></span><span style="font:400 10.5px var(--font-body,Archivo)"><span style="font-family:ui-monospace,monospace;font-weight:600;font-size:9.5px;color:#ec3013">category.deactivated</span> &#183; Sidewalk</span></div>
+  <div style="display:grid;grid-template-columns:150px 170px 1fr;padding:12px 20px;border-bottom:1px solid #ddd9d6;align-items:baseline;opacity:.45"><div style="height:9px;background:#e0dedc;width:70%"></div><div style="height:9px;background:#e0dedc;width:55%"></div><div style="height:9px;background:#e0dedc;width:80%"></div></div>
+  <div style="padding:13px 20px;font:400 10px ui-monospace,monospace;color:#a5a2a0">50 per page &#183; newest first</div>
+</div>
+<div class="api" style="width:760px">GET /api/admin/logs?page=&amp;per_page= &#8212; action, entity_type, entity_id, metadata and the actor profile. Report-scoped history stays on the report (<a class="dv-oid" href="#1j">1j</a>, <a class="dv-oid" href="#1m">1m</a>); this is the system-wide view.</div>
+</div>
+
+</div>
+<p class="dv-next">Try next: &#8220;go with <a class="dv-oid" href="#1b">1b</a> and <a class="dv-oid" href="#1d">1d</a>, drop the rest&#8221; &#183; &#8220;push <a class="dv-oid" href="#1m">1m</a> to hi-fi with the design system&#8221; &#183; &#8220;add the staff mobile view&#8221;</p>
+</section>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{}"></script>
+</body>
+</html>

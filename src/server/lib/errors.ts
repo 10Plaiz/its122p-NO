@@ -18,3 +18,11 @@ export function orThrow<T>({ data, error }: { data: T; error: { message: string 
   if (data == null) throw new ApiError(500, message);
   return data;
 }
+
+// For writes that deliberately return no rows. supabase-js answers a bare insert or
+// update with data: null even when it succeeded, so orThrow would treat every one of
+// them as a failure and report a 500 over a write that actually landed. Only the
+// error means anything here.
+export function throwIfFailed({ error }: { error: { message: string } | null }, message: string) {
+  if (error) throw new ApiError(500, message, error.message);
+}
