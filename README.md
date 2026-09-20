@@ -1,8 +1,9 @@
 # KAMOTI
 
 KAMOTI lets citizens report damaged public infrastructure and track progress.
-Staff work on assigned reports, administrators manage the system, and the
-public board shows reviewed reports without citizen details.
+The current application includes a public transparency board, Citizen report
+submission and tracking, a Staff workspace, and Administrator management
+screens. The public board shows reviewed reports without citizen details.
 
 ## Stack and layout
 
@@ -13,7 +14,9 @@ deployment is one Vercel project for the site and API.
 
 ## Run locally
 
-Install Bun 1.4+ and Node.js 22+, then from the repository root:
+The [local-development guide](docs/LOCAL_DEV.md) owns prerequisites,
+environment safety, Supabase preparation, all available commands, and required
+verification. Once the environment is ready, the shortest start path is:
 
 ```bash
 bun install
@@ -22,27 +25,19 @@ cp .env.example .env
 bun run dev
 ```
 
-Open `http://localhost:5173`. Vite forwards `/api/*` requests to the
-Express server on port 4000. Before using data routes, apply the Supabase
-migrations to the linked project as described in the [API guide](docs/API.md#setup).
+Open `http://localhost:5173`.
 
-| Command | Purpose |
-| :--- | :--- |
-| `bun run dev` | Start web and API together |
-| `bun run typecheck` | Check web, API, and Vercel entry types |
-| `bun run build` | Compile the API and build the web app |
-| `bun run start` | Run the compiled API with Node.js |
-
-The web app is a small starter. Phase 3 screens are still to be built.
-See the [documentation index](docs/INDEX.md) for the proposal, architecture,
-API reference, and course instructions.
+See the [frontend guide](docs/FRONTEND.md) for routes, role access, and page
+behavior. The [documentation index](docs/INDEX.md) routes all other project
+information to its authoritative document.
 
 ## Working together
 
-Use GitHub Issues to track work and separate branches for parallel changes.
-Read [CONTRIBUTING.md](CONTRIBUTING.md) for ownership, environment safety,
-migration responsibility, and the pull request workflow. Before opening a PR,
-validate the linked issue's completion criteria and record the results in the
-[PR template](.github/pull_request_template.md). CI runs the typecheck and
-build commands above on PRs and pushes to `main`; add a test step when the
-project has an automated test script.
+Use GitHub Issues to track work and separate branches or worktrees for parallel
+changes. Read [CONTRIBUTING.md](CONTRIBUTING.md) for ownership and the pull
+request workflow. Before opening a PR, validate the linked issue's completion
+criteria and record the results in the [PR template](.github/pull_request_template.md).
+CI runs `bun run typecheck` and `bun run build` on PRs and pushes to `main`;
+add a test step when the project has an automated test script. The
+[local-development guide](docs/LOCAL_DEV.md#run-and-verify) explains those
+checks and the other available commands.
