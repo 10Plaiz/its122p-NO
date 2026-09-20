@@ -9,14 +9,14 @@ also be exercised with `curl` or Postman.
 ## API used
 
 KAMOTI builds one API and consumes three. The browser only ever talks to two of
-them directly — the KAMOTI API, and Nominatim.
+them directly: the KAMOTI API, and Nominatim.
 
 | API | Provider | Kind | Authentication |
 | :--- | :--- | :--- | :--- |
-| **KAMOTI REST API** | Built by the team — Express 5 on Node.js, TypeScript | First-party, internal | Supabase Auth bearer token |
-| **Supabase** — Auth, Data API, Storage | Supabase Inc. | Third-party platform | Publishable key for sign-in; secret key server-only |
-| **Nominatim reverse geocoding** | OpenStreetMap Foundation | Third-party, public, free | None — governed by a usage policy |
-| **OpenStreetMap raster tiles** | OpenStreetMap Foundation | Third-party, public, free | None — attribution required |
+| **KAMOTI REST API** | Built by the team: Express 5 on Node.js, TypeScript | First-party, internal | Supabase Auth bearer token |
+| **Supabase**: Auth, Data API, Storage | Supabase Inc. | Third-party platform | Publishable key for sign-in; secret key server-only |
+| **Nominatim reverse geocoding** | OpenStreetMap Foundation | Third-party, public, free | None: governed by a usage policy |
+| **OpenStreetMap raster tiles** | OpenStreetMap Foundation | Third-party, public, free | None: attribution required |
 
 Supabase is reached **through** the KAMOTI API and never from the page, because
 the key that reads protected data must not leave the server.
@@ -74,7 +74,7 @@ paging numbers needed to draw the pager. `GET /api/public/reports` returns:
 `reference_code` is the number a citizen quotes. `address_text` is what
 Nominatim supplied, still editable by the reporter. `total` is the count before
 paging. **Absent by design:** no citizen id, name, email or contact number, and
-no `pending` or `cancelled` report — this endpoint reads the `public_reports`
+no `pending` or `cancelled` report: this endpoint reads the `public_reports`
 view, which cannot return those columns or rows at all.
 
 `POST /api/auth/login` returns the caller's profile plus `access_token`,
@@ -104,47 +104,32 @@ From **Nominatim**, KAMOTI reads exactly one field of the response,
   learns where the API is.
 - **Token, not password.** The `access_token` is read from `localStorage` per
   request; a `401` or `403` clears it and ends the session.
-- **No page reloads.** Screens use `useApi` for reads — which tracks loading and
-  error state and abandons superseded requests with `AbortController` — and
+- **No page reloads.** Screens use `useApi` for reads, which tracks loading and
+  error state and abandons superseded requests with `AbortController`. They use
   `useAction` for writes. Uploads send `FormData` with `Content-Type` left unset
   so the browser can write its own multipart boundary.
 - **Request pipeline.** Each route validates with zod (`400` listing the exact
   fields, which is what draws the red text under a form control), then
   `requireAuth`, then `requireRole` and the finer service-level checks, and only
-  then queries Supabase. That order is the security model — see
+  then queries Supabase. That order is the security model: see
   [How authentication works](#how-authentication-works).
 - **Nominatim.** Called from `src/web/lib/leaflet.ts` as `reverseGeocode()`, used
   by the report wizard. Debounced 700 ms to respect the one-request-per-second
   policy, cancelled with `AbortController` when the pin moves again, and silent
-  on failure — the address field stays empty and typeable, so a rate-limited
+  on failure: the address field stays empty and typeable, so a rate-limited
   lookup costs the citizen nothing. Every report can be filed without it.
 
-The full write-up, with field tables and the request-pipeline diagram, is in the
-[API documentation](API_Documentation.md).
+The frozen Phase 3 write-up, with field tables and the request-pipeline diagram,
+is in the [API documentation](API_Documentation.md). Use this guide for the
+maintained contract.
 
 ---
 
-## Setup
+## Local setup
 
-Bun manages dependencies and runs the project scripts. Node.js runs the API.
-Use Bun 1.4 or newer and Node.js 22 or newer.
-
-```bash
-bun install
-bunx supabase login
-bunx supabase link --project-ref YOUR_PROJECT_REF
-bunx supabase migration list
-cp .env.example .env
-# Fill in the URL, publishable key, and secret key in .env.
-bun run dev
-```
-
-Create a fresh Supabase project in the dashboard before linking. Enable the
-Data API and automatic RLS, and disable automatic exposure of new tables. The
-Express API uses Supabase's Data API through `supabase-js`; the migrations grant
-only the access each database role needs. The project ref appears in the
-dashboard URL. Complete CLI login in the same environment where you run the
-commands above; keep access tokens and database passwords private.
+The [local-development guide](LOCAL_DEV.md) owns prerequisites, environment
+configuration, startup commands, and safety boundaries. The migration procedure
+below remains here because it changes the API's database contract.
 
 ## Database migrations
 
@@ -174,11 +159,9 @@ inspection records, and the public board's category filter. The CLI tracks which
 migrations have reached the linked project. Use a fresh project for this
 baseline; an older database built from earlier copies of the schema needs its
 history reconciled before `db push`.
-Keep the publishable and secret keys in the ignored local `.env`. The secret key
-is required by the local Express API and must stay server-only. Add a separate
-production secret key to the Vercel project's server environment when
-deployment is ready. Keep the database password and Supabase CLI access token
-with the migration owner.
+
+Environment and credential safety rules belong to
+[LOCAL_DEV.md](LOCAL_DEV.md#safety-boundaries).
 
 The inspection table stores staff assessments, but no inspection API routes or
 screens are implemented yet.
@@ -214,13 +197,13 @@ The test uses synthetic records inside a transaction and rolls them back.
 | Method | Route | Who can call it |
 | --- | --- | --- |
 | `GET` | `/api/health` | anyone |
-| `POST` | `/api/auth/register` | anyone — always creates a **citizen** |
+| `POST` | `/api/auth/register` | anyone: always creates a **citizen** |
 | `POST` | `/api/auth/login` | anyone |
-| `POST` | `/api/auth/logout` | signed in — records the sign-out in the activity log |
+| `POST` | `/api/auth/logout` | signed in: records the sign-out in the activity log |
 | `GET` | `/api/auth/me` | signed in |
 | `GET` | `/api/categories` | anyone |
 | `POST` `PATCH` `DELETE` | `/api/categories[/:id]` | admin |
-| `GET` | `/api/reports` | signed in — scoped by role |
+| `GET` | `/api/reports` | signed in: scoped by role |
 | `POST` | `/api/reports` | citizen (multipart, optional `photo`, up to 3 MB) |
 | `GET` | `/api/reports/:id` | owner, staff, admin |
 | `PATCH` | `/api/reports/:id` | owner, while `pending` |
@@ -236,7 +219,7 @@ The test uses synthetic records inside a transaction and rolls them back.
 | `GET` | `/api/admin/analytics` | admin |
 | `GET` | `/api/admin/logs` | admin |
 | `GET` | `/api/public/reports` | **anyone, no login** |
-| `GET` | `/api/public/stats` | **anyone, no login** — counts above the board |
+| `GET` | `/api/public/stats` | **anyone, no login**: counts above the board |
 
 `GET /api/reports` is a single handler that filters by role: a citizen sees only their own reports, a staff member sees only reports assigned to them, an admin sees all. Query parameters: `q`, `status`, `category_id`, `from`, `to`, `sort`, `page`, `per_page`. `GET /api/public/reports` takes the same set, except that `status` accepts only the three the board can show.
 
@@ -257,7 +240,7 @@ cancelled          (citizen only, and only from pending)
 
 One step at a time, no skipping and no going back. Enforced in `changeStatus()`. Each change writes a `report_updates` row and a notification for the citizen, and a report becomes visible on the public board once it leaves `pending`.
 
-While a report is still `pending` its owner may edit it (`PATCH /api/reports/:id`) or cancel it (`POST /api/reports/:id/cancel`). Once staff have picked it up, it is out of the citizen's hands — staff may already be acting on what it says. A cancelled report is kept, never deleted, so its history survives, and it never appears on the public board.
+While a report is still `pending` its owner may edit it (`PATCH /api/reports/:id`) or cancel it (`POST /api/reports/:id/cancel`). Once staff have picked it up, it is out of the citizen's hands: staff may already be acting on what it says. A cancelled report is kept, never deleted, so its history survives, and it never appears on the public board.
 
 ## Quick check
 

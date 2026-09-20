@@ -1,5 +1,10 @@
 # API documentation
 
+> **Frozen Phase 3 submission snapshot.** This content records the submitted
+> API write-up and is no longer maintained. Use the maintained
+> [API guide](API.md) for current endpoints, integration behavior, setup, and
+> database workflow.
+
 Phase 3 deliverable. This page answers five questions about every API KAMOTI
 talks to: what it is, who provides it, why it is here, what comes back, and how
 it was wired into this particular website.
@@ -59,7 +64,7 @@ landmark rather than two decimal numbers.
 ### The KAMOTI API
 
 Base path `/api`. The full table with permissions is in the
-[API guide](API.md#endpoints); this is the shape of it.
+[API guide](API.md#api-endpoints); this is the shape of it.
 
 | Method | Endpoint | Purpose |
 | :--- | :--- | :--- |
