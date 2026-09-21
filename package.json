@@ -10,6 +10,7 @@
     "dev:web": "vite",
     "fixture": "tsx scripts/fixture/seed.ts",
     "test": "bun test",
+    "test:smoke": "bun scripts/smoke/verify-deployment.ts",
     "typecheck": "bun run typecheck:api && bun run typecheck:web && bun run typecheck:deploy && bun run typecheck:test",
     "typecheck:api": "tsc --noEmit -p tsconfig.server.json",
     "typecheck:web": "tsc --noEmit -p tsconfig.web.json",
