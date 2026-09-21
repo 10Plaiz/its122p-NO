@@ -61,20 +61,25 @@ export async function reverseGeocode(lat: number, lon: number, signal?: AbortSig
   const delay = scheduledTime - now;
   if (delay > 0) {
     const aborted = await new Promise<boolean>((resolve) => {
-      const timer = setTimeout(() => resolve(false), delay);
+      const onAbort = () => {
+        clearTimeout(timer);
+        resolve(true);
+      };
+      const timer = setTimeout(() => {
+        signal?.removeEventListener("abort", onAbort);
+        resolve(false);
+      }, delay);
       if (signal) {
-        signal.addEventListener(
-          "abort",
-          () => {
-            clearTimeout(timer);
-            resolve(true);
-          },
-          { once: true },
-        );
+        signal.addEventListener("abort", onAbort, { once: true });
       }
     });
 
-    if (aborted || signal?.aborted) return null;
+    if (aborted || signal?.aborted) {
+      if (nextAvailableLookupTime === scheduledTime + 1000) {
+        nextAvailableLookupTime = scheduledTime;
+      }
+      return null;
+    }
   }
 
   const query = new URLSearchParams({
