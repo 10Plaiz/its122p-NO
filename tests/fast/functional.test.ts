@@ -3,21 +3,31 @@ process.env.SUPABASE_PUBLISHABLE_KEY ??= "placeholder-publishable-key";
 process.env.SUPABASE_SECRET_KEY ??= "placeholder-secret-key";
 
 import { describe, expect, it } from "bun:test";
-import { z } from "zod";
-import type { Report, ReportStatus } from "../../src/server/services/reports.service.js";
+import type { Report, ReportStatus, Notice } from "../../src/server/services/reports.service.js";
 import type { AuthUser } from "../../src/server/types/auth.js";
-import {
+import type { Profile } from "../../src/web/lib/types.js";
+import type { AnalyticsReportRow } from "../../src/server/lib/analytics.js";
+
+const {
+  NEXT_STATUS,
   PUBLIC_STATUSES,
   STATUSES,
   STAFF_STATUSES,
   assertCanEdit,
   assertCanUpdate,
-  assertCanView,
-} from "../../src/server/services/reports.service.js";
-import { endOfDay, searchFilter, sortColumn } from "../../src/server/lib/query.js";
-import { getReportReturnTarget } from "../../src/web/lib/navigation.js";
-import { homePathFor } from "../../src/web/lib/auth.js";
-import type { Profile } from "../../src/web/lib/types.js";
+  filterNotificationRecipients,
+} = await import("../../src/server/services/reports.service.js");
+
+const {
+  createSchema: reportCreateSchema,
+  remarkSchema,
+} = await import("../../src/server/routes/reports.routes.js");
+
+const { categorySchema } = await import("../../src/server/routes/categories.routes.js");
+const { calculateAnalytics } = await import("../../src/server/lib/analytics.js");
+const { endOfDay, searchFilter, sortColumn } = await import("../../src/server/lib/query.js");
+const { getReportReturnTarget } = await import("../../src/web/lib/navigation.js");
+const { homePathFor } = await import("../../src/web/lib/auth.js");
 
 // Helper fixtures
 function createReport(overrides?: Partial<Report>): Report {
@@ -49,16 +59,6 @@ function createUser(overrides?: Partial<AuthUser>): AuthUser {
   };
 }
 
-// Schemas mirroring routes for functional validation
-const reportCreateSchema = z.object({
-  title: z.string().trim().min(3).max(150),
-  description: z.string().trim().min(10).max(1000),
-  category_id: z.coerce.number().int().positive(),
-  latitude: z.coerce.number().min(-90).max(90),
-  longitude: z.coerce.number().min(-180).max(180),
-  address_text: z.string().trim().max(255).optional(),
-});
-
 describe("FUNC-01 report creation and input validation", () => {
   it("accepts valid report submission data", () => {
     const valid = {
@@ -77,6 +77,27 @@ describe("FUNC-01 report creation and input validation", () => {
       expect(parsed.data.latitude).toBe(14.5547);
       expect(parsed.data.longitude).toBe(121.0244);
     }
+  });
+
+  it("accepts report submission with nullable or omitted address", () => {
+    const withNullAddress = {
+      title: "Broken Streetlight",
+      description: "Streetlight flickering and completely dark at night.",
+      category_id: 2,
+      latitude: 14.5995,
+      longitude: 120.9842,
+      address_text: null,
+    };
+    expect(reportCreateSchema.safeParse(withNullAddress).success).toBe(true);
+
+    const withoutAddress = {
+      title: "Broken Streetlight",
+      description: "Streetlight flickering and completely dark at night.",
+      category_id: 2,
+      latitude: 14.5995,
+      longitude: 120.9842,
+    };
+    expect(reportCreateSchema.safeParse(withoutAddress).success).toBe(true);
   });
 
   it("rejects report submission with out-of-range GPS coordinates", () => {
@@ -112,8 +133,50 @@ describe("FUNC-01 report creation and input validation", () => {
 
     expect(
       reportCreateSchema.safeParse({
+        title: "Yes",
+        description: "Valid description of the issue.",
+        category_id: 1,
+        latitude: 14.5,
+        longitude: 121.0,
+      }).success,
+    ).toBe(true);
+
+    expect(
+      reportCreateSchema.safeParse({
+        title: "A".repeat(150),
+        description: "Valid description of the issue.",
+        category_id: 1,
+        latitude: 14.5,
+        longitude: 121.0,
+      }).success,
+    ).toBe(true);
+
+    expect(
+      reportCreateSchema.safeParse({
         title: "A".repeat(151),
         description: "Valid description of the issue.",
+        category_id: 1,
+        latitude: 14.5,
+        longitude: 121.0,
+      }).success,
+    ).toBe(false);
+  });
+
+  it("enforces description length bounds (10-1000 characters)", () => {
+    expect(
+      reportCreateSchema.safeParse({
+        title: "Valid Title",
+        description: "Too short",
+        category_id: 1,
+        latitude: 14.5,
+        longitude: 121.0,
+      }).success,
+    ).toBe(false);
+
+    expect(
+      reportCreateSchema.safeParse({
+        title: "Valid Title",
+        description: "A".repeat(1001),
         category_id: 1,
         latitude: 14.5,
         longitude: 121.0,
@@ -123,15 +186,7 @@ describe("FUNC-01 report creation and input validation", () => {
 });
 
 describe("FUNC-02 report linear status progression", () => {
-  const NEXT_STATUS: Record<ReportStatus, ReportStatus[]> = {
-    pending: ["under_review"],
-    under_review: ["in_progress"],
-    in_progress: ["resolved"],
-    resolved: [],
-    cancelled: [],
-  };
-
-  it("progresses sequentially through defined lifecycle states", () => {
+  it("progresses sequentially through defined lifecycle states from reports service", () => {
     let current: ReportStatus = "pending";
 
     const step1 = NEXT_STATUS[current];
@@ -151,14 +206,6 @@ describe("FUNC-02 report linear status progression", () => {
 });
 
 describe("FUNC-03 report status transition enforcement", () => {
-  const NEXT_STATUS: Record<ReportStatus, ReportStatus[]> = {
-    pending: ["under_review"],
-    under_review: ["in_progress"],
-    in_progress: ["resolved"],
-    resolved: [],
-    cancelled: [],
-  };
-
   it("does not allow skipping workflow stages", () => {
     expect(NEXT_STATUS.pending.includes("in_progress")).toBe(false);
     expect(NEXT_STATUS.pending.includes("resolved")).toBe(false);
@@ -214,7 +261,6 @@ describe("FUNC-05 citizen report cancellation workflow", () => {
 
     expect(() => assertCanEdit(report, owner)).not.toThrow();
 
-    // Cancellation sets status to cancelled and guarantees is_public: false
     const cancelledState = {
       ...report,
       status: "cancelled" as ReportStatus,
@@ -258,21 +304,21 @@ describe("FUNC-06 staff assignment and authorization rules", () => {
 });
 
 describe("FUNC-07 staff remark creation and audit preservation", () => {
-  it("allows authorized actors to view and update report remarks", () => {
+  it("validates remark details using canonical remarkSchema", () => {
     const staff = createUser({ id: "staff-func-1", role: "staff" });
     const report = createReport({ assigned_staff: { id: "staff-func-1" } });
 
     expect(() => assertCanUpdate(report, staff)).not.toThrow();
 
-    // Remark payload verification
-    const remarkSchema = z.object({ details: z.string().trim().min(1).max(500) });
     const parsed = remarkSchema.safeParse({ details: "Team dispatched for inspection at 10:00 AM." });
     expect(parsed.success).toBe(true);
   });
 
-  it("rejects empty remark submissions", () => {
-    const remarkSchema = z.object({ details: z.string().trim().min(1).max(500) });
+  it("rejects empty remark submissions and remarks exceeding 500 characters", () => {
     expect(remarkSchema.safeParse({ details: "   " }).success).toBe(false);
+    expect(remarkSchema.safeParse({ details: "" }).success).toBe(false);
+    expect(remarkSchema.safeParse({ details: "A".repeat(501) }).success).toBe(false);
+    expect(remarkSchema.safeParse({ details: "A".repeat(500) }).success).toBe(true);
   });
 });
 
@@ -300,8 +346,8 @@ describe("FUNC-08 public transparency board visibility and query rules", () => {
 });
 
 describe("FUNC-09 administrator analytics computation logic", () => {
-  it("calculates status counts, category totals, and average resolution time", () => {
-    const reports = [
+  it("calculates status counts, category totals, and average resolution time via calculateAnalytics", () => {
+    const reports: AnalyticsReportRow[] = [
       {
         status: "resolved",
         submitted_at: "2026-09-01T08:00:00Z",
@@ -328,45 +374,50 @@ describe("FUNC-09 administrator analytics computation logic", () => {
       },
     ];
 
-    const byStatus = Object.fromEntries(STATUSES.map((s) => [s, 0])) as Record<ReportStatus, number>;
-    const byCategory: Record<string, number> = {};
-    const resolutionDays: number[] = [];
+    const summary = calculateAnalytics(reports);
 
-    for (const r of reports) {
-      if (r.status in byStatus) byStatus[r.status as ReportStatus] += 1;
-      if (r.category?.name) byCategory[r.category.name] = (byCategory[r.category.name] ?? 0) + 1;
-      if (r.resolved_at) {
-        const diff = new Date(r.resolved_at).getTime() - new Date(r.submitted_at).getTime();
-        resolutionDays.push(diff / 86_400_000);
-      }
-    }
+    expect(summary.total_reports).toBe(4);
+    expect(summary.by_status.resolved).toBe(2);
+    expect(summary.by_status.in_progress).toBe(1);
+    expect(summary.by_status.pending).toBe(1);
+    expect(summary.by_category.Roads).toBe(2);
+    expect(summary.by_category.Streetlights).toBe(1);
+    expect(summary.by_category.Drainage).toBe(1);
+    expect(summary.resolved_count).toBe(2);
+    expect(summary.average_resolution_days).toBe(3);
+  });
 
-    const average = resolutionDays.length
-      ? resolutionDays.reduce((a, b) => a + b, 0) / resolutionDays.length
-      : null;
+  it("returns null average resolution days when no reports are resolved or list is empty", () => {
+    const emptySummary = calculateAnalytics([]);
+    expect(emptySummary.total_reports).toBe(0);
+    expect(emptySummary.resolved_count).toBe(0);
+    expect(emptySummary.average_resolution_days).toBe(null);
 
-    expect(byStatus.resolved).toBe(2);
-    expect(byStatus.in_progress).toBe(1);
-    expect(byStatus.pending).toBe(1);
-    expect(byCategory.Roads).toBe(2);
-    expect(byCategory.Streetlights).toBe(1);
-    expect(byCategory.Drainage).toBe(1);
-    expect(resolutionDays).toEqual([2, 4]);
-    expect(average).toBe(3);
+    const pendingOnly: AnalyticsReportRow[] = [
+      {
+        status: "pending",
+        submitted_at: "2026-09-01T08:00:00Z",
+        resolved_at: null,
+        category: { name: "Drainage" },
+      },
+    ];
+    const pendingSummary = calculateAnalytics(pendingOnly);
+    expect(pendingSummary.total_reports).toBe(1);
+    expect(pendingSummary.resolved_count).toBe(0);
+    expect(pendingSummary.average_resolution_days).toBe(null);
   });
 });
 
 describe("FUNC-10 category management lifecycle", () => {
-  it("validates category creation bounds", () => {
-    const schema = z.object({
-      name: z.string().trim().min(2).max(50),
-      description: z.string().trim().max(300).optional(),
-    });
+  it("validates category creation bounds using production categorySchema (2-60 chars name, <= 300 desc)", () => {
+    expect(categorySchema.safeParse({ name: "Road Hazards", description: "Potholes and road damage" }).success).toBe(true);
+    expect(categorySchema.safeParse({ name: "R" }).success).toBe(false);
+    expect(categorySchema.safeParse({ name: "Valid Category", description: "B".repeat(301) }).success).toBe(false);
+    expect(categorySchema.safeParse({ name: "Valid Category", description: "B".repeat(300) }).success).toBe(true);
 
-    expect(schema.safeParse({ name: "Road Hazards", description: "Potholes and road damage" }).success).toBe(true);
-    expect(schema.safeParse({ name: "R" }).success).toBe(false);
-    expect(schema.safeParse({ name: "A".repeat(51) }).success).toBe(false);
-    expect(schema.safeParse({ name: "Valid", description: "B".repeat(301) }).success).toBe(false);
+    // Production schema allows up to 60 characters for category name
+    expect(categorySchema.safeParse({ name: "A".repeat(60) }).success).toBe(true);
+    expect(categorySchema.safeParse({ name: "A".repeat(61) }).success).toBe(false);
   });
 
   it("filters inactive categories from user selection list", () => {
@@ -383,36 +434,37 @@ describe("FUNC-10 category management lifecycle", () => {
 });
 
 describe("FUNC-11 notification routing logic", () => {
-  it("routes status update notifications and suppresses self-notifications", () => {
+  it("routes status update notifications and suppresses self-notifications via filterNotificationRecipients", () => {
     const reportCitizenId = "citizen-func-1";
     const assignedStaffId = "staff-func-1";
     const actorId = "staff-func-1"; // Staff moved the report
 
-    const candidateNotices = [
+    const candidateNotices: Notice[] = [
       { userId: reportCitizenId, message: "Report status changed to In Progress" },
       { userId: assignedStaffId, message: "Report status changed to In Progress" },
     ];
 
-    // Actor must not receive a notification for their own action
-    const recipients = candidateNotices.filter((n) => Boolean(n.userId) && n.userId !== actorId);
+    const recipients = filterNotificationRecipients(candidateNotices, actorId);
 
     expect(recipients.length).toBe(1);
     expect(recipients[0].userId).toBe(reportCitizenId);
   });
 
-  it("routes assignment notification to assigned staff member", () => {
+  it("routes assignment notification to assigned staff member and ignores unassigned staff", () => {
     const adminId = "admin-func-1";
     const staffId = "staff-func-1";
     const citizenId = "citizen-func-1";
 
-    const candidateNotices = [
+    const candidateNotices: Notice[] = [
       { userId: citizenId, message: "Report has been assigned to staff." },
       { userId: staffId, message: "Report has been assigned to you." },
+      { userId: undefined, message: "Unassigned staff notice" },
     ];
 
-    const recipients = candidateNotices.filter((n) => Boolean(n.userId) && n.userId !== adminId);
+    const recipients = filterNotificationRecipients(candidateNotices, adminId);
     expect(recipients.length).toBe(2);
     expect(recipients.map((r) => r.userId)).toContain(staffId);
+    expect(recipients.map((r) => r.userId)).toContain(citizenId);
   });
 });
 
