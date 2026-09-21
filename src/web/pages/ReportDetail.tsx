@@ -262,7 +262,7 @@ function EditReport({
     const controller = new AbortController();
     const timer = setTimeout(async () => {
       const found = await reverseGeocode(point.lat, point.lng, controller.signal);
-      if (found) {
+      if (found && !addressTouched.current) {
         setAddress(found.slice(0, 255));
       }
     }, 700);
@@ -325,7 +325,10 @@ function EditReport({
     if (title.trim() !== report.title) changes.title = title.trim();
     if (description.trim() !== report.description) changes.description = description.trim();
     if (Number(categoryId) !== report.category?.id) changes.category_id = Number(categoryId);
-    if (point.lat !== report.latitude || point.lng !== report.longitude) {
+    if (
+      pointChangedByUser.current &&
+      (point.lat !== report.latitude || point.lng !== report.longitude)
+    ) {
       changes.latitude = point.lat;
       changes.longitude = point.lng;
     }
@@ -346,7 +349,8 @@ function EditReport({
     }
   }
 
-  const categories = categoryData?.categories.filter((c) => c.is_active) ?? [];
+  const categories =
+    categoryData?.categories.filter((c) => c.is_active || c.id === report.category?.id) ?? [];
 
   return (
     <form className="flex flex-col gap-6" onSubmit={handleSubmit} noValidate>
@@ -436,11 +440,11 @@ function EditReport({
               </Button>
             )}
           </div>
-          <div className="h-[280px] border-2 border-divider">
+          <div className="h-[300px] border-2 border-divider">
             <MapPicker value={point} onChange={handlePointChange} />
           </div>
           <p className="text-muted text-[11px] font-mono">
-            {point.lat.toFixed(5)}, {point.lng.toFixed(5)} — drag or tap to adjust
+            {point.lat.toFixed(5)}, {point.lng.toFixed(5)} (drag or tap to adjust)
           </p>
         </div>
       </div>
