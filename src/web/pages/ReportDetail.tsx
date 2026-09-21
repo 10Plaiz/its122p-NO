@@ -24,13 +24,15 @@ import { useAuth } from "../lib/auth.js";
 import { useAction, useApi } from "../lib/useApi.js";
 import { STATUS_LABEL } from "../lib/types.js";
 import type { Category, Report, ReportUpdate } from "../lib/types.js";
+import { getReportReturnTarget } from "../lib/navigation.js";
 
-// Wireframe 1j. Visible to the report's owner, to assigned staff and to admins —
+// Wireframe 1j. Visible to the report's owner, to assigned staff and to admins:
 // assertCanView decides, so an id guessed from the URL returns 403 rather than data.
 export function ReportDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { user } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
+  const returnTarget = getReportReturnTarget(user?.role);
 
   const { data, error, loading, reload } = useApi<{ report: Report }>(id ? `/reports/${id}` : null);
   const { data: history, reload: reloadHistory } = useApi<{ updates: ReportUpdate[] }>(
@@ -48,8 +50,8 @@ export function ReportDetailPage() {
     return (
       <div className="flex flex-col gap-4 items-start">
         <Alert title="Could not open this report">{error.message}</Alert>
-        <Link to="/my-reports" className="btn btn-secondary">
-          Back to my reports
+        <Link to={returnTarget.to} className="btn btn-secondary">
+          {returnTarget.label}
         </Link>
       </div>
     );
@@ -178,8 +180,8 @@ export function ReportDetailPage() {
         </div>
       </div>
 
-      <Link to="/my-reports" className="btn btn-secondary self-start">
-        Back to my reports
+      <Link to={returnTarget.to} className="btn btn-secondary self-start">
+        {returnTarget.label}
       </Link>
     </div>
   );

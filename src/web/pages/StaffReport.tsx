@@ -14,7 +14,9 @@ import {
   formatDateTime,
 } from "../components/ui.js";
 import { api } from "../lib/api.js";
+import { useAuth } from "../lib/auth.js";
 import { TILE_ATTRIBUTION, TILE_URL, pinFor } from "../lib/leaflet.js";
+import { getReportReturnTarget } from "../lib/navigation.js";
 import { useAction, useApi } from "../lib/useApi.js";
 import { NEXT_STATUS, NEXT_STATUS_LABEL, STATUS_LABEL } from "../lib/types.js";
 import type { Report, ReportUpdate } from "../lib/types.js";
@@ -24,6 +26,8 @@ import type { Report, ReportUpdate } from "../lib/types.js";
 // assertCanUpdate and changeStatus.
 export function StaffReportPage() {
   const { id } = useParams<{ id: string }>();
+  const { user } = useAuth();
+  const returnTarget = getReportReturnTarget(user?.role);
 
   const { data, error, loading, reload } = useApi<{ report: Report }>(id ? `/reports/${id}` : null);
   const { data: history, reload: reloadHistory } = useApi<{ updates: ReportUpdate[] }>(
@@ -41,8 +45,8 @@ export function StaffReportPage() {
     return (
       <div className="flex flex-col gap-4 items-start">
         <Alert title="Could not open this report">{error.message}</Alert>
-        <Link to="/staff/queue" className="btn btn-secondary">
-          Back to my queue
+        <Link to={returnTarget.to} className="btn btn-secondary">
+          {returnTarget.label}
         </Link>
       </div>
     );
@@ -156,8 +160,8 @@ export function StaffReportPage() {
         </div>
       </div>
 
-      <Link to="/staff/queue" className="btn btn-secondary self-start">
-        Back to my queue
+      <Link to={returnTarget.to} className="btn btn-secondary self-start">
+        {returnTarget.label}
       </Link>
     </div>
   );
