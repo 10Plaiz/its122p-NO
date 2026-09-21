@@ -84,9 +84,9 @@ export function NewReportPage() {
   const errors = validateStep(step, values);
   const shown = { ...(touched ? errors : {}), ...(error?.fieldErrors ?? {}) };
 
-  // Reverse-geocode the pin into a readable address. Debounced because Nominatim's
-  // policy is one request a second, and a failure is silent — the field stays
-  // editable, so a rate-limited lookup costs the citizen nothing.
+  // Reverse-geocode the pin into a readable address. Debounced 1000 ms because
+  // Nominatim asks for no more than one request per second, and a failure is silent:
+  // the field stays editable, so a rate-limited lookup costs the citizen nothing.
   useEffect(() => {
     const point = values.point;
     if (!point || addressTouched.current) return;
@@ -94,11 +94,11 @@ export function NewReportPage() {
     const controller = new AbortController();
     const timer = setTimeout(async () => {
       const found = await reverseGeocode(point.lat, point.lng, controller.signal);
-      if (found) {
+      if (found && !addressTouched.current && !controller.signal.aborted) {
         setValues((current) => ({ ...current, address: found.slice(0, 255) }));
         setAddressAuto(true);
       }
-    }, 700);
+    }, 1000);
 
     return () => {
       clearTimeout(timer);

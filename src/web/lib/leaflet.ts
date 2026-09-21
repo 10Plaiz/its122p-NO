@@ -42,9 +42,46 @@ export const TILE_ATTRIBUTION =
   '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors';
 
 // Nominatim asks for <= 1 request/second and refuses bulk use. Screens debounce
-// before calling this, and a failure is never fatal — the address field stays
+// before calling this, and a failure is never fatal: the address field stays
 // editable by hand, so a rate-limited lookup costs nothing.
+let nextAvailableLookupTime = 0;
+
+export function resetLookupThrottleForTesting() {
+  nextAvailableLookupTime = 0;
+}
+
 export async function reverseGeocode(lat: number, lon: number, signal?: AbortSignal): Promise<string | null> {
+  if (signal?.aborted) return null;
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+
+  const now = Date.now();
+  const scheduledTime = Math.max(now, nextAvailableLookupTime);
+  nextAvailableLookupTime = scheduledTime + 1000;
+
+  const delay = scheduledTime - now;
+  if (delay > 0) {
+    const aborted = await new Promise<boolean>((resolve) => {
+      const onAbort = () => {
+        clearTimeout(timer);
+        resolve(true);
+      };
+      const timer = setTimeout(() => {
+        signal?.removeEventListener("abort", onAbort);
+        resolve(false);
+      }, delay);
+      if (signal) {
+        signal.addEventListener("abort", onAbort, { once: true });
+      }
+    });
+
+    if (aborted || signal?.aborted) {
+      if (nextAvailableLookupTime === scheduledTime + 1000) {
+        nextAvailableLookupTime = scheduledTime;
+      }
+      return null;
+    }
+  }
+
   const query = new URLSearchParams({
     format: "jsonv2",
     lat: String(lat),
