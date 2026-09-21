@@ -26,3 +26,14 @@ export const contactNumber = z
   .string()
   .trim()
   .regex(/^09\d{9}$/, "Enter an 11-digit mobile number starting with 09.");
+
+export const PASSWORD_MIN_ERROR = "Use at least 8 characters.";
+export const PASSWORD_MAX_ERROR = "Keep the password under 72 characters.";
+
+// 72 is where bcrypt stops reading, so anything past it is not actually part of
+// the password hash.
+export const passwordRule = z
+  .string()
+  .min(8, PASSWORD_MIN_ERROR)
+  .max(72, PASSWORD_MAX_ERROR);
+

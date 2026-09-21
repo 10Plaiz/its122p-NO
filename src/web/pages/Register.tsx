@@ -14,6 +14,7 @@ function validate(values: { name: string; email: string; password: string; conta
   if (values.name.trim().length < 2) errors.name = "Enter your full name.";
   if (!/^\S+@\S+\.\S+$/.test(values.email.trim())) errors.email = "Enter a valid email address.";
   if (values.password.length < 8) errors.password = "Use at least 8 characters.";
+  else if (values.password.length > 72) errors.password = "Keep the password under 72 characters.";
 
   const contactError = validateContactNumber(values.contact);
   if (contactError) errors.contact_number = contactError;

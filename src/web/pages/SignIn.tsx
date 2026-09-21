@@ -11,6 +11,13 @@ type SignInLocationState = {
   email?: string;
 };
 
+function destinationFor(user: Parameters<typeof homePathFor>[0], from?: string) {
+  if (!from || from === "/signin" || from === "/register") {
+    return homePathFor(user);
+  }
+  return from;
+}
+
 export function SignInPage() {
   const { user, signIn, loading } = useAuth();
   const navigate = useNavigate();
@@ -28,12 +35,14 @@ export function SignInPage() {
   // A signed-in user has no reason to see this screen.
   useEffect(() => {
     if (!loading && user) {
-      navigate(state?.from ?? homePathFor(user), { replace: true });
+      navigate(destinationFor(user, state?.from), { replace: true });
     }
   }, [loading, user, navigate, state?.from]);
 
   const emailError = touched && !email.trim() ? "Enter a valid email address." : undefined;
   const passwordError = touched && !password ? "Enter your password." : undefined;
+  const shownEmailError = emailError ?? error?.fieldErrors?.email;
+  const shownPasswordError = passwordError ?? error?.fieldErrors?.password;
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
@@ -50,7 +59,7 @@ export function SignInPage() {
     if (!signedInUser) return;
 
     // Back to whatever they were trying to reach, or their role's home.
-    navigate(state?.from ?? homePathFor(signedInUser), { replace: true });
+    navigate(destinationFor(signedInUser, state?.from), { replace: true });
   }
 
   return (
@@ -69,7 +78,7 @@ export function SignInPage() {
       )}
 
       <form className="flex flex-col gap-4" onSubmit={handleSubmit} noValidate>
-        <Field label="Email" htmlFor="email" error={emailError}>
+        <Field label="Email" htmlFor="email" error={shownEmailError}>
           <Input
             id="email"
             name="email"
@@ -80,7 +89,7 @@ export function SignInPage() {
           />
         </Field>
 
-        <Field label="Password" htmlFor="password" error={passwordError}>
+        <Field label="Password" htmlFor="password" error={shownPasswordError}>
           <Input
             id="password"
             name="password"
