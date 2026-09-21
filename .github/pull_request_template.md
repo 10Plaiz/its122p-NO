@@ -32,6 +32,7 @@ owner to apply them after this PR is merged. Never include keys or passwords. --
 | Check | Result |
 | :--- | :--- |
 | `bun run typecheck` |  |
+| `bun run test` |  |
 | `bun run build` |  |
 | Relevant feature or manual checks |  |
 

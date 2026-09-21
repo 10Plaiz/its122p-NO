@@ -43,7 +43,7 @@ describe("leaflet reverse geocoding", () => {
         status: 200,
         headers: { "Content-Type": "application/json" },
       });
-    }) as typeof fetch;
+    }) as unknown as typeof fetch;
 
     try {
       const result = await reverseGeocode(14.5547, 121.0244);
@@ -57,14 +57,14 @@ describe("leaflet reverse geocoding", () => {
     const originalFetch = globalThis.fetch;
     try {
       // 429 rate limit
-      globalThis.fetch = (async () => new Response("Too Many Requests", { status: 429 })) as typeof fetch;
+      globalThis.fetch = (async () => new Response("Too Many Requests", { status: 429 })) as unknown as typeof fetch;
       const res429 = await reverseGeocode(14.5547, 121.0244);
       expect(res429).toBeNull();
 
       resetLookupThrottleForTesting();
 
       // 500 server error
-      globalThis.fetch = (async () => new Response("Server Error", { status: 500 })) as typeof fetch;
+      globalThis.fetch = (async () => new Response("Server Error", { status: 500 })) as unknown as typeof fetch;
       const res500 = await reverseGeocode(14.5547, 121.0244);
       expect(res500).toBeNull();
 
@@ -73,7 +73,7 @@ describe("leaflet reverse geocoding", () => {
       // Network rejection
       globalThis.fetch = (async () => {
         throw new Error("Network unreachable");
-      }) as typeof fetch;
+      }) as unknown as typeof fetch;
       const resErr = await reverseGeocode(14.5547, 121.0244);
       expect(resErr).toBeNull();
     } finally {
@@ -87,7 +87,7 @@ describe("leaflet reverse geocoding", () => {
     globalThis.fetch = (async () => {
       fetchCalled = true;
       return new Response(JSON.stringify({ display_name: "Ignored" }));
-    }) as typeof fetch;
+    }) as unknown as typeof fetch;
 
     try {
       const controller = new AbortController();
@@ -110,7 +110,7 @@ describe("leaflet reverse geocoding", () => {
         status: 200,
         headers: { "Content-Type": "application/json" },
       });
-    }) as typeof fetch;
+    }) as unknown as typeof fetch;
 
     try {
       const p1 = reverseGeocode(14.55, 121.01);
@@ -138,7 +138,7 @@ describe("leaflet reverse geocoding", () => {
         status: 200,
         headers: { "Content-Type": "application/json" },
       });
-    }) as typeof fetch;
+    }) as unknown as typeof fetch;
 
     try {
       const p1 = reverseGeocode(14.55, 121.01);
@@ -165,7 +165,7 @@ describe("leaflet reverse geocoding", () => {
         status: 200,
         headers: { "Content-Type": "application/json" },
       });
-    }) as typeof fetch;
+    }) as unknown as typeof fetch;
 
     try {
       const p1 = reverseGeocode(14.55, 121.01);

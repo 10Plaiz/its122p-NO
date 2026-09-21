@@ -37,7 +37,7 @@ Use GitHub Issues to track work and separate branches or worktrees for parallel
 changes. Read [CONTRIBUTING.md](CONTRIBUTING.md) for ownership and the pull
 request workflow. Before opening a PR, validate the linked issue's completion
 criteria and record the results in the [PR template](.github/pull_request_template.md).
-CI runs `bun run typecheck` and `bun run build` on PRs and pushes to `main`;
-add a test step when the project has an automated test script. The
-[local-development guide](docs/LOCAL_DEV.md#run-and-verify) explains those
-checks and the other available commands.
+CI runs `bun run typecheck`, `bun run test`, and `bun run build` on PRs and
+pushes to `main`. The [local-development guide](docs/LOCAL_DEV.md#run-and-verify)
+explains those checks, and [its test suites section](docs/LOCAL_DEV.md#test-suites)
+explains what each suite needs.
