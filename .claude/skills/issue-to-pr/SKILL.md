@@ -45,19 +45,24 @@ only from preserved output or logs. Never infer or fabricate a result.
 2. Read the repository documents that own contribution, setup, verification,
    and area-specific rules. Do not load unrelated history as authority.
 3. Explore the affected code, contracts, and configuration.
-4. Present the intended outcome, implementation plan, setup choice, and
-   expected file list. Treat the file list as an estimate, not a whitelist.
-   Necessary tests, documentation, and configuration can remain in scope when
-   they support the agreed outcome. Stop and align if behavior must expand.
-5. Use a feature branch for normal sequential work. Use a worktree when the
-   user requests one or parallel work needs isolation. Follow the repository's
-   setup guide for dependencies and ignored environment files. Never print
-   secret values.
-6. Apply the approval boundary before creating or switching branches or
-   worktrees. Confirm the result with `git status --short --branch`.
+4. Present the intended outcome, implementation plan, expected file list, and
+   two setup choices: a feature branch in the current workspace or a feature
+   branch in a separate worktree. Ask the user to select one. Treat the file
+   list as an estimate, not a whitelist. Necessary tests, documentation, and
+   configuration can remain in scope when they support the agreed outcome.
+   Stop and align if behavior must expand.
+5. Apply the approval boundary to the exact command for the selected setup,
+   then create or switch to the feature branch or create the worktree. Confirm
+   the result with `git status --short --branch` from the selected workspace.
+6. Do not install dependencies, edit source files, or run verification before
+   the selected branch or worktree is ready. After it is ready, perform all
+   remaining stages from that workspace. Follow the repository's setup guide
+   for dependencies and ignored environment files. Never print secret values.
 
-Completion criterion: the user has agreed to the scope and plan, and the
-selected branch or worktree is ready under the repository's setup rules.
+Completion criterion: the user has agreed to the scope and plan, explicitly
+selected a branch or worktree, and the selected workspace is ready under the
+repository's setup rules. No dependency installation, source edit, or
+verification has run before setup completed.
 
 ## Stage 2: Implement and Verify
 
