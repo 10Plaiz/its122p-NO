@@ -52,6 +52,7 @@ database migration operation.
 | `bun run test` | Run the fast test suite in `tests/fast/` |
 | `bun run test:security -- --target REF` | Run the security integration test suite against Express and Supabase |
 | `bun run test:smoke` | Run deployed smoke verification against the test site |
+| `bun run test:browser` | Run Playwright browser automation suite and capture evidence screenshots |
 | `bun run build` | Compile the API and build the web application |
 | `bun run start` | Run the compiled API with Node.js |
 
@@ -69,7 +70,7 @@ change and the others only when their environment is ready.
 | Security integration | `bun run test:security -- --target YOUR_PROJECT_REF` | A running Express API and linked Supabase project with synthetic fixture accounts |
 | Database access | `psql` command below | A disposable database with every migration applied |
 | Smoke | `bun run test:smoke` | Deployed test site or running app with fixture data |
-| Browser and manual | No command yet | A running app, and the synthetic fixture for evidence work |
+| Browser automation | `bun run test:browser` | Deployed test site or local app with fixture accounts, and Chromium installed via `bunx playwright install chromium` |
 
 The fast suite lives in `tests/fast/` and covers logic that can be checked on
 its own: no database, no running server, no browser, and no test runner beyond
@@ -109,6 +110,21 @@ psql "$TEST_DATABASE_URL" -X -v ON_ERROR_STOP=1 -f supabase/tests/api_access.sql
 
 It creates synthetic records inside a transaction and rolls them back. Do not
 run it against a database that is not approved for testing.
+
+The browser automation suite lives in `tests/browser/` and runs Playwright
+tests against Chromium. It exercises citizen report submission, editing,
+cancellation, staff queue transitions, remarks, admin metrics, and multi-viewport
+responsive layouts across mobile (375x812), tablet (768x1024), and desktop (1280x800).
+It automatically captures full-page evidence screenshots to `tests/evidence/`.
+
+```bash
+bunx playwright install chromium
+bun run test:browser
+```
+
+Configuration and runtime parameters:
+- `PLAYWRIGHT_BASE_URL`: Base target deployment (defaults to `https://kamoti-chi.vercel.app`).
+- `FIXTURE_PASSWORD`: Fixture account password (defaults to `Password123!`).
 
 Test case identifiers, results, evidence, and defects belong in the
 [Phase 4 test report](Phase4_Test_Report.md), not in this guide.
