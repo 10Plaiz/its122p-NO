@@ -1,3 +1,7 @@
+process.env.SUPABASE_URL ??= "https://test.supabase.co";
+process.env.SUPABASE_PUBLISHABLE_KEY ??= "test-publishable-key";
+process.env.SUPABASE_SECRET_KEY ??= "test-secret-key";
+
 import { describe, expect, test } from "bun:test";
 import { z } from "zod";
 import { ApiError } from "../../src/server/lib/errors.js";
@@ -9,6 +13,11 @@ import {
   passwordRule,
 } from "../../src/server/lib/validate.js";
 import { registerSchema } from "../../src/server/routes/auth.routes.js";
+import {
+  createSchema as reportCreateSchema,
+  editSchema as reportEditSchema,
+} from "../../src/server/routes/reports.routes.js";
+import { categorySchema } from "../../src/server/routes/categories.routes.js";
 import { CONTACT_ERROR, validateContactNumber } from "../../src/web/components/ContactNumberField.js";
 
 // Section A cases. Both contact-number rules are written down once here so the
@@ -125,19 +134,6 @@ describe("VAL-05 password rule is the same on both sides", () => {
   }
 });
 
-const reportCreateSchema = z.object({
-  title: z.string().trim().min(3).max(150),
-  description: z
-    .string()
-    .trim()
-    .min(10, "Describe the problem in at least 10 characters.")
-    .max(1000, "Keep the description under 1000 characters."),
-  category_id: z.coerce.number().int().positive(),
-  latitude: z.coerce.number().min(-90).max(90),
-  longitude: z.coerce.number().min(-180).max(180),
-  address_text: z.string().trim().max(255).nullable().optional(),
-});
-
 describe("VAL-06 report submission validation schema", () => {
   const validReport = {
     title: "Large pothole on highway",
@@ -225,11 +221,6 @@ describe("VAL-07 user registration validation schema", () => {
   });
 });
 
-const reportEditSchema = reportCreateSchema.partial().refine(
-  (changes) => Object.keys(changes).length > 0,
-  "Send at least one field to change.",
-);
-
 describe("VAL-08 report edit schema validation", () => {
   test("accepts single field update", () => {
     const result = reportEditSchema.safeParse({ title: "Updated report title" });
@@ -241,16 +232,6 @@ describe("VAL-08 report edit schema validation", () => {
     expect(result.success).toBe(false);
     expect(result.error?.issues[0]?.message).toBe("Send at least one field to change.");
   });
-});
-
-const categorySchema = z.object({
-  name: z
-    .string()
-    .trim()
-    .min(2, "Enter a category name.")
-    .max(60, "Keep the category name under 60 characters."),
-  description: z.string().trim().max(300).optional(),
-  is_active: z.boolean().optional(),
 });
 
 describe("VAL-09 category management validation schema", () => {

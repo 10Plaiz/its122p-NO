@@ -35,7 +35,7 @@ function present(report: Report) {
 }
 
 // Multipart form fields arrive as strings, so numbers are coerced here.
-const createSchema = z.object({
+export const createSchema = z.object({
   title: z.string().trim().min(3).max(150),
   description: z
     .string()
@@ -56,7 +56,7 @@ const listSchema = z.object({
 });
 
 // A citizen may correct any of these while the report is still pending.
-const editSchema = createSchema.partial().refine(
+export const editSchema = createSchema.partial().refine(
   (changes) => Object.keys(changes).length > 0,
   "Send at least one field to change.",
 );
