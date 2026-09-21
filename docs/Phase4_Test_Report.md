@@ -13,7 +13,9 @@ cases, their results, and the evidence that supports them.
 **Status: automated fast, functional, and security integration tests recorded.** Automated
 test suites cover Sections A through F (Input Validation, SQL Injection,
 Authentication, Authorization, Cross-Site Scripting, and Functional Testing).
-Usability test tables will be completed in subsequent Phase 4 deliverables.
+Section G currently contains the usability protocol and blank result tables
+only. It is preparation, not evidence of completed usability testing; the three
+sessions and their evidence remain outstanding.
 
 ## Test case identifiers
 
@@ -272,18 +274,18 @@ Result is `Completed`, `Completed with difficulty`, or `Not completed`.
 | Session | ID | Task | Result | Observation | Evidence |
 | :--- | :--- | :--- | :--- | :--- | :--- |
 | `USE-S1` | `USE-01` | Find pothole reports on the public board |  |  |  |
-| `USE-S1` | `USE-02` | Filter to reports being worked on and share the link |  |  |  |
+| `USE-S1` | `USE-02` | Filter to In progress reports and share the link |  |  |  |
 | `USE-S1` | `USE-03` | Find an existing report and read its current status |  |  |  |
 | `USE-S1` | `USE-04` | Submit a new report from a phone |  |  |  |
 | `USE-S1` | `USE-05` | Edit the pending report, then return to the report list |  |  |  |
 | `USE-S2` | `USE-01` | Find pothole reports on the public board |  |  |  |
-| `USE-S2` | `USE-02` | Filter to reports being worked on and share the link |  |  |  |
+| `USE-S2` | `USE-02` | Filter to In progress reports and share the link |  |  |  |
 | `USE-S2` | `USE-06` | Open an assigned report, add a remark, advance its status |  |  |  |
 | `USE-S2` | `USE-07` | Check the queue and return to the worked report |  |  |  |
 | `USE-S3` | `USE-01` | Find pothole reports on the public board |  |  |  |
-| `USE-S3` | `USE-02` | Filter to reports being worked on and share the link |  |  |  |
-| `USE-S3` | `USE-08` | Assign an unassigned report to a staff member |  |  |  |
-| `USE-S3` | `USE-09` | Create a category and find the action in the activity log |  |  |  |
+| `USE-S3` | `USE-02` | Filter to In progress reports and share the link |  |  |  |
+| `USE-S3` | `USE-08` | Assign the unassigned fixture drainage report |  |  |  |
+| `USE-S3` | `USE-09` | Create the run-specific category and find its activity log |  |  |  |
 
 ### Ratings
 

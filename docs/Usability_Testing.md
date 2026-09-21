@@ -9,6 +9,11 @@ Section G of the [Phase 4 instructions](Phase4_Instructions.md) owns the
 requirement. The [test environment](TEST_ENVIRONMENT.md) owns the test URL and
 the fixture sign-in details a facilitator hands to a tester.
 
+This protocol and the blank result tables prepare the sessions; they do not
+prove that usability testing occurred. The usability requirement is complete
+only after all three sessions, their evidence, and their findings are recorded
+in the Phase 4 test report.
+
 This is a short peer evaluation, not a research study. Three sessions of roughly
 twenty minutes each are enough. Keep recruitment, consent, and evidence
 proportionate to that.
@@ -32,26 +37,34 @@ defect issue. Nothing anywhere maps a code back to a person.
 ## Before the session
 
 1. Confirm the test site is healthy: `bun run test:smoke`.
-2. Reset fixture data if an earlier session moved a report out of `pending`:
+2. Before `USE-S1`, create one evaluation run ID in `YYYYMMDD-HHMM` form. Reuse
+   it on all three session capture sheets. Test-created report and category
+   names include this ID so a retry never collides with an earlier run.
+3. Check the test project's account list before giving the device to a tester.
+   Continue only when every visible account is one of the documented fixture
+   accounts. If another account is present, stop and ask the deployment owner
+   for a fixture-only test project. Do not delete or deactivate accounts as
+   session setup.
+4. Before every session, restore the fixture report states and assignments:
    `bun run fixture -- --target YOUR_PROJECT_REF`.
-3. Check that the public board has something to look at. It shows only reports
-   at `under_review`, `in_progress`, or `resolved` — a `pending` report is not
-   on it, and `pending` is not one of its filter options. The fixture leaves one
-   report on the board, which is thin for `USE-01` and `USE-02`. Sign in as the
-   fixture administrator beforehand and move a second fixture report to
-   `under_review` so the board has more than one row. `bun run fixture` restores
-   the states afterwards.
-4. Before `USE-S3`, check who is in the test project's account list. The
-   Administrator tasks put the tester on screens that show every account, and
-   the evidence rules below forbid capturing any account that is not a fixture
-   account. Either remove the non-fixture accounts from the test project first,
-   or run `USE-08` and `USE-09` without capturing the user list. The same
-   applies to the staff picker when assigning a report.
-5. Open the test URL from [TEST_ENVIRONMENT.md](TEST_ENVIRONMENT.md#non-secret-handoff-record)
+   This restores the fixture rows, but it does not erase append-only history,
+   notifications, categories, or activity logs from earlier sessions.
+5. Sign in as the fixture Administrator and prepare two public rows through the
+   normal interface:
+   - Advance `[FIXTURE] Pothole cluster on Demo Boulevard` from `under_review`
+     to `in_progress`.
+   - Advance `[FIXTURE] Overflowing drainage canal on Test Street` from
+     `pending` to `under_review`. Leave it unassigned for `USE-08`.
+6. Open the public board and verify that searching for `pothole` finds the
+   fixture pothole and filtering to `In progress` keeps it visible. If either
+   check fails, stop the session and record an environment defect.
+7. Open the test URL from [TEST_ENVIRONMENT.md](TEST_ENVIRONMENT.md#non-secret-handoff-record)
    on the tester's device and sign the tester in with the fixture account for
    their session. The tester never uses their own account, email, or phone
    number.
-6. Read the consent note below and get a verbal yes before recording anything.
+8. For `USE-S1`, give the tester the synthetic Sample Avenue pin at latitude
+   `14.5995`, longitude `120.9842`. Tell them not to select **Use my location**.
+9. Read the consent note below and get a verbal yes before recording anything.
 
 ### Consent note to read aloud
 
@@ -67,7 +80,8 @@ defect issue. Nothing anywhere maps a code back to a person.
 Read each task as written. Do not explain the interface, and do not help until
 the tester asks or gives up. Record the result as `Completed`,
 `Completed with difficulty`, or `Not completed`, and note where the tester
-hesitated.
+hesitated. Replace `RUN_ID` in `USE-04` and `USE-09` with the evaluation's
+recorded run ID before reading those tasks.
 
 If a task turns out to be impossible rather than merely hard — the screen does
 not exist, the data is not there, the control does nothing — stop that task,
@@ -80,21 +94,31 @@ tester's fault. Tell them so, briefly, and carry on.
 | ID | Journey | Task read to the tester |
 | :--- | :--- | :--- |
 | `USE-01` | Public board | Without signing in, find the reports the community has filed about potholes. |
-| `USE-02` | Public board | Narrow the board to reports that are already being worked on, then send me the link to exactly what you are looking at. |
+| `USE-02` | Public board | Narrow the board to reports marked In progress, then send me the link to exactly what you are looking at. |
 | `USE-03` | Citizen | You filed a report a while ago. Find it and tell me what is happening with it now. |
-| `USE-04` | Citizen | Report a new problem: a broken streetlight near where you are. Start the title with `[USABILITY]`. |
-| `USE-05` | Citizen | You gave the wrong street. Change the details of the report you just filed, then get back to your list of reports. |
+| `USE-04` | Citizen | Report a fictional broken streetlight at the supplied Sample Avenue test pin. Do not use your current location. Start the title with `[USABILITY] RUN_ID`. |
+| `USE-05` | Citizen | You entered Sample Avenue but should have entered Test Street. Correct the report you just filed, then get back to your report list. |
 | `USE-06` | Staff | A report has been assigned to you. Open it, record that you inspected the site, and move it forward. |
 | `USE-07` | Staff | Find out whether anything else is waiting for you, and get back to the report you just worked on. |
-| `USE-08` | Administrator | A report has nobody working on it. Give it to a staff member. |
-| `USE-09` | Administrator | Add a new report category for flooding, then show me that the system recorded you doing it. |
+| `USE-08` | Administrator | The fixture drainage report has nobody working on it. Find it and give it to a staff member. |
+| `USE-09` | Administrator | Add a category named `[USABILITY] Flooding RUN_ID`, then show me that the system recorded you doing it. |
 
 ### Data the tasks create
 
-`USE-04` creates a report. Its title starts with `[USABILITY]` so the team can
-find and delete these afterwards. `USE-06` and `USE-08` move fixture reports
-out of `pending`; rerunning `bun run fixture` restores them. Nothing else in
-the script writes data.
+The script intentionally changes only synthetic test data:
+
+- `USE-04` creates one report and `USE-05` edits it. Its title includes
+  `[USABILITY]` and the run ID so the team can find it afterwards.
+- `USE-06` appends a remark, changes the assigned pothole's status, and creates
+  history and notifications.
+- `USE-08` assigns the fixture drainage report and creates history and
+  notifications. Assignment does not change its status.
+- `USE-09` creates one uniquely named category and an activity-log entry.
+
+The fixture command restores the fixture reports' current status and
+assignment. It does not remove report history, notifications, categories, or
+activity logs. Those append-only records can remain as synthetic test history;
+use the run ID and timestamps to distinguish the current session.
 
 ## Questionnaire
 
@@ -150,6 +174,7 @@ Section G of the report needs and nothing else.
 ```text
 Session:        USE-S_   (S1 mobile/Citizen, S2 desktop/Staff, S3 desktop/Admin)
 Tester code:    T_
+Run ID:
 Device/browser:
 Date:
 
@@ -157,13 +182,13 @@ TASKS   result = Completed | Completed with difficulty | Not completed
 USE-01  Find pothole reports on the public board
         result:
         note:
-USE-02  Filter to reports being worked on, share the link
+USE-02  Filter to In progress reports, share the link
         result:
         note:
 USE-03  Find an existing report and read its status        (S1 only)
         result:
         note:
-USE-04  Submit a new report, title starting [USABILITY]    (S1 only)
+USE-04  Submit at the synthetic pin, title [USABILITY] RUN_ID (S1 only)
         result:
         note:
 USE-05  Edit that pending report, return to the list       (S1 only)
@@ -175,10 +200,10 @@ USE-06  Open assigned report, add remark, advance status   (S2 only)
 USE-07  Check the queue, return to the worked report       (S2 only)
         result:
         note:
-USE-08  Assign an unassigned report to a staff member      (S3 only)
+USE-08  Assign the unassigned fixture drainage report      (S3 only)
         result:
         note:
-USE-09  Create a category, find it in the activity log     (S3 only)
+USE-09  Create [USABILITY] Flooding RUN_ID, find its log   (S3 only)
         result:
         note:
 
@@ -211,5 +236,12 @@ Send the three filled blocks back and they transcribe directly into Section G.
      a row in the bug log referencing that issue.
    - Every other finding stays visible as a bug log row with its severity. It
      does not need an issue.
-4. Delete the `[USABILITY]` reports from the test environment and rerun
-   `bun run fixture` to restore the fixture report states.
+4. Sign in as the fixture Citizen and cancel the pending report whose title
+   contains this run ID. The application keeps cancelled reports and their
+   history by design; do not delete records directly from the shared project.
+5. Sign in as the fixture Administrator and retire the category whose name
+   contains this run ID. The category and its activity log remain as inactive
+   synthetic test history.
+6. Restore fixture status and assignment for the next session with
+   `bun run fixture -- --target YOUR_PROJECT_REF`. This command does not erase
+   the append-only history described above.
