@@ -207,10 +207,10 @@ The test uses synthetic records inside a transaction and rolls them back.
 | `POST` `PATCH` `DELETE` | `/api/categories[/:id]` | admin |
 | `GET` | `/api/reports` | signed in: scoped by role |
 | `POST` | `/api/reports` | citizen (multipart, optional `photo`, up to 3 MB) |
-| `GET` | `/api/reports/:id` | owner, staff, admin |
+| `GET` | `/api/reports/:id` | owner, assigned staff, admin |
 | `PATCH` | `/api/reports/:id` | owner, while `pending` |
 | `POST` | `/api/reports/:id/cancel` | owner, while `pending` |
-| `GET` | `/api/reports/:id/updates` | owner, staff, admin |
+| `GET` | `/api/reports/:id/updates` | owner, assigned staff, admin |
 | `PATCH` | `/api/reports/:id/status` | assigned staff, admin |
 | `PATCH` | `/api/reports/:id/assign` | **admin only** |
 | `POST` | `/api/reports/:id/remarks` | assigned staff, admin |
@@ -224,6 +224,8 @@ The test uses synthetic records inside a transaction and rolls them back.
 | `GET` | `/api/public/stats` | **anyone, no login**: counts above the board |
 
 `GET /api/reports` is a single handler that filters by role: a citizen sees only their own reports, a staff member sees only reports assigned to them, an admin sees all. Query parameters: `q`, `status`, `category_id`, `from`, `to`, `sort`, `page`, `per_page`. `GET /api/public/reports` takes the same set, except that `status` accepts only the three the board can show.
+
+Protected report-detail access (`GET /api/reports/:id` and `GET /api/reports/:id/updates`) enforces record-level authorization: a Citizen may only view their own report, Staff may only view a report assigned to them, and an Administrator may view any report. Unpermitted requests receive `403 Forbidden` and disclose no report data or timeline history. This contrasts with the public transparency board (`GET /api/public/reports`), which requires no sign-in and displays reviewed reports without reporter identity, contact numbers, pending or cancelled reports, protected history, or operational notes.
 
 The third-party endpoint, called from the browser rather than from this API:
 
