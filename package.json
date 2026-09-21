@@ -10,6 +10,8 @@
     "dev:web": "vite",
     "fixture": "tsx scripts/fixture/seed.ts",
     "test": "bun test",
+    "test:browser": "playwright test",
+    "test:browser:report": "playwright show-report",
     "test:security": "tsx tests/integration/security.ts",
     "test:smoke": "bun scripts/smoke/verify-deployment.ts",
     "typecheck": "bun run typecheck:api && bun run typecheck:web && bun run typecheck:deploy && bun run typecheck:test",
@@ -41,6 +43,7 @@
     "node": ">=22.0.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.63.0",
     "@types/bun": "^1.4.2",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",

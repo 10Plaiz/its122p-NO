@@ -6,3 +6,5 @@ dist/
 .vercel/
 coverage/
 *.tsbuildinfo
+test-results/
+playwright-report/
