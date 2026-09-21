@@ -44,8 +44,14 @@ the server remains responsible for access control.
 
 ## Shared browser behavior
 
-- `src/web/lib/auth.tsx` restores a stored session with `/auth/me`, clears an
-  invalid session, and selects the role home after sign-in.
+- `src/web/lib/auth.tsx` restores a stored session with `/auth/me`, listens for
+  the `kamoti:auth-expired` event dispatched on 401 or deactivation 403 API
+  responses to clear local session state, and selects the role home after
+  sign-in. Role or record ownership 403 responses preserve the session and
+  display an on-screen alert.
+- Successful citizen registration navigates to `/signin` with registration
+  state, pre-filling the submitted email and displaying an account creation
+  confirmation banner.
 - Client validation mirrors server validation where immediate field feedback is
   useful. Server validation remains authoritative.
 - API field errors appear beside the corresponding form controls. Page-level
