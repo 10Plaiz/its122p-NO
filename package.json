@@ -10,10 +10,11 @@
     "dev:web": "vite",
     "fixture": "tsx scripts/fixture/seed.ts",
     "test": "bun test tests/fast",
-    "typecheck": "bun run typecheck:api && bun run typecheck:web && bun run typecheck:deploy",
+    "typecheck": "bun run typecheck:api && bun run typecheck:web && bun run typecheck:deploy && bun run typecheck:test",
     "typecheck:api": "tsc --noEmit -p tsconfig.server.json",
     "typecheck:web": "tsc --noEmit -p tsconfig.web.json",
     "typecheck:deploy": "tsc --noEmit -p tsconfig.deploy.json",
+    "typecheck:test": "tsc --noEmit -p tsconfig.test.json",
     "build": "bun run build:api && bun run build:web",
     "build:api": "tsc -p tsconfig.server.json",
     "build:web": "vite build",
@@ -38,6 +39,7 @@
     "node": ">=22.0.0"
   },
   "devDependencies": {
+    "@types/bun": "^1.4.2",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
     "@types/leaflet": "^1.9.22",
