@@ -10,8 +10,9 @@ submitted. The [local-development guide](LOCAL_DEV.md#run-and-verify) owns the
 test commands and the environment each suite needs. This report owns the test
 cases, their results, and the evidence that supports them.
 
-**Status: no results recorded yet.** The structure, identifiers, and evidence
-rules below are in place; later Phase 4 work fills the tables in.
+**Status: automated fast tests recorded.** Initial automated test cases for
+input validation, query safety, authentication, and authorization are recorded;
+manual browser testing will be recorded in later Phase 4 work.
 
 ## Test case identifiers
 
@@ -53,8 +54,14 @@ These are allocated by the fast suite in `tests/fast/`. Do not reuse them.
 | `VAL-01` | Contact number rule accepts and rejects the documented forms | `tests/fast/validation.test.ts` |
 | `VAL-02` | Contact number rule is identical in the form and the API | `tests/fast/validation.test.ts` |
 | `VAL-03` | Rejected input returns 400 and names every invalid field | `tests/fast/validation.test.ts` |
+| `VAL-04` | Password creation rule enforces 8 to 72 character range | `tests/fast/validation.test.ts` |
+| `VAL-05` | Password rule is identical in the form and the API | `tests/fast/validation.test.ts` |
 | `SQLI-01` | A search term cannot add or change a query filter | `tests/fast/query-safety.test.ts` |
 | `SQLI-02` | A search term with nothing left to match is skipped | `tests/fast/query-safety.test.ts` |
+| `AUTH-01` | Unauthenticated request returns 401 | `tests/fast/auth.test.ts` |
+| `AUTH-02` | Deactivated user receives 403 with administrator prompt | `tests/fast/auth.test.ts` |
+| `AUTH-03` | Session expiration event dispatches on 401 and deactivation 403 | `tests/fast/auth.test.ts` |
+| `AUTHZ-01` | Role authorization denies cross-role requests with 403 and keeps session | `tests/fast/auth.test.ts` |
 
 ## Evidence rules
 
@@ -73,7 +80,11 @@ These are allocated by the fast suite in `tests/fast/`. Do not reuse them.
 
 | ID | Field or form | Input | Expected result | Actual result | Method | Evidence | Status |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-|  |  |  |  |  |  |  |  |
+| `VAL-01` | Contact number | 11 digits starting 09, spaces, or invalid formats | Accepts valid formats; rejects invalid prefixes, lengths, or letters | Matches expected patterns | Automated | `tests/fast/validation.test.ts` | `PASS` |
+| `VAL-02` | Contact number parity | Documented valid and invalid inputs | Form validation and API schema accept and reject identical inputs | Frontend and API accept/reject identically | Automated | `tests/fast/validation.test.ts` | `PASS` |
+| `VAL-03` | Schema parsing | Malformed payload with missing fields | HTTP 400 Bad Request listing every invalid field | Returns 400 with details array | Automated | `tests/fast/validation.test.ts` | `PASS` |
+| `VAL-04` | Password length policy | Passwords outside 8 to 72 range, 7 chars, 73 chars, empty | Rejects < 8 and > 72 with specific messages; accepts 8 to 72 chars | Matches character limits | Automated | `tests/fast/validation.test.ts` | `PASS` |
+| `VAL-05` | Password parity | Boundary passwords across client and server | Client validation and API schemas agree on boundary values | Client and API accept/reject identically | Automated | `tests/fast/validation.test.ts` | `PASS` |
 
 ## B. SQL injection test
 
@@ -82,7 +93,8 @@ text, then the cases that show it.
 
 | ID | Entry point | Payload | Expected result | Actual result | Method | Evidence | Status |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-|  |  |  |  |  |  |  |  |
+| `SQLI-01` | Search query filter | Filter injection payloads and operators | PostgREST grammar stripped; values kept inside ilike clauses | Injections neutralized | Automated | `tests/fast/query-safety.test.ts` | `PASS` |
+| `SQLI-02` | Search filter boundary | Wildcards only, whitespace, or empty punctuation | Search filter omitted (returns null) rather than querying broad wildcard | Null returned safely | Automated | `tests/fast/query-safety.test.ts` | `PASS` |
 
 **How injection is prevented.** _To be written with the case results._
 
@@ -93,7 +105,9 @@ out, and reaching a protected page without a session.
 
 | ID | Scenario | Steps | Expected result | Actual result | Method | Evidence | Status |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-|  |  |  |  |  |  |  |  |
+| `AUTH-01` | Unauthenticated request handling | Send request without Authorization header, with expired token, or for missing profile | HTTP 401 Unauthorized with appropriate sign-in or missing account prompt | Returns 401 Unauthorized with prompt | Automated | `tests/fast/auth.test.ts` | `PASS` |
+| `AUTH-02` | Deactivated user handling | Call protected endpoint or login with deactivated user account | HTTP 403 Forbidden with prompt to contact administrator | Returns 403 Forbidden with prompt | Automated | `tests/fast/auth.test.ts` | `PASS` |
+| `AUTH-03` | Session expiration synchronization | Trigger 401 or deactivation 403 from authenticated API client call | Dispatches `kamoti:auth-expired` event; does not dispatch on role denial or login | Event dispatched appropriately and local session cleared | Automated | `tests/fast/auth.test.ts` | `PASS` |
 
 ## D. Authorization test
 
@@ -101,7 +115,7 @@ Cover each role against the pages and endpoints it should and should not reach.
 
 | ID | Role | Page or endpoint | Expected access | Actual access | Method | Evidence | Status |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-|  |  |  |  |  |  |  |  |
+| `AUTHZ-01` | Citizen attempting staff/admin endpoint | Call role-gated endpoint with non-permitted role | HTTP 403 Forbidden; user session remains active | Returns 403; session remains active | Automated | `tests/fast/auth.test.ts` | `PASS` |
 
 ## E. Cross-site scripting (XSS) test
 

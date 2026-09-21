@@ -1,26 +1,21 @@
 import { Router } from "express";
 import { z } from "zod";
 import { auth, db } from "../config/supabase.js";
-import { badRequest, orThrow, unauthorized } from "../lib/errors.js";
-import { contactNumber, parse } from "../lib/validate.js";
+import { badRequest, forbidden, orThrow, unauthorized } from "../lib/errors.js";
+import { contactNumber, parse, passwordRule } from "../lib/validate.js";
 import { requireAuth } from "../middleware/auth.js";
 import { logActivity } from "../lib/activity.js";
 
 const router = Router();
 
-const registerSchema = z.object({
+export const registerSchema = z.object({
   name: z.string().trim().min(2, "Enter your full name.").max(80, "Keep the name under 80 characters."),
   email: z.email("Enter a valid email address.").max(254, "That email address is too long."),
-  // 72 is where the password hash stops reading, so anything past it is not
-  // actually part of the password.
-  password: z
-    .string()
-    .min(8, "Use at least 8 characters.")
-    .max(72, "Keep the password under 72 characters."),
+  password: passwordRule,
   contact_number: contactNumber.optional(),
 });
 
-const loginSchema = z.object({
+export const loginSchema = z.object({
   email: z.email("Enter a valid email address."),
   password: z.string().min(1, "Enter your password."),
 });
@@ -68,7 +63,8 @@ router.post("/login", async (req, res) => {
     .eq("id", data.user.id)
     .single();
 
-  if (!profile?.is_active) throw unauthorized("This account has been deactivated.");
+  if (!profile) throw unauthorized("Your account no longer exists.");
+  if (!profile.is_active) throw forbidden("Your account has been deactivated. Contact an administrator.");
 
   res.json({
     user: profile,

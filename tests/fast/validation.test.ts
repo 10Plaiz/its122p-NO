@@ -1,7 +1,13 @@
 import { describe, expect, test } from "bun:test";
 import { z } from "zod";
 import { ApiError } from "../../src/server/lib/errors.js";
-import { contactNumber, parse } from "../../src/server/lib/validate.js";
+import {
+  PASSWORD_MAX_ERROR,
+  PASSWORD_MIN_ERROR,
+  contactNumber,
+  parse,
+  passwordRule,
+} from "../../src/server/lib/validate.js";
 import { CONTACT_ERROR, validateContactNumber } from "../../src/web/components/ContactNumberField.js";
 
 // Section A cases. Both contact-number rules are written down once here so the
@@ -77,3 +83,44 @@ describe("VAL-03 rejected input names the fields that were wrong", () => {
     ]);
   });
 });
+
+const PASSWORD_INPUTS = [
+  { value: "a".repeat(8), valid: true, note: "minimum length of 8 characters" },
+  { value: "a".repeat(72), valid: true, note: "maximum length of 72 characters" },
+  { value: "correct-horse-battery-staple", valid: true, note: "typical passphrase" },
+  { value: "a".repeat(7), valid: false, expectedMessage: PASSWORD_MIN_ERROR, note: "7 characters is too short" },
+  { value: "", valid: false, expectedMessage: PASSWORD_MIN_ERROR, note: "empty string is too short" },
+  { value: "a".repeat(73), valid: false, expectedMessage: PASSWORD_MAX_ERROR, note: "73 characters is too long" },
+];
+
+function validateClientPassword(password: string): string | undefined {
+  if (password.length < 8) return "Use at least 8 characters.";
+  if (password.length > 72) return "Keep the password under 72 characters.";
+  return undefined;
+}
+
+describe("VAL-04 password creation rule", () => {
+  for (const { value, valid, note } of PASSWORD_INPUTS) {
+    test(`${valid ? "accepts" : "rejects"} ${note}`, () => {
+      expect(passwordRule.safeParse(value).success).toBe(valid);
+    });
+  }
+});
+
+describe("VAL-05 password rule is the same on both sides", () => {
+  for (const { value, valid, expectedMessage, note } of PASSWORD_INPUTS) {
+    test(`frontend and API agree on ${note}`, () => {
+      const serverResult = passwordRule.safeParse(value);
+      const clientError = validateClientPassword(value);
+
+      expect(serverResult.success).toBe(valid);
+      expect(clientError === undefined).toBe(valid);
+
+      if (!valid && expectedMessage) {
+        expect(serverResult.error?.issues[0]?.message).toBe(expectedMessage);
+        expect(clientError).toBe(expectedMessage);
+      }
+    });
+  }
+});
+

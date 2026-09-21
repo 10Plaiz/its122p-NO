@@ -103,7 +103,8 @@ From **Nominatim**, KAMOTI reads exactly one field of the response,
   Node function in production. The same build works in both because it never
   learns where the API is.
 - **Token, not password.** The `access_token` is read from `localStorage` per
-  request; a `401` or `403` clears it and ends the session.
+  request; a `401` or a deactivation `403` clears it and ends the session. Role
+  and record ownership `403` responses keep the session active.
 - **No page reloads.** Screens use `useApi` for reads, which tracks loading and
   error state and abandons superseded requests with `AbortController`. They use
   `useAction` for writes. Uploads send `FormData` with `Content-Type` left unset

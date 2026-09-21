@@ -1,9 +1,9 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { ChangeEvent, FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { ContactNumberField, validateContactNumber } from "../components/ContactNumberField.js";
 import { Alert, Button, Field, Input, focusFirstError } from "../components/ui.js";
-import { useAuth } from "../lib/auth.js";
+import { homePathFor, useAuth } from "../lib/auth.js";
 import { useAction } from "../lib/useApi.js";
 
 // Rules mirror registerSchema in src/server/routes/auth.routes.ts, message for
@@ -14,6 +14,7 @@ function validate(values: { name: string; email: string; password: string; conta
   if (values.name.trim().length < 2) errors.name = "Enter your full name.";
   if (!/^\S+@\S+\.\S+$/.test(values.email.trim())) errors.email = "Enter a valid email address.";
   if (values.password.length < 8) errors.password = "Use at least 8 characters.";
+  else if (values.password.length > 72) errors.password = "Keep the password under 72 characters.";
 
   const contactError = validateContactNumber(values.contact);
   if (contactError) errors.contact_number = contactError;
@@ -22,12 +23,19 @@ function validate(values: { name: string; email: string; password: string; conta
 }
 
 export function RegisterPage() {
-  const { register } = useAuth();
+  const { user, register, loading } = useAuth();
   const navigate = useNavigate();
   const { run, pending, error } = useAction(register);
 
   const [values, setValues] = useState({ name: "", email: "", password: "", contact: "" });
   const [touched, setTouched] = useState(false);
+
+  // A signed-in user has no reason to see this screen.
+  useEffect(() => {
+    if (!loading && user) {
+      navigate(homePathFor(user), { replace: true });
+    }
+  }, [loading, user, navigate]);
 
   const errors = validate(values);
   // Whatever the server rejected wins over the local guess for that field.
@@ -55,7 +63,12 @@ export function RegisterPage() {
     });
 
     // run() returns null when the request failed; only a success navigates away.
-    if (created) navigate("/signin", { replace: true });
+    if (created) {
+      navigate("/signin", {
+        replace: true,
+        state: { registered: true, email: values.email.trim() },
+      });
+    }
   }
 
   return (
