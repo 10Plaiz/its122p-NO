@@ -70,6 +70,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
+  // Listen for session expiration or account deactivation events triggered by any API call.
+  useEffect(() => {
+    function handleSessionExpired() {
+      setToken(null);
+      setUser(null);
+    }
+    window.addEventListener("kamoti:auth-expired", handleSessionExpired);
+    return () => window.removeEventListener("kamoti:auth-expired", handleSessionExpired);
+  }, []);
+
   const signIn = useCallback(async (email: string, password: string) => {
     const session = await api.post<Session>("/auth/login", { email, password });
     setToken(session.access_token);

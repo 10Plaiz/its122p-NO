@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { z } from "zod";
 import { auth, db } from "../config/supabase.js";
-import { badRequest, orThrow, unauthorized } from "../lib/errors.js";
+import { badRequest, forbidden, orThrow, unauthorized } from "../lib/errors.js";
 import { contactNumber, parse } from "../lib/validate.js";
 import { requireAuth } from "../middleware/auth.js";
 import { logActivity } from "../lib/activity.js";
@@ -68,7 +68,8 @@ router.post("/login", async (req, res) => {
     .eq("id", data.user.id)
     .single();
 
-  if (!profile?.is_active) throw unauthorized("This account has been deactivated.");
+  if (!profile) throw unauthorized("Your account no longer exists.");
+  if (!profile.is_active) throw forbidden("Your account has been deactivated. Contact an administrator.");
 
   res.json({
     user: profile,

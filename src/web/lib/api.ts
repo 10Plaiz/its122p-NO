@@ -97,6 +97,16 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
       payload && typeof payload === "object" && "error" in payload
         ? String((payload as { error: unknown }).error)
         : "Something went wrong. Try again.";
+
+    if (
+      typeof window !== "undefined" &&
+      token &&
+      path !== "/auth/login" &&
+      (response.status === 401 || (response.status === 403 && message.toLowerCase().includes("deactivated")))
+    ) {
+      window.dispatchEvent(new CustomEvent("kamoti:auth-expired", { detail: { status: response.status, message } }));
+    }
+
     throw new ApiError(response.status, message, (payload as { details?: unknown } | null)?.details);
   }
 
