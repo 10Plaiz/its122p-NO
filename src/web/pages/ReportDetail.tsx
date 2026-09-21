@@ -1,18 +1,46 @@
+import { useState, useRef, useEffect } from "react";
+import type { FormEvent } from "react";
 import { Link, useParams } from "react-router-dom";
 import { MapContainer, Marker, TileLayer } from "react-leaflet";
-import { Alert, Loading, PhotoFrame, StatusBadge, formatDateTime } from "../components/ui.js";
-import { TILE_ATTRIBUTION, TILE_URL, pinFor } from "../lib/leaflet.js";
-import { useApi } from "../lib/useApi.js";
+import {
+  Alert,
+  Button,
+  Field,
+  Input,
+  Loading,
+  PhotoFrame,
+  Select,
+  StatusBadge,
+  Textarea,
+  focusFirstError,
+  formatDateTime,
+} from "../components/ui.js";
+import { MapPicker } from "../components/MapPicker.js";
+import type { Point } from "../components/MapPicker.js";
+import { useToast } from "../components/Toast.js";
+import { TILE_ATTRIBUTION, TILE_URL, pinFor, reverseGeocode } from "../lib/leaflet.js";
+import { api } from "../lib/api.js";
+import { useAuth } from "../lib/auth.js";
+import { useAction, useApi } from "../lib/useApi.js";
 import { STATUS_LABEL } from "../lib/types.js";
-import type { Report, ReportUpdate } from "../lib/types.js";
+import type { Category, Report, ReportUpdate } from "../lib/types.js";
 
 // Wireframe 1j. Visible to the report's owner, to assigned staff and to admins —
 // assertCanView decides, so an id guessed from the URL returns 403 rather than data.
 export function ReportDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const { user } = useAuth();
+  const [isEditing, setIsEditing] = useState(false);
 
-  const { data, error, loading } = useApi<{ report: Report }>(id ? `/reports/${id}` : null);
-  const { data: history } = useApi<{ updates: ReportUpdate[] }>(id ? `/reports/${id}/updates` : null);
+  const { data, error, loading, reload } = useApi<{ report: Report }>(id ? `/reports/${id}` : null);
+  const { data: history, reload: reloadHistory } = useApi<{ updates: ReportUpdate[] }>(
+    id ? `/reports/${id}/updates` : null,
+  );
+
+  function refresh() {
+    reload();
+    reloadHistory();
+  }
 
   if (loading) return <Loading label="Loading the report" />;
 
@@ -30,6 +58,22 @@ export function ReportDetailPage() {
   if (!data) return null;
 
   const report = data.report;
+  const canEdit =
+    user?.role === "citizen" && report.citizen?.id === user.id && report.status === "pending";
+
+  if (isEditing && canEdit) {
+    return (
+      <EditReport
+        report={report}
+        onDone={() => {
+          refresh();
+          setIsEditing(false);
+        }}
+        onCancel={() => setIsEditing(false)}
+      />
+    );
+  }
+
   const initial = report.photos.filter((photo) => photo.kind === "initial");
   const resolution = report.photos.filter((photo) => photo.kind === "resolution");
 
@@ -38,7 +82,14 @@ export function ReportDetailPage() {
       <header className="flex flex-col gap-2">
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <span className="font-mono text-[11px] text-muted">{report.reference_code}</span>
-          <StatusBadge status={report.status} />
+          <div className="flex items-center gap-2">
+            <StatusBadge status={report.status} />
+            {canEdit && (
+              <Button type="button" variant="secondary" onClick={() => setIsEditing(true)}>
+                Edit report
+              </Button>
+            )}
+          </div>
         </div>
         <h2>{report.title}</h2>
         <p className="text-muted font-mono text-[11px]">
@@ -175,3 +226,240 @@ function Timeline({ updates }: { updates: ReportUpdate[] }) {
     </ol>
   );
 }
+
+// Allows the reporting citizen to edit their pending report before staff begin handling it.
+function EditReport({
+  report,
+  onDone,
+  onCancel,
+}: {
+  report: Report;
+  onDone: () => void;
+  onCancel: () => void;
+}) {
+  const toast = useToast();
+  const { data: categoryData } = useApi<{ categories: Category[] }>("/categories");
+
+  const [title, setTitle] = useState(report.title);
+  const [description, setDescription] = useState(report.description);
+  const [categoryId, setCategoryId] = useState(String(report.category?.id ?? ""));
+  const [address, setAddress] = useState(report.address_text ?? "");
+  const [point, setPoint] = useState<Point>({ lat: report.latitude, lng: report.longitude });
+  const [locating, setLocating] = useState(false);
+  const [touched, setTouched] = useState(false);
+
+  const pointChangedByUser = useRef(false);
+  const addressTouched = useRef(false);
+
+  function handlePointChange(newPoint: Point) {
+    pointChangedByUser.current = true;
+    setPoint(newPoint);
+  }
+
+  // Reverse-geocode when the user adjusts the pin location on the map.
+  useEffect(() => {
+    if (!point || !pointChangedByUser.current || addressTouched.current) return;
+    const controller = new AbortController();
+    const timer = setTimeout(async () => {
+      const found = await reverseGeocode(point.lat, point.lng, controller.signal);
+      if (found && !addressTouched.current) {
+        setAddress(found.slice(0, 255));
+      }
+    }, 700);
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
+  }, [point]);
+
+  function useMyLocation() {
+    if (!navigator.geolocation) return;
+    setLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        handlePointChange({ lat: position.coords.latitude, lng: position.coords.longitude });
+        setLocating(false);
+      },
+      () => setLocating(false),
+      { timeout: 10000, enableHighAccuracy: true },
+    );
+  }
+
+  const { run, pending, error } = useAction((changes: Record<string, unknown>) =>
+    api.patch<{ report: Report }>(`/reports/${report.id}`, changes),
+  );
+
+  function validate() {
+    const errors: Record<string, string> = {};
+    const trimmedTitle = title.trim();
+    if (trimmedTitle.length < 3) errors.title = "Give the report a title of at least 3 characters.";
+    if (trimmedTitle.length > 150) errors.title = "Keep the title under 150 characters.";
+
+    const trimmedDesc = description.trim();
+    if (trimmedDesc.length < 10) errors.description = "Describe the problem in at least 10 characters.";
+    if (trimmedDesc.length > 1000) errors.description = "Keep the description under 1000 characters.";
+
+    if (!categoryId) errors.category_id = "Choose the category that fits best.";
+    if (address.length > 255) errors.address_text = "Keep the address under 255 characters.";
+    return errors;
+  }
+
+  const errors = validate();
+  const shown = { ...(touched ? errors : {}), ...(error?.fieldErrors ?? {}) };
+
+  async function handleSubmit(event: FormEvent) {
+    event.preventDefault();
+    setTouched(true);
+    const validationErrors = validate();
+    if (Object.keys(validationErrors).length > 0) {
+      focusFirstError(validationErrors, {
+        title: "edit-title",
+        category_id: "edit-category",
+        description: "edit-description",
+        address_text: "edit-address",
+      });
+      return;
+    }
+
+    const changes: Record<string, unknown> = {};
+    if (title.trim() !== report.title) changes.title = title.trim();
+    if (description.trim() !== report.description) changes.description = description.trim();
+    if (Number(categoryId) !== report.category?.id) changes.category_id = Number(categoryId);
+    if (
+      pointChangedByUser.current &&
+      (point.lat !== report.latitude || point.lng !== report.longitude)
+    ) {
+      changes.latitude = point.lat;
+      changes.longitude = point.lng;
+    }
+    const cleanAddress = address.trim();
+    if (cleanAddress !== (report.address_text ?? "")) {
+      changes.address_text = cleanAddress || null;
+    }
+
+    if (Object.keys(changes).length === 0) {
+      onCancel();
+      return;
+    }
+
+    const updated = await run(changes);
+    if (updated) {
+      toast("Report updated.");
+      onDone();
+    }
+  }
+
+  const categories =
+    categoryData?.categories.filter((c) => c.is_active || c.id === report.category?.id) ?? [];
+
+  return (
+    <form className="flex flex-col gap-6" onSubmit={handleSubmit} noValidate>
+      <header className="flex flex-col gap-1 border-b border-divider pb-4">
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <span className="font-mono text-[11px] text-muted">Editing {report.reference_code}</span>
+          <StatusBadge status={report.status} />
+        </div>
+        <h3>Edit pending report</h3>
+        <p className="text-muted text-[13px]">
+          You can update details or adjust the map location while this report is still pending review.
+        </p>
+      </header>
+
+      <div className="grid gap-6 lg:grid-cols-2">
+        <div className="flex flex-col gap-4">
+          <Field label="Title" htmlFor="edit-title" count={title.length} max={150} error={shown.title}>
+            <Input
+              id="edit-title"
+              name="title"
+              maxLength={150}
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+            />
+          </Field>
+
+          <Field label="Category" htmlFor="edit-category" error={shown.category_id}>
+            <Select
+              id="edit-category"
+              name="category_id"
+              value={categoryId}
+              onChange={(e) => setCategoryId(e.target.value)}
+            >
+              <option value="">Choose a category</option>
+              {categories.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </Select>
+          </Field>
+
+          <Field
+            label="What is wrong?"
+            htmlFor="edit-description"
+            count={description.length}
+            max={1000}
+            error={shown.description}
+          >
+            <Textarea
+              id="edit-description"
+              name="description"
+              rows={5}
+              maxLength={1000}
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+            />
+          </Field>
+
+          <Field
+            label="Address or landmark"
+            htmlFor="edit-address"
+            hint="Optional. Updated when the pin moves, or type your own."
+            count={address.length}
+            max={255}
+            error={shown.address_text}
+          >
+            <Input
+              id="edit-address"
+              name="address"
+              maxLength={255}
+              value={address}
+              onChange={(e) => {
+                addressTouched.current = true;
+                setAddress(e.target.value);
+              }}
+            />
+          </Field>
+        </div>
+
+        <div className="flex flex-col gap-3">
+          <div className="flex items-center justify-between gap-3">
+            <span className="font-semibold text-[13px]">Pin location</span>
+            {"geolocation" in navigator && (
+              <Button type="button" variant="ghost" disabled={locating} onClick={useMyLocation}>
+                {locating ? "Finding location…" : "Use my location"}
+              </Button>
+            )}
+          </div>
+          <div className="h-[300px] border-2 border-divider">
+            <MapPicker value={point} onChange={handlePointChange} />
+          </div>
+          <p className="text-muted text-[11px] font-mono">
+            {point.lat.toFixed(5)}, {point.lng.toFixed(5)} (drag or tap to adjust)
+          </p>
+        </div>
+      </div>
+
+      {error && <Alert title="Could not update report">{error.message}</Alert>}
+
+      <div className="flex items-center gap-3 pt-2 border-t border-divider">
+        <Button type="submit" variant="primary" disabled={pending}>
+          {pending ? "Saving changes…" : "Save changes"}
+        </Button>
+        <Button type="button" variant="secondary" disabled={pending} onClick={onCancel}>
+          Cancel
+        </Button>
+      </div>
+    </form>
+  );
+}
+

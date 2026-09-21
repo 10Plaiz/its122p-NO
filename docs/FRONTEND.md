@@ -16,7 +16,7 @@ important interface behavior. Use [API.md](API.md) for endpoint contracts and
 | `/register` | Public | Create a Citizen account |
 | `/report/new` | Citizen | Submit a report through the location, details, and review steps |
 | `/my-reports` | Citizen | Search, filter, open, or cancel the Citizen's reports |
-| `/reports/:id` | Citizen, Staff, Administrator | Read a report and its history, subject to server authorization |
+| `/reports/:id` | Citizen, Staff, Administrator | Read a report and its history, subject to server authorization. Owning citizens can edit pending reports inline. |
 | `/notifications` | Citizen, Staff, Administrator | Read and mark the signed-in user's notifications |
 | `/staff/queue` | Staff | Search and filter reports assigned to the Staff member |
 | `/staff/reports/:id` | Staff, Administrator | Work a report, add remarks, advance status, and upload repair evidence |
@@ -54,6 +54,9 @@ the server remains responsible for access control.
   shareable and browser navigation restores them.
 - The report form keeps reverse-geocoded addresses editable. Coordinates remain
   the report location when the third-party lookup is unavailable.
+- Citizens who own a pending report can edit details and pin location inline on
+  `/reports/:id` before staff handling begins. Saving updates the record and
+  refreshes the timeline.
 
 The browser request wrapper, data hooks, endpoint behavior, and response shapes
 belong to [API.md](API.md).

@@ -45,7 +45,7 @@ const createSchema = z.object({
   category_id: z.coerce.number().int().positive(),
   latitude: z.coerce.number().min(-90).max(90),
   longitude: z.coerce.number().min(-180).max(180),
-  address_text: z.string().trim().max(255).optional(),
+  address_text: z.string().trim().max(255).nullable().optional(),
 });
 
 const listSchema = z.object({
