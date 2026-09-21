@@ -61,9 +61,13 @@ export const editSchema = createSchema.partial().refine(
   "Send at least one field to change.",
 );
 
-const statusSchema = z.object({
+export const statusSchema = z.object({
   status: z.enum(STAFF_STATUSES),
   details: z.string().trim().max(500).optional(),
+});
+
+export const remarkSchema = z.object({
+  details: z.string().trim().min(1, "Enter remark details.").max(500, "Keep remarks under 500 characters."),
 });
 
 // GET /api/reports — one handler, scoped by role.
@@ -191,7 +195,7 @@ router.patch("/:id/assign", requireRole("admin"), async (req, res) => {
 
 // POST /api/reports/:id/remarks — a note on the report without changing status.
 router.post("/:id/remarks", requireRole("admin", "staff"), async (req, res) => {
-  const { details } = parse(z.object({ details: z.string().trim().min(1).max(500) }), req.body);
+  const { details } = parse(remarkSchema, req.body);
   const report = await findReport(req.params.id);
   assertCanUpdate(report, currentUser(req));
 

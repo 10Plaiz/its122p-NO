@@ -17,7 +17,7 @@ export type Report = {
 
 // The status flow from the proposal. A report moves forward one step at a time.
 // "cancelled" is a dead end reached only by the citizen who filed the report.
-const NEXT_STATUS: Record<ReportStatus, ReportStatus[]> = {
+export const NEXT_STATUS: Record<ReportStatus, ReportStatus[]> = {
   pending: ["under_review"],
   under_review: ["in_progress"],
   in_progress: ["resolved"],
@@ -94,8 +94,17 @@ function reportLabel(report: Report) {
 
 // Who to tell about a change. The citizen and the assigned staff member get
 // different wording for the same event, because they need different things from
-// it: one is following their report, the other is being handed work.
-type Notice = { userId: string | undefined; message: string };
+export type Notice = { userId: string | undefined; message: string };
+
+export function filterNotificationRecipients(
+  notify: Notice[] | undefined,
+  actorId: string,
+): { userId: string; message: string }[] {
+  return (notify ?? []).filter(
+    (notice): notice is { userId: string; message: string } =>
+      Boolean(notice.userId) && notice.userId !== actorId,
+  );
+}
 
 // Records a history entry and tells everyone the change concerns.
 // Written as separate statements for readability; if partial writes ever become
@@ -116,10 +125,7 @@ async function recordUpdate({ report, actorId, updateType, previousStatus, newSt
 
   // Nobody is told about their own action, and an unassigned report has no staff
   // member to tell.
-  const recipients = (notify ?? []).filter(
-    (notice): notice is { userId: string; message: string } =>
-      Boolean(notice.userId) && notice.userId !== actorId,
-  );
+  const recipients = filterNotificationRecipients(notify, actorId);
 
   if (recipients.length === 0) return;
 
