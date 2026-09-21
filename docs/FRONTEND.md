@@ -16,10 +16,10 @@ important interface behavior. Use [API.md](API.md) for endpoint contracts and
 | `/register` | Public | Create a Citizen account |
 | `/report/new` | Citizen | Submit a report through the location, details, and review steps |
 | `/my-reports` | Citizen | Search, filter, open, or cancel the Citizen's reports |
-| `/reports/:id` | Citizen, Staff, Administrator | Read a report and its history, subject to server authorization. Owning citizens can edit pending reports inline. |
+| `/reports/:id` | Citizen, Staff, Administrator | Read a report and its history, subject to record-level server authorization (owning Citizen, assigned Staff, or Administrator). Owning citizens can edit pending reports inline. |
 | `/notifications` | Citizen, Staff, Administrator | Read and mark the signed-in user's notifications |
 | `/staff/queue` | Staff | Search and filter reports assigned to the Staff member |
-| `/staff/reports/:id` | Staff, Administrator | Work a report, add remarks, advance status, and upload repair evidence |
+| `/staff/reports/:id` | Staff, Administrator | Work a report, add remarks, advance status, and upload repair evidence, subject to record-level server authorization (assigned Staff or Administrator) |
 | `/admin` | Administrator | View system analytics |
 | `/admin/reports` | Administrator | Search all reports and assign active Staff |
 | `/admin/users` | Administrator | Create and maintain accounts |
@@ -41,6 +41,15 @@ record-level permission checks before returning data.
 All signed-in roles receive the notification link. The community board remains
 available without an account. Navigation visibility is a presentation choice;
 the server remains responsible for access control.
+
+### Report-detail return navigation
+
+Protected report-detail views (`/reports/:id` and `/staff/reports/:id`) provide role-correct return navigation across both success and error states:
+- Citizen returns to My reports (`/my-reports`).
+- Staff returns to the Staff queue (`/staff/queue`).
+- Administrator returns to Admin reports (`/admin/reports`).
+
+When a user directly accesses a protected report-detail URL for a report they are not authorized to view, the server rejects the request with `403 Forbidden`. The interface renders the rejection alert without exposing protected report data or history, and the return button guides the user back to their role workspace.
 
 ## Shared browser behavior
 
