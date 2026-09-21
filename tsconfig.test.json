@@ -10,5 +10,6 @@
     "skipLibCheck": true,
     "types": ["bun"]
   },
-  "include": ["tests/**/*.ts", "src/server/types/**/*.d.ts"]
+  "include": ["tests/**/*.ts", "scripts/**/*.ts", "src/server/types/**/*.d.ts"]
 }
+
