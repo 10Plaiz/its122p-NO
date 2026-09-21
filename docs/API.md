@@ -114,10 +114,11 @@ From **Nominatim**, KAMOTI reads exactly one field of the response,
   then queries Supabase. That order is the security model: see
   [How authentication works](#how-authentication-works).
 - **Nominatim.** Called from `src/web/lib/leaflet.ts` as `reverseGeocode()`, used
-  by the report wizard. Debounced 700 ms to respect the one-request-per-second
-  policy, cancelled with `AbortController` when the pin moves again, and silent
-  on failure: the address field stays empty and typeable, so a rate-limited
-  lookup costs the citizen nothing. Every report can be filed without it.
+  by the report wizard. Debounced 1000 ms and throttled to start no more than
+  one request per second, cancelled with `AbortController` when the pin moves
+  again, and silent on failure: the address field stays empty and typeable, so a
+  rate-limited lookup costs the citizen nothing. Every report can be filed
+  without it.
 
 The frozen Phase 3 write-up, with field tables and the request-pipeline diagram,
 is in the [API documentation](API_Documentation.md). Use this guide for the
