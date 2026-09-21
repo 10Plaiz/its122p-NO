@@ -74,6 +74,16 @@ To run smoke checks against an alternate deployment URL:
 bun run test:smoke -- --url https://your-alternate-deployment.vercel.app
 ```
 
+### Configuration options
+
+The smoke test runner supports CLI flags and environment variable overrides:
+
+| Setting | CLI Flag | Environment Variable | Default |
+| :--- | :--- | :--- | :--- |
+| **Target URL** | `--url <url>` | `DEPLOYED_TEST_URL` or `TEST_URL` | `https://kamoti-chi.vercel.app` |
+| **Fixture password** | `--password <pass>` | `FIXTURE_PASSWORD` | `Password123!` |
+| **Help message** | `-h`, `--help` | N/A | N/A |
+
 ### Verified smoke criteria
 
 1. **Health endpoint:** `GET /api/health` returns `200 OK` with `{"status":"ok"}`.
@@ -81,8 +91,8 @@ bun run test:smoke -- --url https://your-alternate-deployment.vercel.app
 3. **Public stats:** `GET /api/public/stats` returns `200 OK`.
 4. **Authentication:** `POST /api/auth/login` succeeds for Citizen, Staff, and Administrator fixture accounts.
 5. **Route protection:** Unauthenticated requests to protected endpoints return `401 Unauthorized`.
-6. **Authorization gating:** Cross-role access requests (such as a Citizen requesting Administrator endpoints) return `403 Forbidden`.
-7. **Authorized access:** Role-authorized callers access protected endpoints successfully (`200 OK`).
+6. **Authorization gating:** Cross-role access requests (such as Citizen or Staff requesting Administrator endpoints) return `403 Forbidden`.
+7. **Authorized access:** Role-authorized callers access protected endpoints successfully (`200 OK` for Citizen, Staff, and Administrator).
 
 ## Defect boundary
 
