@@ -50,6 +50,7 @@ database migration operation.
 | `bun run dev:api` | Run only the Express API in watch mode |
 | `bun run typecheck` | Check frontend, API, and deployment TypeScript |
 | `bun run test` | Run the fast test suite in `tests/fast/` |
+| `bun run test:smoke` | Run deployed smoke verification against the test site |
 | `bun run build` | Compile the API and build the web application |
 | `bun run start` | Run the compiled API with Node.js |
 
@@ -65,6 +66,7 @@ change and the others only when their environment is ready.
 | :--- | :--- | :--- |
 | Fast | `bun run test` | Nothing beyond `bun install` |
 | Database access | `psql` command below | A disposable database with every migration applied |
+| Smoke | `bun run test:smoke` | Deployed test site or running app with fixture data |
 | Browser and manual | No command yet | A running app, and the synthetic fixture for evidence work |
 
 The fast suite lives in `tests/fast/` and covers logic that can be checked on

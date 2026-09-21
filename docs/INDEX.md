@@ -13,6 +13,7 @@ Use this page to find the document that owns the information you need.
 | [Phase 3 instructions](Phase3_Instructions.md) | Frontend and API submission requirements |
 | [Phase 4 instructions](Phase4_Instructions.md) | Testing and security submission requirements |
 | [Phase 4 test report](Phase4_Test_Report.md) | Test cases, evidence index, bug log, result metrics, and peer evaluation |
+| [Test environment](TEST_ENVIRONMENT.md) | Deployed test URL, baseline revision, smoke verification, and configuration handoff |
 | [KAMOTI proposal](Final_Project.md) | Intended features, roles, architecture, and technology choices |
 | [Architecture](ARCHITECTURE.md) | Code boundaries, request path, and deployment layout |
 | [API guide](API.md) | API integrations, endpoint contracts, database migrations, access rules, and example requests |
