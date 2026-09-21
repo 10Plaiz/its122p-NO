@@ -50,6 +50,7 @@ database migration operation.
 | `bun run dev:api` | Run only the Express API in watch mode |
 | `bun run typecheck` | Check frontend, API, and deployment TypeScript |
 | `bun run test` | Run the fast test suite in `tests/fast/` |
+| `bun run test:security -- --target REF` | Run the security integration test suite against Express and Supabase |
 | `bun run test:smoke` | Run deployed smoke verification against the test site |
 | `bun run build` | Compile the API and build the web application |
 | `bun run start` | Run the compiled API with Node.js |
@@ -65,17 +66,39 @@ change and the others only when their environment is ready.
 | Suite | Command | Needs |
 | :--- | :--- | :--- |
 | Fast | `bun run test` | Nothing beyond `bun install` |
+| Security integration | `bun run test:security -- --target YOUR_PROJECT_REF` | A running Express API and linked Supabase project with synthetic fixture accounts |
 | Database access | `psql` command below | A disposable database with every migration applied |
 | Smoke | `bun run test:smoke` | Deployed test site or running app with fixture data |
 | Browser and manual | No command yet | A running app, and the synthetic fixture for evidence work |
 
 The fast suite lives in `tests/fast/` and covers logic that can be checked on
 its own: no database, no running server, no browser, and no test runner beyond
-the one built into Bun. CI runs it on every pull request next to
+the one built into Bun. It proves input validation schemas, search filter
+character stripping, role authorization rules, report ownership, pending-only
+edits, and safe public error handling. CI runs it on every pull request next to
 `bun run typecheck` and `bun run build`. Keep that boundary: a test that needs
 a database, a deployed site, or a browser belongs in another suite, not in
 `tests/fast/`. `bun run typecheck` checks tests via `typecheck:test` alongside
 application sources.
+
+The security integration suite lives in `tests/integration/security.ts` and
+verifies the live Express API and Supabase database against the Phase 4 security
+matrix: authentication workflows, role-based endpoint access, search parameter
+SQL injection resilience, XSS plain-data storage, and error masking. It runs
+with:
+
+```bash
+bun run test:security -- --target YOUR_PROJECT_REF
+```
+
+Required runtime inputs:
+1. `--target YOUR_PROJECT_REF`: Must match the project ref in `SUPABASE_URL`.
+2. Fixture password: Provided through `--password <password>`, the `FIXTURE_PASSWORD`
+   environment variable, or piped stdin/interactive prompt.
+
+The integration suite is safe to rerun: it restores any fixture report titles
+it modifies, deletes temporary test records, and never mutates ordinary user
+accounts or reports. Tokens and credentials are suppressed from logs.
 
 The database suite verifies access boundaries on a disposable database after
 applying all migrations:

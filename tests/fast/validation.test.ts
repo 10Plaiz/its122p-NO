@@ -1,3 +1,7 @@
+process.env.SUPABASE_URL ??= "https://test.supabase.co";
+process.env.SUPABASE_PUBLISHABLE_KEY ??= "test-publishable-key";
+process.env.SUPABASE_SECRET_KEY ??= "test-secret-key";
+
 import { describe, expect, test } from "bun:test";
 import { z } from "zod";
 import { ApiError } from "../../src/server/lib/errors.js";
@@ -8,6 +12,12 @@ import {
   parse,
   passwordRule,
 } from "../../src/server/lib/validate.js";
+import { registerSchema } from "../../src/server/routes/auth.routes.js";
+import {
+  createSchema as reportCreateSchema,
+  editSchema as reportEditSchema,
+} from "../../src/server/routes/reports.routes.js";
+import { categorySchema } from "../../src/server/routes/categories.routes.js";
 import { CONTACT_ERROR, validateContactNumber } from "../../src/web/components/ContactNumberField.js";
 
 // Section A cases. Both contact-number rules are written down once here so the
@@ -124,3 +134,127 @@ describe("VAL-05 password rule is the same on both sides", () => {
   }
 });
 
+describe("VAL-06 report submission validation schema", () => {
+  const validReport = {
+    title: "Large pothole on highway",
+    description: "Deep pothole damaging front tires near the intersection.",
+    category_id: 1,
+    latitude: 14.5995,
+    longitude: 120.9842,
+    address_text: "Sample Avenue corner Main St",
+  };
+
+  test("accepts completely valid report input", () => {
+    const result = reportCreateSchema.safeParse(validReport);
+    expect(result.success).toBe(true);
+  });
+
+  test("rejects title shorter than 3 characters", () => {
+    const result = reportCreateSchema.safeParse({ ...validReport, title: "ab" });
+    expect(result.success).toBe(false);
+  });
+
+  test("rejects title exceeding 150 characters", () => {
+    const result = reportCreateSchema.safeParse({ ...validReport, title: "a".repeat(151) });
+    expect(result.success).toBe(false);
+  });
+
+  test("rejects description shorter than 10 characters with helpful message", () => {
+    const result = reportCreateSchema.safeParse({ ...validReport, description: "too short" });
+    expect(result.success).toBe(false);
+    expect(result.error?.issues[0]?.message).toBe("Describe the problem in at least 10 characters.");
+  });
+
+  test("rejects description exceeding 1000 characters with helpful message", () => {
+    const result = reportCreateSchema.safeParse({ ...validReport, description: "a".repeat(1001) });
+    expect(result.success).toBe(false);
+    expect(result.error?.issues[0]?.message).toBe("Keep the description under 1000 characters.");
+  });
+
+  test("rejects invalid latitude bounds (< -90 or > 90)", () => {
+    expect(reportCreateSchema.safeParse({ ...validReport, latitude: 90.1 }).success).toBe(false);
+    expect(reportCreateSchema.safeParse({ ...validReport, latitude: -90.1 }).success).toBe(false);
+  });
+
+  test("rejects invalid longitude bounds (< -180 or > 180)", () => {
+    expect(reportCreateSchema.safeParse({ ...validReport, longitude: 180.1 }).success).toBe(false);
+    expect(reportCreateSchema.safeParse({ ...validReport, longitude: -180.1 }).success).toBe(false);
+  });
+
+  test("rejects negative or non-integer category_id", () => {
+    expect(reportCreateSchema.safeParse({ ...validReport, category_id: -1 }).success).toBe(false);
+    expect(reportCreateSchema.safeParse({ ...validReport, category_id: 0 }).success).toBe(false);
+    expect(reportCreateSchema.safeParse({ ...validReport, category_id: 1.5 }).success).toBe(false);
+  });
+});
+
+describe("VAL-07 user registration validation schema", () => {
+  const validRegistration = {
+    name: "Maria Santos",
+    email: "maria.santos@example.com",
+    password: "StrongPassword123!",
+    contact_number: "09181234567",
+  };
+
+  test("accepts valid registration input", () => {
+    const result = registerSchema.safeParse(validRegistration);
+    expect(result.success).toBe(true);
+  });
+
+  test("rejects name shorter than 2 characters", () => {
+    const result = registerSchema.safeParse({ ...validRegistration, name: "M" });
+    expect(result.success).toBe(false);
+    expect(result.error?.issues[0]?.message).toBe("Enter your full name.");
+  });
+
+  test("rejects invalid email formats", () => {
+    for (const invalidEmail of ["notanemail", "user@", "@domain.com", "user@domain"]) {
+      const result = registerSchema.safeParse({ ...validRegistration, email: invalidEmail });
+      expect(result.success).toBe(false);
+      expect(result.error?.issues[0]?.message).toBe("Enter a valid email address.");
+    }
+  });
+
+  test("rejects password violating length constraints", () => {
+    expect(registerSchema.safeParse({ ...validRegistration, password: "short" }).success).toBe(false);
+    expect(registerSchema.safeParse({ ...validRegistration, password: "a".repeat(73) }).success).toBe(false);
+  });
+});
+
+describe("VAL-08 report edit schema validation", () => {
+  test("accepts single field update", () => {
+    const result = reportEditSchema.safeParse({ title: "Updated report title" });
+    expect(result.success).toBe(true);
+  });
+
+  test("rejects empty edit payload", () => {
+    const result = reportEditSchema.safeParse({});
+    expect(result.success).toBe(false);
+    expect(result.error?.issues[0]?.message).toBe("Send at least one field to change.");
+  });
+});
+
+describe("VAL-09 category management validation schema", () => {
+  test("accepts valid category input", () => {
+    const result = categorySchema.safeParse({
+      name: "Traffic Lights",
+      description: "Non-functional or damaged traffic control signals.",
+      is_active: true,
+    });
+    expect(result.success).toBe(true);
+  });
+
+  test("rejects category name shorter than 2 characters", () => {
+    const result = categorySchema.safeParse({ name: "A" });
+    expect(result.success).toBe(false);
+    expect(result.error?.issues[0]?.message).toBe("Enter a category name.");
+  });
+
+  test("rejects description exceeding 300 characters", () => {
+    const result = categorySchema.safeParse({
+      name: "Road Hazards",
+      description: "a".repeat(301),
+    });
+    expect(result.success).toBe(false);
+  });
+});

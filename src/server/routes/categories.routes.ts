@@ -9,7 +9,7 @@ import { logActivity } from "../lib/activity.js";
 const router = Router();
 const adminOnly = [requireAuth, requireRole("admin")];
 
-const categorySchema = z.object({
+export const categorySchema = z.object({
   name: z
     .string()
     .trim()
