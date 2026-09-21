@@ -13,9 +13,10 @@ cases, their results, and the evidence that supports them.
 **Status: automated fast, functional, and security integration tests recorded.** Automated
 test suites cover Sections A through F (Input Validation, SQL Injection,
 Authentication, Authorization, Cross-Site Scripting, and Functional Testing).
-Section G currently contains the usability protocol and blank result tables
-only. It is preparation, not evidence of completed usability testing; the three
-sessions and their evidence remain outstanding.
+Functional tests in Section F exercise production schemas, service helpers, and
+domain logic directly rather than local copies. Section G currently contains
+the usability protocol and blank result tables only; the three sessions and
+their evidence remain outstanding.
 
 ## Test case identifiers
 
@@ -235,17 +236,17 @@ Cover every core feature named in the [proposal](Final_Project.md).
 
 | ID | Feature | Test procedure | Expected result | Actual result | Method | Evidence | Status |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| `FUNC-01` | Report creation & validation | Submit report with valid data, then with out-of-bounds GPS lat/lng and invalid title lengths | Valid submission accepted; out-of-range coordinates and title bounds rejected | Valid data parsed cleanly; invalid values rejected by schema | Automated | `tests/fast/functional.test.ts` | `PASS` |
-| `FUNC-02` | Linear status progression | Advance report sequentially through `pending` -> `under_review` -> `in_progress` -> `resolved` | Status advances strictly one stage at a time | Lifecycle follows exact defined progression | Automated | `tests/fast/functional.test.ts` | `PASS` |
+| `FUNC-01` | Report creation & validation | Submit report using production `createSchema` with valid data, out-of-bounds GPS, invalid title lengths, description bounds, and nullable address | Valid submission accepted; invalid coordinates, title, and description rejected; null and omitted address accepted | Valid data parsed cleanly; invalid values rejected by production schema; nullable address accepted correctly | Automated | `tests/fast/functional.test.ts` | `PASS` |
+| `FUNC-02` | Linear status progression | Advance report sequentially through `pending` -> `under_review` -> `in_progress` -> `resolved` using production `NEXT_STATUS` | Status advances strictly one stage at a time | Lifecycle follows exact progression defined in production `NEXT_STATUS` map | Automated | `tests/fast/functional.test.ts` | `PASS` |
 | `FUNC-03` | Status transition enforcement | Attempt skipping workflow stages or transitioning out of terminal `resolved`/`cancelled` | Stage-skipping rejected; terminal states cannot be transitioned | Disallowed transitions rejected; terminal states stay dead ends | Automated | `tests/fast/functional.test.ts` | `PASS` |
 | `FUNC-04` | Citizen pending report editing | Attempt report editing as owner while pending vs non-pending vs non-owner | Allowed only by owner while status is pending; rejected otherwise | Allowed while pending; throws 403 when non-pending or non-owner | Automated | `tests/fast/functional.test.ts` | `PASS` |
 | `FUNC-05` | Citizen report cancellation | Citizen owner cancels pending report; verify public board visibility and row preservation | Status changes to cancelled; removed from public board; row retained | Status set to cancelled; is_public false; row preserved | Automated | `tests/fast/functional.test.ts` | `PASS` |
 | `FUNC-06` | Staff assignment & authorization | Admin assigns staff to report; verify update permissions for assigned vs unassigned staff | Admin can update any; assigned staff updates assigned; unassigned rejected | Admin & assigned staff allowed; unassigned staff rejected with 403 | Automated | `tests/fast/functional.test.ts` | `PASS` |
-| `FUNC-07` | Staff remark creation | Add inspection notes to report without changing its current status | Remark recorded in update history without altering report status | Remark recorded in audit updates; report status unmodified | Automated | `tests/fast/functional.test.ts` | `PASS` |
+| `FUNC-07` | Staff remark creation | Validate remark input using production `remarkSchema`; verify empty, whitespace, and over-limit submissions rejected | Remark recorded in update history without altering report status | Production `remarkSchema` accepts valid remarks; rejects empty, whitespace-only, and over-500-char submissions | Automated | `tests/fast/functional.test.ts` | `PASS` |
 | `FUNC-08` | Public board visibility & queries | Check reviewed status requirement, search sanitization, sort directions, and date boundary | Only reviewed statuses shown; search safely escaped; sort and date filters valid | Pending/cancelled omitted; PostgREST grammar safely escaped | Automated | `tests/fast/functional.test.ts` | `PASS` |
-| `FUNC-09` | Admin analytics computation | Compute status distribution, category breakdown, and average resolution duration | Accurate counts and average duration calculated from submitted/resolved timestamps | Aggregations match expected sums; average resolution days correct | Automated | `tests/fast/functional.test.ts` | `PASS` |
-| `FUNC-10` | Category lifecycle & selection | Validate category schema bounds and active vs inactive category filtering | Valid bounds enforced; inactive categories omitted from user selection list | Bounds enforced (2-50 chars name, <= 300 desc); inactive categories filtered | Automated | `tests/fast/functional.test.ts` | `PASS` |
-| `FUNC-11` | Notification recipient routing | Route notifications on status update and assignment; suppress actor self-notification | Citizens and staff notified as appropriate; acting user receives no self-notification | Proper recipients targeted; actor filtered out from notification list | Automated | `tests/fast/functional.test.ts` | `PASS` |
+| `FUNC-09` | Admin analytics computation | Compute status distribution, category breakdown, and average resolution duration via `calculateAnalytics` | Accurate counts and average duration calculated from submitted/resolved timestamps | Production `calculateAnalytics` aggregations match expected sums; average resolution days correct; empty list returns null | Automated | `tests/fast/functional.test.ts` | `PASS` |
+| `FUNC-10` | Category lifecycle & selection | Validate production `categorySchema` bounds and active vs inactive category filtering | Valid bounds enforced; inactive categories omitted from user selection list | Bounds enforced (2-60 chars name, <= 300 desc) using production schema; inactive categories filtered | Automated | `tests/fast/functional.test.ts` | `PASS` |
+| `FUNC-11` | Notification recipient routing | Route notifications on status update and assignment; suppress actor self-notification via `filterNotificationRecipients` | Citizens and staff notified as appropriate; acting user receives no self-notification | Production `filterNotificationRecipients` targets proper recipients; actor filtered out; undefined userId entries excluded | Automated | `tests/fast/functional.test.ts` | `PASS` |
 | `FUNC-12` | Responsive navigation & layouts | Check role-based route return destinations and role home paths | Role-appropriate workspaces and return paths resolved for citizen, staff, admin | Correct paths returned for each role across navigation helpers | Automated | `tests/fast/functional.test.ts` | `PASS` |
 
 ## G. Usability test
@@ -348,7 +349,8 @@ One row per evidence file. Nothing in this table is stored in the repository.
 
 | ID | Bug or issue | Found by case | Description | Severity | Action taken | Status |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-|  | None | N/A | Security testing revealed no blocking vulnerabilities in the completed baseline | Low | Security test suites added to prevent regressions | Fixed |
+| `BUG-01` | Category name bound mismatch in functional test | `FUNC-10` | `functional.test.ts` declared a local schema capping category names at 50 chars, but production `categorySchema` in `categories.routes.ts` allows 60 chars. Test was silently rejecting valid 51-60 char names. | Low | Refactored `functional.test.ts` to import and test against the canonical production `categorySchema` directly; updated `FUNC-10` actual result in this report | Fixed |
+|  | None (security) | N/A | Security testing revealed no blocking vulnerabilities in the completed baseline | Low | Security test suites added to prevent regressions | Fixed |
 
 Severity is `Critical`, `High`, `Medium`, or `Low`. Status is `Open`,
 `Fixed`, or `Won't fix` with a reason. A bug that is fixed in code links the
@@ -358,10 +360,10 @@ pull request that fixed it.
 
 | Metric | Count |
 | :--- | :--- |
-| Total test cases | 62 |
-| Passed | 62 |
+| Total test cases | 65 |
+| Passed | 65 |
 | Failed | 0 |
-| Fixed | 0 |
+| Fixed | 1 |
 | Remaining issues | 0 |
 
 ## Peer evaluation and contributions
