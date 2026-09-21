@@ -247,7 +247,7 @@ Cover every core feature named in the [proposal](Final_Project.md).
 | `FUNC-09` | Admin analytics computation | Compute status distribution, category breakdown, and average resolution duration via `calculateAnalytics` | Accurate counts and average duration calculated from submitted/resolved timestamps | Production `calculateAnalytics` aggregations match expected sums; average resolution days correct; empty list returns null | Automated | `tests/fast/functional.test.ts` | `PASS` |
 | `FUNC-10` | Category lifecycle & selection | Validate production `categorySchema` bounds and active vs inactive category filtering | Valid bounds enforced; inactive categories omitted from user selection list | Bounds enforced (2-60 chars name, <= 300 desc) using production schema; inactive categories filtered | Automated | `tests/fast/functional.test.ts` | `PASS` |
 | `FUNC-11` | Notification recipient routing | Route notifications on status update and assignment; suppress actor self-notification via `filterNotificationRecipients` | Citizens and staff notified as appropriate; acting user receives no self-notification | Production `filterNotificationRecipients` targets proper recipients; actor filtered out; undefined userId entries excluded | Automated | `tests/fast/functional.test.ts` | `PASS` |
-| `FUNC-12` | Responsive navigation & layouts | Check role-based route return destinations and role home paths | Role-appropriate workspaces and return paths resolved for citizen, staff, admin | Correct paths returned for each role across navigation helpers | Automated | `tests/fast/functional.test.ts` | `PASS` |
+| `FUNC-12` | Role-based navigation routes and responsive rendering | Check role-based route return destinations and role home paths using production `getReportReturnTarget`; verify nav renders correctly across 375 px (mobile), 768 px (tablet), and 1280 px (desktop) viewports via Playwright | Role-appropriate workspaces and return paths resolved; nav renders at all tested breakpoints | Correct paths returned for each role; Playwright confirms layout renders at mobile, tablet, and desktop viewports | Automated (fast suite + browser) | `tests/fast/functional.test.ts`, `tests/browser/responsive.spec.ts`, `tests/evidence/FUNC-12-*.png` | `PASS` |
 
 ## G. Usability test
 
@@ -330,7 +330,7 @@ only once.
 
 ## Evidence index
 
-One row per evidence file. Nothing in this table is stored in the repository.
+One row per evidence file. Automated Playwright screenshots are committed to `tests/evidence/` and are reproduced by running `bun run test:browser`. Manual screenshots (if any) are stored outside the repository.
 
 | Evidence name | Case ID | Type | Location |
 | :--- | :--- | :--- | :--- |
@@ -344,6 +344,26 @@ One row per evidence file. Nothing in this table is stored in the repository.
 | `AUTHZ-06-to-15-live-authz.log` | `AUTHZ-06` to `AUTHZ-15` | Test Execution Log | Automated test output from `tests/integration/security.ts` |
 | `XSS-01-to-04-live-xss.log` | `XSS-01` to `XSS-04` | Test Execution Log | Automated test output from `tests/integration/security.ts` |
 | `FUNC-01-to-12-functional-suite.log` | `FUNC-01` to `FUNC-12` | Test Execution Log | Automated test output from `tests/fast/functional.test.ts` |
+| `AUTH-04-citizen-login.png` | `AUTH-04` | Browser Screenshot | `tests/evidence/` (committed; run `bun run test:browser` to regenerate) |
+| `AUTH-05-staff-login.png` | `AUTH-05` | Browser Screenshot | `tests/evidence/` |
+| `AUTH-06-admin-login.png` | `AUTH-06` | Browser Screenshot | `tests/evidence/` |
+| `AUTH-07-invalid-password.png` | `AUTH-07` | Browser Screenshot | `tests/evidence/` |
+| `AUTH-08-unknown-email.png` | `AUTH-08` | Browser Screenshot | `tests/evidence/` |
+| `AUTH-09-empty-form.png` | `AUTH-09` | Browser Screenshot | `tests/evidence/` |
+| `AUTH-10-protected-redirect.png` | `AUTH-10` | Browser Screenshot | `tests/evidence/` |
+| `AUTH-11-logout.png` | `AUTH-11` | Browser Screenshot | `tests/evidence/` |
+| `FUNC-01a-report-create.png` | `FUNC-01` | Browser Screenshot | `tests/evidence/` |
+| `FUNC-01b-coordinate-error.png` | `FUNC-01` | Browser Screenshot | `tests/evidence/` |
+| `FUNC-02-status-progression.png` | `FUNC-02` | Browser Screenshot | `tests/evidence/` |
+| `FUNC-04-edit-pending.png` | `FUNC-04` | Browser Screenshot | `tests/evidence/` |
+| `FUNC-05-cancelled-report.png` | `FUNC-05` | Browser Screenshot | `tests/evidence/` |
+| `FUNC-07-staff-remark.png` | `FUNC-07` | Browser Screenshot | `tests/evidence/` |
+| `FUNC-08-public-board.png` | `FUNC-08` | Browser Screenshot | `tests/evidence/` |
+| `FUNC-09-admin-analytics.png` | `FUNC-09` | Browser Screenshot | `tests/evidence/` |
+| `FUNC-10-category-management.png` | `FUNC-10` | Browser Screenshot | `tests/evidence/` |
+| `FUNC-12-mobile-nav.png` | `FUNC-12` | Browser Screenshot | `tests/evidence/` |
+| `FUNC-12-tablet-board.png` | `FUNC-12` | Browser Screenshot | `tests/evidence/` |
+| `FUNC-12-desktop-report.png` | `FUNC-12` | Browser Screenshot | `tests/evidence/` |
 
 ## Bug and issue log
 
