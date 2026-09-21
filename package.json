@@ -9,6 +9,7 @@
     "dev:api": "tsx watch src/server/server.ts",
     "dev:web": "vite",
     "fixture": "tsx scripts/fixture/seed.ts",
+    "test": "bun test tests/fast",
     "typecheck": "bun run typecheck:api && bun run typecheck:web && bun run typecheck:deploy",
     "typecheck:api": "tsc --noEmit -p tsconfig.server.json",
     "typecheck:web": "tsc --noEmit -p tsconfig.web.json",

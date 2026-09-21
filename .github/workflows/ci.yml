@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   check-and-build:
-    name: Typecheck and build
+    name: Typecheck, fast tests, and build
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -22,4 +22,5 @@ jobs:
           bun-version: '1.4.2'
       - run: bun install --frozen-lockfile
       - run: bun run typecheck
+      - run: bun run test
       - run: bun run build

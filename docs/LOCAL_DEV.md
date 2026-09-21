@@ -49,21 +49,44 @@ database migration operation.
 | `bun run dev:web` | Run only the Vite frontend |
 | `bun run dev:api` | Run only the Express API in watch mode |
 | `bun run typecheck` | Check frontend, API, and deployment TypeScript |
+| `bun run test` | Run the fast test suite in `tests/fast/` |
 | `bun run build` | Compile the API and build the web application |
 | `bun run start` | Run the compiled API with Node.js |
 
 Open `http://localhost:5173`. Vite forwards `/api/*` to the local Express
 server. A basic API check is available at `http://localhost:4000/api/health`.
 
-To verify database access boundaries on a disposable database after applying
-all migrations:
+## Test suites
+
+Suites are separated by what they need to run, so the fast one can run on every
+change and the others only when their environment is ready.
+
+| Suite | Command | Needs |
+| :--- | :--- | :--- |
+| Fast | `bun run test` | Nothing beyond `bun install` |
+| Database access | `psql` command below | A disposable database with every migration applied |
+| Browser and manual | No command yet | A running app, and the synthetic fixture for evidence work |
+
+The fast suite lives in `tests/fast/` and covers logic that can be checked on
+its own: no database, no running server, no browser, and no test runner beyond
+the one built into Bun. CI runs it on every pull request next to
+`bun run typecheck` and `bun run build`. Keep that boundary — a test that needs
+a database, a deployed site, or a browser belongs in another suite, not in
+`tests/fast/`. Those files are not covered by `bun run typecheck`, because the
+typecheck projects compile application sources only.
+
+The database suite verifies access boundaries on a disposable database after
+applying all migrations:
 
 ```bash
 psql "$TEST_DATABASE_URL" -X -v ON_ERROR_STOP=1 -f supabase/tests/api_access.sql
 ```
 
-The SQL test creates synthetic records inside a transaction and rolls them
-back. Do not run it against a database that is not approved for testing.
+It creates synthetic records inside a transaction and rolls them back. Do not
+run it against a database that is not approved for testing.
+
+Test case identifiers, results, evidence, and defects belong in the
+[Phase 4 test report](Phase4_Test_Report.md), not in this guide.
 
 ## Safety boundaries
 
