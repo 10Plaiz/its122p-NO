@@ -70,10 +70,10 @@ change and the others only when their environment is ready.
 The fast suite lives in `tests/fast/` and covers logic that can be checked on
 its own: no database, no running server, no browser, and no test runner beyond
 the one built into Bun. CI runs it on every pull request next to
-`bun run typecheck` and `bun run build`. Keep that boundary — a test that needs
+`bun run typecheck` and `bun run build`. Keep that boundary: a test that needs
 a database, a deployed site, or a browser belongs in another suite, not in
-`tests/fast/`. Those files are not covered by `bun run typecheck`, because the
-typecheck projects compile application sources only.
+`tests/fast/`. `bun run typecheck` checks tests via `typecheck:test` alongside
+application sources.
 
 The database suite verifies access boundaries on a disposable database after
 applying all migrations:
@@ -124,23 +124,25 @@ Three runtime inputs are required, in this order:
    This phrase belongs to this fixture only. Any other input stops the run
    before anything is written.
 3. Finally the command asks for a fixture password (8-72 characters, hidden
-   input). Choose any password at runtime; never commit, share, or document a
-   real one. The command never stores the password in the repository, prints
-   it, or logs it. For scripted runs, pipe the confirmation phrase and the
-   password into stdin, one line each. Piped values are trimmed, so type the
-   password interactively instead when it must start or end with a space.
+   input). For local development and manual verification, use the standard test
+   password `Password123!`. For scripted or non-interactive runs, pipe the
+   confirmation phrase and password into stdin:
+
+```bash
+printf "KAMOTI-APPLY-FIXTURE\nPassword123!\n" | bun run fixture -- --target YOUR_PROJECT_REF
+```
 
 ### Expected aliases and report states
 
-Accounts. Aliases are stable and use the reserved `.invalid` domain:
+Accounts. Aliases are stable and use the reserved `.invalid` domain. All fixture accounts use the standard test password `Password123!`:
 
-| Alias | Role |
-| :--- | :--- |
-| `fixture-admin@kamoti.invalid` | Administrator |
-| `fixture-citizen-1@kamoti.invalid` | Citizen, owns two fixture reports |
-| `fixture-citizen-2@kamoti.invalid` | Citizen, owns one fixture report |
-| `fixture-staff-1@kamoti.invalid` | Staff, has one fixture report assigned |
-| `fixture-staff-2@kamoti.invalid` | Staff, has no assignment |
+| Alias | Role | Default Password | Notes |
+| :--- | :--- | :--- | :--- |
+| `fixture-admin@kamoti.invalid` | Administrator | `Password123!` | Full admin access |
+| `fixture-citizen-1@kamoti.invalid` | Citizen | `Password123!` | Owns two fixture reports |
+| `fixture-citizen-2@kamoti.invalid` | Citizen | `Password123!` | Owns one fixture report |
+| `fixture-staff-1@kamoti.invalid` | Staff | `Password123!` | Has one fixture report assigned |
+| `fixture-staff-2@kamoti.invalid` | Staff | `Password123!` | Has no report assignments |
 
 Reports. Titles are stable and start with `[FIXTURE]`:
 
