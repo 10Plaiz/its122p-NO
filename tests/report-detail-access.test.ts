@@ -1,7 +1,13 @@
+process.env.SUPABASE_URL ??= "https://test.supabase.co";
+process.env.SUPABASE_PUBLISHABLE_KEY ??= "test-publishable-key";
+process.env.SUPABASE_SECRET_KEY ??= "test-secret-key";
+
 import { describe, expect, it } from "bun:test";
-import { assertCanView, type Report } from "../src/server/services/reports.service.js";
+import type { Report } from "../src/server/services/reports.service.js";
 import type { AuthUser } from "../src/server/types/auth.js";
 import { getReportReturnTarget } from "../src/web/lib/navigation.js";
+
+const { assertCanView } = await import("../src/server/services/reports.service.js");
 
 function createReport(overrides?: Partial<Report>): Report {
   return {
