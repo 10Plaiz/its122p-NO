@@ -60,17 +60,18 @@ describe("VAL-03 rejected input names the fields that were wrong", () => {
   });
 
   test("an invalid body throws a 400 listing every bad field", () => {
-    let thrown: unknown;
+    let thrownError: ApiError | undefined;
     try {
       parse(schema, { title: "", contact_number: "0917" });
     } catch (error) {
-      thrown = error;
+      if (error instanceof ApiError) {
+        thrownError = error;
+      }
     }
 
-    expect(thrown).toBeInstanceOf(ApiError);
-    const apiError = thrown as ApiError;
-    expect(apiError.status).toBe(400);
-    expect(apiError.details).toEqual([
+    expect(thrownError).toBeDefined();
+    expect(thrownError?.status).toBe(400);
+    expect(thrownError?.details).toEqual([
       { field: "title", message: expect.any(String) },
       { field: "contact_number", message: CONTACT_ERROR },
     ]);

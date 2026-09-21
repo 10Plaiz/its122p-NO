@@ -11,16 +11,15 @@ const INJECTION_TERMS = [
   { term: "or(status.eq.resolved,status.eq.closed)", note: "a nested or() group" },
   { term: "' OR '1'='1", note: "the classic SQL payload" },
   { term: "'; DROP TABLE reports; --", note: "a statement terminator" },
-  { term: "%", note: "a bare wildcard" },
 ];
 
 describe("SQLI-01 a search term cannot add or change a filter", () => {
   for (const { term, note } of INJECTION_TERMS) {
     test(`keeps ${note} inside the two ilike clauses`, () => {
       const filter = searchFilter(term);
-      if (filter === null) return; // Covered by SQLI-02.
+      expect(filter).not.toBeNull();
 
-      const clauses = filter.split(",");
+      const clauses = filter!.split(",");
       expect(clauses).toHaveLength(2);
       expect(clauses[0]).toStartWith("title.ilike.%");
       expect(clauses[1]).toStartWith("description.ilike.%");
