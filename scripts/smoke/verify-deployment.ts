@@ -39,8 +39,25 @@ function parseArg(flag: string): string | null {
   return null;
 }
 
+if (process.argv.includes("--help") || process.argv.includes("-h")) {
+  console.log(`Usage: bun scripts/smoke/verify-deployment.ts [options]
+
+Options:
+  --url <url>         Target deployment URL (default: ${DEFAULT_URL})
+  --password <pass>   Fixture account password (default: ${DEFAULT_FIXTURE_PASSWORD})
+  -h, --help          Show this help message
+
+Environment variables:
+  DEPLOYED_TEST_URL   Target deployment URL
+  TEST_URL            Fallback target deployment URL
+  FIXTURE_PASSWORD    Fixture account password
+`);
+  process.exit(0);
+}
+
 const baseUrl = (parseArg("--url") ?? process.env.DEPLOYED_TEST_URL ?? process.env.TEST_URL ?? DEFAULT_URL).replace(/\/+$/, "");
 const password = parseArg("--password") ?? process.env.FIXTURE_PASSWORD ?? DEFAULT_FIXTURE_PASSWORD;
+
 
 interface StepResult {
   name: string;
@@ -122,30 +139,49 @@ async function run(): Promise<void> {
   }
 
   // 5. Unauthenticated protected-route smoke check
+  const unauthName = "Unauthenticated request rejection (/api/reports)";
   try {
     const res = await fetch(`${baseUrl}/api/reports`);
     const ok = res.status === 401;
-    record("Unauthenticated request rejection (/api/reports)", ok, `HTTP ${res.status} (expected 401)`);
+    record(unauthName, ok, `HTTP ${res.status} (expected 401)`);
   } catch (err) {
-    record("Unauthenticated request rejection (/api/reports)", false, `Connection error: ${(err as Error).message}`);
+    record(unauthName, false, `Connection error: ${(err as Error).message}`);
   }
 
   // 6. Wrong-role authorization smoke check (Citizen calling Admin endpoint)
+  const citizenWrongRoleName = "Wrong-role request rejection (Citizen accessing /api/admin/users)";
   if (tokens.citizen) {
     try {
       const res = await fetch(`${baseUrl}/api/admin/users`, {
         headers: { Authorization: `Bearer ${tokens.citizen}` },
       });
       const ok = res.status === 403;
-      record("Wrong-role request rejection (Citizen accessing /api/admin/users)", ok, `HTTP ${res.status} (expected 403)`);
+      record(citizenWrongRoleName, ok, `HTTP ${res.status} (expected 403)`);
     } catch (err) {
-      record("Wrong-role request rejection", false, `Connection error: ${(err as Error).message}`);
+      record(citizenWrongRoleName, false, `Connection error: ${(err as Error).message}`);
     }
   } else {
-    record("Wrong-role request rejection", false, "Skipped: Citizen token not available");
+    record(citizenWrongRoleName, false, "Skipped: Citizen token not available");
   }
 
-  // 7. Authorized protected-route smoke check (Citizen accessing own reports)
+  // 7. Wrong-role authorization smoke check (Staff calling Admin endpoint)
+  const staffWrongRoleName = "Wrong-role request rejection (Staff accessing /api/admin/users)";
+  if (tokens.staff) {
+    try {
+      const res = await fetch(`${baseUrl}/api/admin/users`, {
+        headers: { Authorization: `Bearer ${tokens.staff}` },
+      });
+      const ok = res.status === 403;
+      record(staffWrongRoleName, ok, `HTTP ${res.status} (expected 403)`);
+    } catch (err) {
+      record(staffWrongRoleName, false, `Connection error: ${(err as Error).message}`);
+    }
+  } else {
+    record(staffWrongRoleName, false, "Skipped: Staff token not available");
+  }
+
+  // 8. Authorized protected-route smoke check (Citizen accessing own reports)
+  const citizenAccessName = "Authorized Citizen route access (/api/reports)";
   if (tokens.citizen) {
     try {
       const res = await fetch(`${baseUrl}/api/reports`, {
@@ -153,13 +189,33 @@ async function run(): Promise<void> {
       });
       const body = (await res.json().catch(() => ({}))) as { reports?: unknown[] };
       const ok = res.status === 200 && Array.isArray(body.reports);
-      record("Authorized Citizen route access (/api/reports)", ok, `HTTP ${res.status} (reports count: ${body.reports?.length ?? 0})`);
+      record(citizenAccessName, ok, `HTTP ${res.status} (reports count: ${body.reports?.length ?? 0})`);
     } catch (err) {
-      record("Authorized Citizen route access", false, `Connection error: ${(err as Error).message}`);
+      record(citizenAccessName, false, `Connection error: ${(err as Error).message}`);
     }
+  } else {
+    record(citizenAccessName, false, "Skipped: Citizen token not available");
   }
 
-  // 8. Authorized Administrator route access (/api/admin/users)
+  // 9. Authorized protected-route smoke check (Staff accessing assigned reports)
+  const staffAccessName = "Authorized Staff route access (/api/reports)";
+  if (tokens.staff) {
+    try {
+      const res = await fetch(`${baseUrl}/api/reports`, {
+        headers: { Authorization: `Bearer ${tokens.staff}` },
+      });
+      const body = (await res.json().catch(() => ({}))) as { reports?: unknown[] };
+      const ok = res.status === 200 && Array.isArray(body.reports);
+      record(staffAccessName, ok, `HTTP ${res.status} (reports count: ${body.reports?.length ?? 0})`);
+    } catch (err) {
+      record(staffAccessName, false, `Connection error: ${(err as Error).message}`);
+    }
+  } else {
+    record(staffAccessName, false, "Skipped: Staff token not available");
+  }
+
+  // 10. Authorized Administrator route access (/api/admin/users)
+  const adminAccessName = "Authorized Admin route access (/api/admin/users)";
   if (tokens.admin) {
     try {
       const res = await fetch(`${baseUrl}/api/admin/users`, {
@@ -167,10 +223,12 @@ async function run(): Promise<void> {
       });
       const body = (await res.json().catch(() => ({}))) as { users?: unknown[] };
       const ok = res.status === 200 && Array.isArray(body.users);
-      record("Authorized Admin route access (/api/admin/users)", ok, `HTTP ${res.status} (users count: ${body.users?.length ?? 0})`);
+      record(adminAccessName, ok, `HTTP ${res.status} (users count: ${body.users?.length ?? 0})`);
     } catch (err) {
-      record("Authorized Admin route access", false, `Connection error: ${(err as Error).message}`);
+      record(adminAccessName, false, `Connection error: ${(err as Error).message}`);
     }
+  } else {
+    record(adminAccessName, false, "Skipped: Admin token not available");
   }
 
   // Summary
