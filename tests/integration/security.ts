@@ -194,6 +194,21 @@ async function main(): Promise<void> {
       throw new Error("Fixture reports do not match expected status/assignment baseline.");
     }
 
+    // 2. Fetch active category from database for non-destructive testing
+    const { data: activeCategories, error: catErr } = await db
+      .from("categories")
+      .select("id, name, description, is_active")
+      .eq("is_active", true)
+      .order("id", { ascending: true })
+      .limit(1);
+
+    if (catErr || !activeCategories || activeCategories.length === 0) {
+      throw new Error(`No active categories found on ${configured}. Apply migrations and fixtures first.`);
+    }
+
+    const testCategory = activeCategories[0]!;
+    const originalCategoryDesc = testCategory.description ?? null;
+
     // Helper request wrapper
     async function api(path: string, options: RequestInit = {}) {
       const res = await fetch(`${baseUrl}${path}`, {
@@ -389,13 +404,14 @@ async function main(): Promise<void> {
         headers: { Authorization: `Bearer ${citizen1Token}` },
         body: JSON.stringify({ title: "[FIXTURE] Broken streetlight on Sample Avenue (Updated)" }),
       });
-      if (res.status !== 200) throw new Error(`Expected 200, got ${res.status} (${res.body?.error})`);
 
-      // Register cleanup to restore title
+      // Always register cleanup immediately after dispatching mutation
       cleanups.push(async () => {
         await db.from("reports").update({ title: originalTitle }).eq("id", reportPendingCitizen1.id);
         await db.from("report_updates").delete().eq("report_id", reportPendingCitizen1.id).eq("update_type", "edit");
       });
+
+      if (res.status !== 200) throw new Error(`Expected 200, got ${res.status} (${res.body?.error})`);
     });
 
     await runCase("AUTHZ-14", "Authorization", "citizen denied editing non-pending report", async () => {
@@ -474,24 +490,23 @@ async function main(): Promise<void> {
         body: JSON.stringify({
           title: xssTitle,
           description: xssDescription,
-          category_id: 3, // Streetlight or Drainage
+          category_id: testCategory.id,
           latitude: 14.5995,
           longitude: 120.9842,
           address_text: "Synthetic Test Street corner XSS Ave",
         }),
       });
 
-      if (res.status !== 201) throw new Error(`Failed to create report: ${res.status} (${res.body?.error})`);
-      createdReportId = res.body.report.id;
-
-      // Register cleanup for this report
-      cleanups.push(async () => {
-        if (createdReportId) {
-          await db.from("notifications").delete().eq("report_id", createdReportId);
-          await db.from("report_updates").delete().eq("report_id", createdReportId);
-          await db.from("reports").delete().eq("id", createdReportId);
-        }
-      });
+      if (res.status === 201 && res.body?.report?.id) {
+        createdReportId = res.body.report.id;
+        cleanups.push(async () => {
+          await db.from("notifications").delete().eq("report_id", createdReportId!);
+          await db.from("report_updates").delete().eq("report_id", createdReportId!);
+          await db.from("reports").delete().eq("id", createdReportId!);
+        });
+      } else {
+        throw new Error(`Failed to create report: ${res.status} (${res.body?.error})`);
+      }
 
       // Verify the payload is preserved strictly as data (unaltered string, not evaluated or executed)
       const fetchRes = await api(`/api/reports/${createdReportId}`, {
@@ -513,6 +528,13 @@ async function main(): Promise<void> {
         headers: { Authorization: `Bearer ${staff1Token}` },
         body: JSON.stringify({ details: xssRemark }),
       });
+
+      // Always register cleanup immediately after remark creation
+      cleanups.push(async () => {
+        await db.from("report_updates").delete().eq("report_id", reportUnderReview.id).eq("details", xssRemark);
+        await db.from("notifications").delete().eq("report_id", reportUnderReview.id).like("message", "%remark was added%");
+      });
+
       if (res.status !== 201) throw new Error(`Failed to add remark: ${res.status}`);
 
       // Verify history holds exact string
@@ -522,29 +544,26 @@ async function main(): Promise<void> {
       if (histRes.status !== 200) throw new Error(`Failed to fetch updates: ${histRes.status}`);
       const addedUpdate = histRes.body.updates?.find((u: any) => u.details === xssRemark);
       if (!addedUpdate) throw new Error("XSS remark was not found in updates history");
-
-      cleanups.push(async () => {
-        await db.from("report_updates").delete().eq("report_id", reportUnderReview.id).eq("details", xssRemark);
-        await db.from("notifications").delete().eq("report_id", reportUnderReview.id).like("message", "%remark was added%");
-      });
     });
 
     await runCase("XSS-03", "Cross-Site Scripting", "administrator category input preserves HTML as literal text", async () => {
       const xssCategoryDesc = "Hazardous infrastructure <script>alert(1)</script>";
-      const res = await api("/api/categories/1", {
+      const res = await api(`/api/categories/${testCategory.id}`, {
         method: "PATCH",
         headers: { Authorization: `Bearer ${adminToken}` },
         body: JSON.stringify({ description: xssCategoryDesc }),
       });
+
+      // Always register cleanup immediately after category mutation
+      cleanups.push(async () => {
+        await db.from("categories").update({ description: originalCategoryDesc }).eq("id", testCategory.id);
+        await db.from("activity_logs").delete().eq("entity_type", "category").eq("entity_id", String(testCategory.id));
+      });
+
       if (res.status !== 200) throw new Error(`Failed to update category: ${res.status}`);
-      if (res.body.category.description !== xssCategoryDesc) {
+      if (res.body?.category?.description !== xssCategoryDesc) {
         throw new Error("Category description did not match payload");
       }
-
-      cleanups.push(async () => {
-        await db.from("categories").update({ description: null }).eq("id", 1);
-        await db.from("activity_logs").delete().eq("entity_type", "category").eq("entity_id", "1");
-      });
     });
 
     await runCase("XSS-04", "Cross-Site Scripting", "search queries with XSS payload return JSON without execution", async () => {
