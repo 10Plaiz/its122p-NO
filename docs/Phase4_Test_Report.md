@@ -10,10 +10,10 @@ submitted. The [local-development guide](LOCAL_DEV.md#run-and-verify) owns the
 test commands and the environment each suite needs. This report owns the test
 cases, their results, and the evidence that supports them.
 
-**Status: automated fast and security integration tests recorded.** Automated
-test suites cover Sections A through E (Input Validation, SQL Injection,
-Authentication, Authorization, and Cross-Site Scripting). Functional and
-usability test tables will be completed in subsequent Phase 4 deliverables.
+**Status: automated fast, functional, and security integration tests recorded.** Automated
+test suites cover Sections A through F (Input Validation, SQL Injection,
+Authentication, Authorization, Cross-Site Scripting, and Functional Testing).
+Usability test tables will be completed in subsequent Phase 4 deliverables.
 
 ## Test case identifiers
 
@@ -102,6 +102,18 @@ These are allocated by `tests/fast/` and `tests/integration/security.ts`. Do not
 | `XSS-02` | Staff remark stores script tags strictly as plain text | `tests/integration/security.ts` |
 | `XSS-03` | Admin category update preserves HTML markup as literal text | `tests/integration/security.ts` |
 | `XSS-04` | Search query with script payload returns JSON without execution | `tests/integration/security.ts` |
+| `FUNC-01` | Report creation and coordinate bounds validation | `tests/fast/functional.test.ts` |
+| `FUNC-02` | Linear report status progression across lifecycle states | `tests/fast/functional.test.ts` |
+| `FUNC-03` | Status transition enforcement rejects skips and terminal transitions | `tests/fast/functional.test.ts` |
+| `FUNC-04` | Citizen pending report editing permission and restriction rules | `tests/fast/functional.test.ts` |
+| `FUNC-05` | Citizen report cancellation sets cancelled and removes public display | `tests/fast/functional.test.ts` |
+| `FUNC-06` | Staff assignment and update permissions for designated assignees | `tests/fast/functional.test.ts` |
+| `FUNC-07` | Staff remark creation records progress note without status change | `tests/fast/functional.test.ts` |
+| `FUNC-08` | Public board visibility and PostgREST query filter rules | `tests/fast/functional.test.ts` |
+| `FUNC-09` | Administrator analytics aggregation for status and resolution days | `tests/fast/functional.test.ts` |
+| `FUNC-10` | Category management lifecycle and active selection filtering | `tests/fast/functional.test.ts` |
+| `FUNC-11` | Notification recipient routing and self-notification suppression | `tests/fast/functional.test.ts` |
+| `FUNC-12` | Responsive navigation role return targets and home paths | `tests/fast/functional.test.ts` |
 
 ## Evidence rules
 
@@ -216,7 +228,18 @@ Cover every core feature named in the [proposal](Final_Project.md).
 
 | ID | Feature | Test procedure | Expected result | Actual result | Method | Evidence | Status |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-|  |  |  |  |  |  |  |  |
+| `FUNC-01` | Report creation & validation | Submit report with valid data, then with out-of-bounds GPS lat/lng and invalid title lengths | Valid submission accepted; out-of-range coordinates and title bounds rejected | Valid data parsed cleanly; invalid values rejected by schema | Automated | `tests/fast/functional.test.ts` | `PASS` |
+| `FUNC-02` | Linear status progression | Advance report sequentially through `pending` -> `under_review` -> `in_progress` -> `resolved` | Status advances strictly one stage at a time | Lifecycle follows exact defined progression | Automated | `tests/fast/functional.test.ts` | `PASS` |
+| `FUNC-03` | Status transition enforcement | Attempt skipping workflow stages or transitioning out of terminal `resolved`/`cancelled` | Stage-skipping rejected; terminal states cannot be transitioned | Disallowed transitions rejected; terminal states stay dead ends | Automated | `tests/fast/functional.test.ts` | `PASS` |
+| `FUNC-04` | Citizen pending report editing | Attempt report editing as owner while pending vs non-pending vs non-owner | Allowed only by owner while status is pending; rejected otherwise | Allowed while pending; throws 403 when non-pending or non-owner | Automated | `tests/fast/functional.test.ts` | `PASS` |
+| `FUNC-05` | Citizen report cancellation | Citizen owner cancels pending report; verify public board visibility and row preservation | Status changes to cancelled; removed from public board; row retained | Status set to cancelled; is_public false; row preserved | Automated | `tests/fast/functional.test.ts` | `PASS` |
+| `FUNC-06` | Staff assignment & authorization | Admin assigns staff to report; verify update permissions for assigned vs unassigned staff | Admin can update any; assigned staff updates assigned; unassigned rejected | Admin & assigned staff allowed; unassigned staff rejected with 403 | Automated | `tests/fast/functional.test.ts` | `PASS` |
+| `FUNC-07` | Staff remark creation | Add inspection notes to report without changing its current status | Remark recorded in update history without altering report status | Remark recorded in audit updates; report status unmodified | Automated | `tests/fast/functional.test.ts` | `PASS` |
+| `FUNC-08` | Public board visibility & queries | Check reviewed status requirement, search sanitization, sort directions, and date boundary | Only reviewed statuses shown; search safely escaped; sort and date filters valid | Pending/cancelled omitted; PostgREST grammar safely escaped | Automated | `tests/fast/functional.test.ts` | `PASS` |
+| `FUNC-09` | Admin analytics computation | Compute status distribution, category breakdown, and average resolution duration | Accurate counts and average duration calculated from submitted/resolved timestamps | Aggregations match expected sums; average resolution days correct | Automated | `tests/fast/functional.test.ts` | `PASS` |
+| `FUNC-10` | Category lifecycle & selection | Validate category schema bounds and active vs inactive category filtering | Valid bounds enforced; inactive categories omitted from user selection list | Bounds enforced (2-50 chars name, <= 300 desc); inactive categories filtered | Automated | `tests/fast/functional.test.ts` | `PASS` |
+| `FUNC-11` | Notification recipient routing | Route notifications on status update and assignment; suppress actor self-notification | Citizens and staff notified as appropriate; acting user receives no self-notification | Proper recipients targeted; actor filtered out from notification list | Automated | `tests/fast/functional.test.ts` | `PASS` |
+| `FUNC-12` | Responsive navigation & layouts | Check role-based route return destinations and role home paths | Role-appropriate workspaces and return paths resolved for citizen, staff, admin | Correct paths returned for each role across navigation helpers | Automated | `tests/fast/functional.test.ts` | `PASS` |
 
 ## G. Usability test
 
@@ -243,6 +266,7 @@ One row per evidence file. Nothing in this table is stored in the repository.
 | `AUTHZ-01-to-05-fast-authz.log` | `AUTHZ-01` to `AUTHZ-05` | Test Execution Log | Automated test output from `tests/fast/permissions.test.ts` |
 | `AUTHZ-06-to-15-live-authz.log` | `AUTHZ-06` to `AUTHZ-15` | Test Execution Log | Automated test output from `tests/integration/security.ts` |
 | `XSS-01-to-04-live-xss.log` | `XSS-01` to `XSS-04` | Test Execution Log | Automated test output from `tests/integration/security.ts` |
+| `FUNC-01-to-12-functional-suite.log` | `FUNC-01` to `FUNC-12` | Test Execution Log | Automated test output from `tests/fast/functional.test.ts` |
 
 ## Bug and issue log
 
@@ -258,8 +282,8 @@ pull request that fixed it.
 
 | Metric | Count |
 | :--- | :--- |
-| Total test cases | 50 |
-| Passed | 50 |
+| Total test cases | 62 |
+| Passed | 62 |
 | Failed | 0 |
 | Fixed | 0 |
 | Remaining issues | 0 |
