@@ -54,10 +54,19 @@ export async function findReport(reportId: string | string[]) {
   return data as unknown as Report;
 }
 
-// Citizens may only see their own reports; staff and admins may see any.
+// Citizens may only view their own reports; assigned staff may only view reports
+// assigned to them; admins may view any report.
 export function assertCanView(report: Report, user: AuthUser) {
-  if (user.role === "admin" || user.role === "staff") return;
-  if (report.citizen.id !== user.id) throw forbidden("You can only view your own reports.");
+  if (user.role === "admin") return;
+  if (user.role === "staff") {
+    if (report.assigned_staff?.id === user.id) return;
+    throw forbidden("You can only view reports assigned to you.");
+  }
+  if (user.role === "citizen") {
+    if (report.citizen?.id === user.id) return;
+    throw forbidden("You can only view your own reports.");
+  }
+  throw forbidden("You do not have permission to view this report.");
 }
 
 // Admins may act on any report; staff only on the ones assigned to them.
