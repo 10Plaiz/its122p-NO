@@ -128,4 +128,65 @@ describe("leaflet reverse geocoding", () => {
       globalThis.fetch = originalFetch;
     }
   });
+
+  it("aborts when signal aborts during throttle delay", async () => {
+    const originalFetch = globalThis.fetch;
+    let fetchCount = 0;
+    globalThis.fetch = (async () => {
+      fetchCount++;
+      return new Response(JSON.stringify({ display_name: "Location" }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    }) as typeof fetch;
+
+    try {
+      const p1 = reverseGeocode(14.55, 121.01);
+      const controller = new AbortController();
+      const p2 = reverseGeocode(14.56, 121.02, controller.signal);
+
+      setTimeout(() => controller.abort(), 50);
+
+      const [r1, r2] = await Promise.all([p1, p2]);
+      expect(r1).toBe("Location");
+      expect(r2).toBeNull();
+      expect(fetchCount).toBe(1);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
+  it("recovers throttle reservation when delayed lookup aborts", async () => {
+    const originalFetch = globalThis.fetch;
+    const fetchTimestamps: number[] = [];
+    globalThis.fetch = (async () => {
+      fetchTimestamps.push(Date.now());
+      return new Response(JSON.stringify({ display_name: "Location" }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    }) as typeof fetch;
+
+    try {
+      const p1 = reverseGeocode(14.55, 121.01);
+
+      const controller = new AbortController();
+      const p2 = reverseGeocode(14.56, 121.02, controller.signal);
+      controller.abort();
+      await p2;
+
+      const p3 = reverseGeocode(14.57, 121.03);
+      const [r1, r3] = await Promise.all([p1, p3]);
+
+      expect(r1).toBe("Location");
+      expect(r3).toBe("Location");
+      expect(fetchTimestamps.length).toBe(2);
+
+      const interval = fetchTimestamps[1] - fetchTimestamps[0];
+      expect(interval).toBeGreaterThanOrEqual(995);
+      expect(interval).toBeLessThan(1500);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
 });
