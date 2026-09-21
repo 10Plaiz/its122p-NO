@@ -13,7 +13,9 @@ cases, their results, and the evidence that supports them.
 **Status: automated fast, functional, and security integration tests recorded.** Automated
 test suites cover Sections A through F (Input Validation, SQL Injection,
 Authentication, Authorization, Cross-Site Scripting, and Functional Testing).
-Usability test tables will be completed in subsequent Phase 4 deliverables.
+Section G currently contains the usability protocol and blank result tables
+only. It is preparation, not evidence of completed usability testing; the three
+sessions and their evidence remain outstanding.
 
 ## Test case identifiers
 
@@ -45,6 +47,11 @@ automated test that covers it, so all four can be matched without guessing.
 - **Evidence filenames.** `PREFIX-NN-short-slug.ext`, for example
   `VAL-04-blank-title-error.png`. One case may have several files: number them
   `VAL-04a`, `VAL-04b`.
+- **Usability sessions.** Section G names sessions `USE-S1` to `USE-S3` and the
+  tasks in the shared script `USE-01` upward, so a rating, an observation, an
+  evidence file, and a defect all point at the same session and task. Evidence
+  is named `USE-Sn-USE-NN-short-slug.ext`. The
+  [usability testing protocol](Usability_Testing.md) owns both.
 
 ### Identifiers already in use
 
@@ -243,13 +250,82 @@ Cover every core feature named in the [proposal](Final_Project.md).
 
 ## G. Usability test
 
-Record who tested, on what device, and what they said about navigation,
-readability, interface consistency, control placement, error message clarity,
-mobile responsiveness, and overall ease of use.
+Three sessions with external peers on the deployed test site, using fixture
+accounts and a fixed task script so the feedback is comparable. The
+[usability testing protocol](Usability_Testing.md) owns the script, the
+questionnaire, the tester codes, and the evidence rules. This section owns the
+results.
 
-| ID | Tester | Device and browser | Area | Feedback | Action taken | Evidence |
-| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-|  |  |  |  |  |  |  |
+**Status: sessions not yet run.** The rows below are filled in as each session
+completes.
+
+### Sessions
+
+| Session | Tester | Device and browser | Journeys covered | Date | Evidence |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| `USE-S1` | `T1` | Mobile phone browser | Public board, Citizen |  |  |
+| `USE-S2` | `T2` | Desktop browser | Public board, Staff |  |  |
+| `USE-S3` | `T3` | Desktop browser | Public board, Administrator |  |  |
+
+### Task completion
+
+Result is `Completed`, `Completed with difficulty`, or `Not completed`.
+
+| Session | ID | Task | Result | Observation | Evidence |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| `USE-S1` | `USE-01` | Find pothole reports on the public board |  |  |  |
+| `USE-S1` | `USE-02` | Filter to In progress reports and share the link |  |  |  |
+| `USE-S1` | `USE-03` | Find an existing report and read its current status |  |  |  |
+| `USE-S1` | `USE-04` | Submit a new report from a phone |  |  |  |
+| `USE-S1` | `USE-05` | Edit the pending report, then return to the report list |  |  |  |
+| `USE-S2` | `USE-01` | Find pothole reports on the public board |  |  |  |
+| `USE-S2` | `USE-02` | Filter to In progress reports and share the link |  |  |  |
+| `USE-S2` | `USE-06` | Open an assigned report, add a remark, advance its status |  |  |  |
+| `USE-S2` | `USE-07` | Check the queue and return to the worked report |  |  |  |
+| `USE-S3` | `USE-01` | Find pothole reports on the public board |  |  |  |
+| `USE-S3` | `USE-02` | Filter to In progress reports and share the link |  |  |  |
+| `USE-S3` | `USE-08` | Assign the unassigned fixture drainage report |  |  |  |
+| `USE-S3` | `USE-09` | Create the run-specific category and find its activity log |  |  |  |
+
+### Ratings
+
+Each item is rated 1 to 5, where `1 = very poor` and `5 = very good`. A comment
+is optional. Ratings are reported per tester and never averaged into a single
+score, so a low rating stays visible.
+
+| # | Item | `T1` mobile | `T2` desktop | `T3` desktop | Comments |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| 1 | Navigation |  |  |  |  |
+| 2 | Readability |  |  |  |  |
+| 3 | Interface consistency |  |  |  |  |
+| 4 | Button and link placement |  |  |  |  |
+| 5 | Error clarity |  |  |  |  |
+| 6 | Mobile responsiveness |  |  |  |  |
+| 7 | Overall ease of use |  |  |  |  |
+|  | One thing to change first |  |  |  |  |
+
+Item 6 is rated for the screen each session actually ran on. The device column
+is part of the rating, so a desktop answer is not read as a phone answer.
+
+### Findings
+
+Findings raised by more than one tester:
+
+| Finding | Sessions | Severity | Disposition |
+| :--- | :--- | :--- | :--- |
+|  |  |  |  |
+
+Findings raised by one tester, and any answer that disagreed with the others:
+
+| Finding | Session | Severity | Disposition |
+| :--- | :--- | :--- | :--- |
+|  |  |  |  |
+
+A finding that stops a tester completing a core journey, or that blocks a
+required Phase 4 deliverable, gets its own linked GitHub defect issue, and its
+bug log row links that issue. Every other finding stays visible as a bug log
+row with its severity and needs no issue. Nothing is dropped for being raised
+only once.
 
 ## Evidence index
 
