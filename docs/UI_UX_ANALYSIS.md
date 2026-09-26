@@ -56,21 +56,21 @@ The platform contains 15 distinct routes across 4 user roles. The table below li
 | Route Path | Primary Role | Source File | UX/UI Friction Points & Evidence | Priority Tier |
 | :--- | :--- | :--- | :--- | :--- |
 | `/` | Public Visitor | [`EntryPage`](../src/web/pages/Entry.tsx) | Page handles missing statistics gracefully ([`Entry.tsx:L14-16`](../src/web/pages/Entry.tsx#L14-L16)). The bottom board link card lacks strong interactive signposting. | Tier 3 (Low) |
-| `/board` | Public Visitor | [`BoardPage`](../src/web/pages/Board.tsx) | **Mobile Viewport Collapse:** Fixed 320px vertical map ([`Board.tsx:L252`](../src/web/pages/Board.tsx#L252)) buries report cards below the screen fold.<br>**List Scroll Shifting:** Card expansion inside `<button>` causes layout shifts ([`Board.tsx:L330-360`](../src/web/pages/Board.tsx#L330-L360)).<br>**Map Sync Discoverability:** Checkbox toggle is easily missed ([`Board.tsx:L265-272`](../src/web/pages/Board.tsx#L265-L272)). | **Tier 1 (Critical)** |
+| `/board` | Public Visitor | [`BoardPage`](../src/web/pages/Board.tsx) | **Resolved:** Added mobile segmented toggle (Map View / List View) with `AutoInvalidate` (`map.invalidateSize()`). Report cards render immediately on mobile without scrolling past map. | **Tier 1 (Completed: #34, commit `432e4f0`)** |
 | `/signin` | Unauthenticated | [`SignInPage`](../src/web/pages/SignIn.tsx) | Clean single-column layout with client-side validation and focus management ([`SignIn.tsx:L47-63`](../src/web/pages/SignIn.tsx#L47-L63)). | Tier 3 (Low) |
 | `/register` | Unauthenticated | [`RegisterPage`](../src/web/pages/Register.tsx) | Standard registration form with contact number formatting ([`Register.tsx:L60-90`](../src/web/pages/Register.tsx#L60-L90)). | Tier 3 (Low) |
-| `/report/new` | Citizen | [`NewReportPage`](../src/web/pages/NewReport.tsx) | **Pre-flight Incompleteness:** Step 3 summary displays Category, Title, and Location, but omits Description text and Photo preview ([`NewReport.tsx:L309-318`](../src/web/pages/NewReport.tsx#L309-L318)).<br>**Linear Step Trap:** Step indicators are unclickable text; users must click Back repeatedly to correct mistakes. | **Tier 1 (High ROI)** |
+| `/report/new` | Citizen | [`NewReportPage`](../src/web/pages/NewReport.tsx) | **Resolved:** Step 3 renders full description text and photo thumbnail preview with file size; added interactive step navigation buttons across all visited steps. | **Tier 1 (Completed: #33, commit `93143ea`)** |
 | `/my-reports` | Citizen | [`MyReportsPage`](../src/web/pages/MyReports.tsx) | **Mobile Table Overflow:** Standard table forces horizontal scrolling ([`MyReports.tsx:L126`](../src/web/pages/MyReports.tsx#L126)).<br>**Cancel Flow Expansion:** Inline confirmation expands three controls in a single cell ([`MyReports.tsx:L193-217`](../src/web/pages/MyReports.tsx#L193-L217)). | Tier 2 (Medium) |
 | `/reports/:id` | Citizen / All | [`ReportDetailPage`](../src/web/pages/ReportDetail.tsx) | Read-only screen for staff and administrators; does not show operational action forms ([`ReportDetail.tsx:L63-75`](../src/web/pages/ReportDetail.tsx#L63-L75)). Photo evidence lacks full-resolution zoom. | Tier 2 (Medium) |
 | `/notifications` | All Roles | [`NotificationsPage`](../src/web/pages/Notifications.tsx) | Unread badge and bulk update work correctly. Routing targets bifurcate based on user role ([`Notifications.tsx:L111-120`](../src/web/pages/Notifications.tsx#L111-L120)). | Tier 3 (Low) |
 | `/staff/queue` | Staff Member | [`StaffQueuePage`](../src/web/pages/StaffQueue.tsx) | **Action Affordance Mismatch:** Primary button labeled "Begin work" or "Resolve" ([`StaffQueue.tsx:L127-129`](../src/web/pages/StaffQueue.tsx#L127-L129)) navigates to detail view instead of executing transition.<br>**Mobile Table Scrolling:** Strict table layout is difficult to use on small screens. | Tier 2 (Medium) |
 | `/staff/reports/:id`| Staff / Admin | [`StaffReportPage`](../src/web/pages/StaffReport.tsx) | Three stacked forms clutter the right column. Citizen phone number is plain text instead of a clickable link ([`StaffReport.tsx:L88`](../src/web/pages/StaffReport.tsx#L88)). | Tier 2 (Medium) |
-| `/admin` | Administrator | [`AdminDashboardPage`](../src/web/pages/AdminDashboard.tsx) | Clean proportional bar metrics ([`AdminDashboard.tsx:L94-106`](../src/web/pages/AdminDashboard.tsx#L94-L106)). Lacks secondary navigation links to other admin pages. | **Tier 1 (High ROI)** |
-| `/admin/reports` | Administrator | [`AdminReportsPage`](../src/web/pages/AdminReports.tsx) | Assignment dialog works as intended ([`AdminReports.tsx:L185-220`](../src/web/pages/AdminReports.tsx#L185-L220)). Navigation relies entirely on global top header. | **Tier 1 (High ROI)** |
-| `/admin/users` | Administrator | [`AdminUsersPage`](../src/web/pages/AdminUsers.tsx) | User creation and role modification work as expected. Lacks secondary navigation links. | **Tier 1 (High ROI)** |
-| `/admin/categories`| Administrator | [`AdminCategoriesPage`](../src/web/pages/AdminCategories.tsx) | Category retirement functions correctly. Lacks secondary navigation links. | **Tier 1 (High ROI)** |
-| `/admin/logs` | Administrator | [`AdminLogsPage`](../src/web/pages/AdminLogs.tsx) | System audit log viewer. Table forces horizontal scrolling on mobile viewports ([`AdminLogs.tsx:L34`](../src/web/pages/AdminLogs.tsx#L34)). | Tier 2 (Medium) |
-| **Global Shell** | All Roles | [`Layout.tsx`](../src/web/components/Layout.tsx) | **Header Link Overload:** Admin role renders 9 items in a flat line ([`Layout.tsx:L23-30`](../src/web/components/Layout.tsx#L23-L30)), causing text to wrap on screens under 1100px.<br>**Mobile Menu Content Push:** Mobile menu pushes page content downward instead of opening an overlay sheet ([`Layout.tsx:L84`](../src/web/components/Layout.tsx#L84)). | **Tier 1 (Critical)** |
+| `/admin` | Administrator | [`AdminDashboardPage`](../src/web/pages/AdminDashboard.tsx) | **Resolved:** Clean proportional bar metrics; secondary sub-navigation provided by persistent `AdminLayout` tab bar. | **Tier 1 (Completed: #32, commit `f579ee0`)** |
+| `/admin/reports` | Administrator | [`AdminReportsPage`](../src/web/pages/AdminReports.tsx) | **Resolved:** Assignment dialog works as intended; integrated under persistent `AdminLayout` secondary tab bar. | **Tier 1 (Completed: #32, commit `f579ee0`)** |
+| `/admin/users` | Administrator | [`AdminUsersPage`](../src/web/pages/AdminUsers.tsx) | **Resolved:** User creation and role modification work as expected; integrated under persistent `AdminLayout` secondary tab bar. | **Tier 1 (Completed: #32, commit `f579ee0`)** |
+| `/admin/categories`| Administrator | [`AdminCategoriesPage`](../src/web/pages/AdminCategories.tsx) | **Resolved:** Category retirement functions correctly; integrated under persistent `AdminLayout` secondary tab bar. | **Tier 1 (Completed: #32, commit `f579ee0`)** |
+| `/admin/logs` | Administrator | [`AdminLogsPage`](../src/web/pages/AdminLogs.tsx) | System audit log viewer. Table forces horizontal scrolling on mobile viewports ([`AdminLogs.tsx:L34`](../src/web/pages/AdminLogs.tsx#L34)). Integrated under `AdminLayout`. | Tier 2 (Medium) |
+| **Global Shell** | All Roles | [`Layout.tsx`](../src/web/components/Layout.tsx) | **Resolved:** Consolidated 5 flat admin links in the global header into a single `Admin` nav link, eliminating link wrapping on tablet and desktop viewports. | **Tier 1 (Completed: #32, commit `f579ee0`)** |
 
 ---
 
@@ -128,16 +128,29 @@ flowchart LR
 
 ## 6. Prioritized Execution Roadmap
 
-### Tier 1: High-ROI, Zero-Backend-Risk Improvements
+### Tier 1: High-ROI, Zero-Backend-Risk Improvements (Completed)
 *Focus: Resolves header crowding, completes citizen verification, and eliminates mobile map traps.*
 
-1. **Admin Navigation Consolidation:**
-   - Consolidate [`Layout.tsx`](../src/web/components/Layout.tsx) admin links into a single `Admin` link.
-   - Build a reusable `AdminNav` secondary tab bar across `/admin`, `/admin/reports`, `/admin/users`, `/admin/categories`, and `/admin/logs`.
-2. **Citizen Wizard Pre-Flight Completion:**
-   - Update [`NewReport.tsx`](../src/web/pages/NewReport.tsx) Step 3 to render description text and photo attachment thumbnails before submission.
-3. **Public Board Mobile Segmented View:**
-   - In [`Board.tsx`](../src/web/pages/Board.tsx), introduce a mobile segmented toggle (`Map` vs `List`) using `.seg` and `.seg-opt` classes. Ensure Leaflet recalculates dimensions with `invalidateSize()` upon selection.
+1. **[x] Admin Navigation Consolidation:**
+   - Consolidated [`Layout.tsx`](../src/web/components/Layout.tsx) admin links into a single `Admin` link.
+   - Built reusable [`AdminLayout.tsx`](../src/web/components/AdminLayout.tsx) secondary tab bar across `/admin`, `/admin/reports`, `/admin/users`, `/admin/categories`, and `/admin/logs`.
+   - **Resolution:** Issue [#32](https://github.com/10Plaiz/its122p-NO/issues/32), Commit `f579ee0`. Verified by Playwright test `UIUX-01` in [`admin.browser.ts`](../tests/browser/admin.browser.ts).
+2. **[x] Citizen Wizard Pre-Flight Completion:**
+   - Updated [`NewReport.tsx`](../src/web/pages/NewReport.tsx) Step 3 to render full description text and photo attachment thumbnail preview with file size.
+   - Added interactive step navigation buttons across all visited steps with `maxStep` tracking.
+   - **Resolution:** Issue [#33](https://github.com/10Plaiz/its122p-NO/issues/33), Commit `93143ea`. Verified by Playwright test `UIUX-02` in [`citizen.browser.ts`](../tests/browser/citizen.browser.ts).
+3. **[x] Public Board Mobile Segmented View:**
+   - In [`Board.tsx`](../src/web/pages/Board.tsx), introduced a mobile segmented toggle (`List View` vs `Map View`) using `.seg` and `.seg-opt` classes.
+   - Updated [`ReportMap.tsx`](../src/web/components/ReportMap.tsx) with `AutoInvalidate` (`map.invalidateSize()` and `ResizeObserver`) to prevent unrendered tile boxes upon selection.
+   - **Resolution:** Issue [#34](https://github.com/10Plaiz/its122p-NO/issues/34), Commit `432e4f0`. Verified by Playwright test `UIUX-03` in [`responsive.browser.ts`](../tests/browser/responsive.browser.ts).
+
+#### Verification Evidence Artifacts (Tier 1)
+
+| Feature Slice | Issue | Visual Evidence | Verification Test | Result |
+| :--- | :--- | :--- | :--- | :--- |
+| **Admin Navigation Header & Tabs** | [#32](https://github.com/10Plaiz/its122p-NO/issues/32) | [`ADMIN-header-desktop.png`](../tests/evidence/ADMIN-header-desktop.png)<br>[`ADMIN-header-tablet.png`](../tests/evidence/ADMIN-header-tablet.png) | `tests/browser/admin.browser.ts:UIUX-01` | Passed |
+| **Citizen Wizard Step 3 Review** | [#33](https://github.com/10Plaiz/its122p-NO/issues/33) | [`CITIZEN-wizard-step3-summary.png`](../tests/evidence/CITIZEN-wizard-step3-summary.png) | `tests/browser/citizen.browser.ts:UIUX-02` | Passed |
+| **Mobile Board Segmented Toggle** | [#34](https://github.com/10Plaiz/its122p-NO/issues/34) | [`BOARD-mobile-list.png`](../tests/evidence/BOARD-mobile-list.png)<br>[`BOARD-mobile-map.png`](../tests/evidence/BOARD-mobile-map.png) | `tests/browser/responsive.browser.ts:UIUX-03` | Passed |
 
 ### Tier 2: Responsive Ergonomics and Field Usability
 *Focus: Improves touch targets and mobile field workflows for staff and citizens.*
