@@ -1,170 +1,158 @@
-# KAMOTI: UI/UX Landscape, Consolidation & Strategic Directions
+# KAMOTI: UI/UX Route Triage and Optimization Plan
 
-This document delivers a UI/UX audit of the KAMOTI platform. It identifies workflow friction points, component consolidation opportunities, and strategic directions to elevate user experience prior to demonstration and evaluation.
-
----
-
-## 1. Design System Identity & Presentation Context
-
-### The Modernist Aesthetic Foundation
-KAMOTI implements a Modernist, Swiss-influenced design language defined in [`src/web/styles/app.css`](../src/web/styles/app.css) and [`src/web/styles/ds.css`](../src/web/styles/ds.css):
-- **Typography:** Heavyweight Archivo (800 weight headings, letter-spacing -0.015em) paired with monospace metadata tags.
-- **Zero Radius:** Strict ban on rounded corners (`--radius-sm: 0px`, `--radius-md: 0px`, `--radius-lg: 0px`).
-- **Industrial Contrast:** Light neutral backgrounds (`#f3f2f2`, `#eae9e9`), stark charcoal text (`#201e1d`), heavy 2px rule borders, and a safety-orange accent (`#ec3013`).
-
-### Evaluator & Presentation Perspective
-When grading or critiquing civic municipal software, evaluators focus on:
-1. **Frictionless Citizen Reporting:** How quickly can a resident in distress or on the street submit an issue with minimal cognitive effort?
-2. **Operational Clarity for Staff:** Does the staff workspace make the next field action obvious, or does it require navigating nested menus?
-3. **Visual Hierarchy & Information Density:** Is the screen cluttered with raw database fields, or is critical operational context prioritized?
-4. **Mobile Viability:** Civic reporting happens on smartphones at the physical site of damage. Desktop-only paradigms degrade presentation credibility.
+This document defines the user interface and user experience audit for the KAMOTI platform. It integrates empirical route triage findings, identifies operational friction points, and defines a prioritized roadmap to improve system usability.
 
 ---
 
-## 2. Screen-by-Screen UI/UX Findings & Friction Points
+## 1. Context and Purpose
 
-### A. Navigation Shell and Header ([`Layout.tsx`](../src/web/components/Layout.tsx))
+### 1.1 Purpose of this Document
+Developers and designers must use this document to:
+- Identify high-priority user experience defects across all platform routes.
+- Understand the technical and operational risks of unoptimized interfaces.
+- Execute interface changes using verified design patterns and controlled technical English.
+- Prepare the platform for academic evaluation, project review, and live field use.
 
-| Finding / Area | Current Implementation | User Experience Friction |
+### 1.2 Why Optimization is Necessary (Background)
+KAMOTI connects citizens, municipal field workers, and administrators in a single civic tracking workflow:
+- Citizens file infrastructure issues on mobile devices under outdoor conditions.
+- Municipal staff triage and repair reported problems in the field.
+- Administrators schedule tasks, assign personnel, and audit system activity.
+
+Initial development established correct database schemas, role validation, and core page components. However, several interfaces contain layout shifts, crowded navigation bars, and incomplete summaries. Interface optimization resolves these friction points before project evaluation.
+
+### 1.3 Consequences of Inaction
+If the team does not resolve these interface defects, the following failures will occur:
+
+| Persona / Area | Consequence of Inaction | Net Operational Impact |
 | :--- | :--- | :--- |
-| **Top Navigation Crowding** | All role routes are rendered as flat links in the header. For Admins, this renders 6 separate links (`Community board`, `Dashboard`, `Reports`, `Users`, `Categories`, `Activity`). | On tablet or medium screens, the navigation wraps onto multiple lines or collapses abruptly into the mobile menu. |
-| **User Identity & Role Indicator** | Displays a plain text label (`{user.name} · {user.role}`) beside the sign out button. | Lacks visual weight; users cannot easily verify their active permissions or switch context at a glance. |
-| **Mobile Drawer Ergonomics** | Toggle opens a vertical list that pushes the main page content downward rather than an overlay sheet. | Shifts page layout and disorients users on mobile viewports. |
+| **Citizen (Mobile)** | Citizens drop out of the report wizard because Step 3 does not show description or photo previews. Citizens must navigate backward to verify data. | Increased submission errors, duplicate reports, and report abandonment. |
+| **Public Visitor (Mobile)** | The 320px static map pushes report cards below the fold on mobile screens. Users cannot see reports without scrolling past the map. | Poor public transparency engagement and degraded first impressions for evaluators. |
+| **Staff Member (Field)** | Table rows on mobile force horizontal scrolling. Action buttons labeled "Begin work" navigate to detail pages instead of changing status, causing user confusion. | Slower response times in the field and operational user frustration. |
+| **Administrator** | Top navigation bar displays 9 flat items, wrapping into multiple rows on medium displays. Administrators cannot switch sub-modules without returning to the main header. | Degraded visual credibility and navigation inefficiency during system demonstrations. |
 
 ---
 
-### B. Public Transparency Board ([`Board.tsx`](../src/web/pages/Board.tsx))
+## 2. Design System Foundation
 
-| Finding / Area | Current Implementation | User Experience Friction |
-| :--- | :--- | :--- |
-| **Dual-Pane Viewport Balance** | Split 50/50 between Leaflet Map (top on mobile, left on desktop) and Report List. | On mobile screens, the map consumes 320px of vertical space, leaving less than one visible report card below the fold without extensive scrolling. |
-| **Interactive Card Expansion** | Clicking a report card in the list expands its full description, address, and photo inline inside the `<button>` element. | Expanding a card with a large photo shifts list scroll position, pushing sibling cards off screen. |
-| **Map View Sync Discoverability** | The checkbox "Only show reports in this map view" is tucked into a subtle subheader above the cards. | Users who pan or zoom the map expect the list to filter automatically, or may not realize the toggle exists. |
+KAMOTI uses a Modernist design language defined in [`src/web/styles/app.css`](../src/web/styles/app.css) and [`src/web/styles/ds.css`](../src/web/styles/ds.css):
+- **Typography:** Heavyweight Archivo headings paired with monospace metadata tags.
+- **Zero Radius:** Rectangular borders without rounded corners (`--radius-sm: 0px`, `--radius-md: 0px`, `--radius-lg: 0px`).
+- **Industrial Contrast:** Light neutral backgrounds (`#f3f2f2`, `#eae9e9`), dark charcoal text (`#201e1d`), 2px divider lines, and a safety-orange accent (`#ec3013`).
 
----
-
-### C. Citizen Report Creation Wizard ([`NewReport.tsx`](../src/web/pages/NewReport.tsx))
-
-| Finding / Area | Current Implementation | User Experience Friction |
-| :--- | :--- | :--- |
-| **Linear Step Isolation** | 3-step sequential wizard (`01: Where is it?`, `02: What is wrong?`, `03: Show us`). | Citizens cannot jump back and forth directly via breadcrumbs; they must repeatedly click Back and Continue. |
-| **Address Geocoding Dependency** | Nominatim reverse-geocoding triggers on pin drop with a 1-second debounce. | If geocoding fails or lags on slow mobile connections, the address field remains blank without explicit feedback explaining that coordinates are already saved. |
-| **Review Step Completeness** | Step 3 "Check before sending" only summarizes Category, Title, and Location. | It omits the description text and photo thumbnail from the pre-flight summary, forcing the citizen to go back to verify details. |
+### 2.1 Evaluator Perspective
+Evaluators assess four key areas during system demonstration:
+1. **Frictionless Reporting:** A resident can submit an issue quickly with minimal cognitive load.
+2. **Operational Clarity:** Field workers can identify their next task without navigating nested menus.
+3. **Information Hierarchy:** Screens display operational context clearly without raw database clutter.
+4. **Mobile Usability:** Screens adapt cleanly to mobile viewports without horizontal table overflow or hidden controls.
 
 ---
 
-### D. The Dual Report Detail Disconnect (Citizen vs. Staff)
+## 3. Complete Frontend Route Triage Matrix
 
-The application maintains two separate detail screens for the exact same underlying report entity:
-- [`ReportDetail.tsx`](../src/web/pages/ReportDetail.tsx) (`/reports/:id`)
-- [`StaffReport.tsx`](../src/web/pages/StaffReport.tsx) (`/staff/reports/:id`)
+The platform contains 15 distinct routes across 4 user roles. The table below lists each route, its source component, identified defects, and priority tier.
+
+| Route Path | Primary Role | Source File | UX/UI Friction Points & Evidence | Priority Tier |
+| :--- | :--- | :--- | :--- | :--- |
+| `/` | Public Visitor | [`EntryPage`](../src/web/pages/Entry.tsx) | Page handles missing statistics gracefully ([`Entry.tsx:L14-16`](../src/web/pages/Entry.tsx#L14-L16)). The bottom board link card lacks strong interactive signposting. | Tier 3 (Low) |
+| `/board` | Public Visitor | [`BoardPage`](../src/web/pages/Board.tsx) | **Mobile Viewport Collapse:** Fixed 320px vertical map ([`Board.tsx:L252`](../src/web/pages/Board.tsx#L252)) buries report cards below the screen fold.<br>**List Scroll Shifting:** Card expansion inside `<button>` causes layout shifts ([`Board.tsx:L330-360`](../src/web/pages/Board.tsx#L330-L360)).<br>**Map Sync Discoverability:** Checkbox toggle is easily missed ([`Board.tsx:L265-272`](../src/web/pages/Board.tsx#L265-L272)). | **Tier 1 (Critical)** |
+| `/signin` | Unauthenticated | [`SignInPage`](../src/web/pages/SignIn.tsx) | Clean single-column layout with client-side validation and focus management ([`SignIn.tsx:L47-63`](../src/web/pages/SignIn.tsx#L47-L63)). | Tier 3 (Low) |
+| `/register` | Unauthenticated | [`RegisterPage`](../src/web/pages/Register.tsx) | Standard registration form with contact number formatting ([`Register.tsx:L60-90`](../src/web/pages/Register.tsx#L60-L90)). | Tier 3 (Low) |
+| `/report/new` | Citizen | [`NewReportPage`](../src/web/pages/NewReport.tsx) | **Pre-flight Incompleteness:** Step 3 summary displays Category, Title, and Location, but omits Description text and Photo preview ([`NewReport.tsx:L309-318`](../src/web/pages/NewReport.tsx#L309-L318)).<br>**Linear Step Trap:** Step indicators are unclickable text; users must click Back repeatedly to correct mistakes. | **Tier 1 (High ROI)** |
+| `/my-reports` | Citizen | [`MyReportsPage`](../src/web/pages/MyReports.tsx) | **Mobile Table Overflow:** Standard table forces horizontal scrolling ([`MyReports.tsx:L126`](../src/web/pages/MyReports.tsx#L126)).<br>**Cancel Flow Expansion:** Inline confirmation expands three controls in a single cell ([`MyReports.tsx:L193-217`](../src/web/pages/MyReports.tsx#L193-L217)). | Tier 2 (Medium) |
+| `/reports/:id` | Citizen / All | [`ReportDetailPage`](../src/web/pages/ReportDetail.tsx) | Read-only screen for staff and administrators; does not show operational action forms ([`ReportDetail.tsx:L63-75`](../src/web/pages/ReportDetail.tsx#L63-L75)). Photo evidence lacks full-resolution zoom. | Tier 2 (Medium) |
+| `/notifications` | All Roles | [`NotificationsPage`](../src/web/pages/Notifications.tsx) | Unread badge and bulk update work correctly. Routing targets bifurcate based on user role ([`Notifications.tsx:L111-120`](../src/web/pages/Notifications.tsx#L111-L120)). | Tier 3 (Low) |
+| `/staff/queue` | Staff Member | [`StaffQueuePage`](../src/web/pages/StaffQueue.tsx) | **Action Affordance Mismatch:** Primary button labeled "Begin work" or "Resolve" ([`StaffQueue.tsx:L127-129`](../src/web/pages/StaffQueue.tsx#L127-L129)) navigates to detail view instead of executing transition.<br>**Mobile Table Scrolling:** Strict table layout is difficult to use on small screens. | Tier 2 (Medium) |
+| `/staff/reports/:id`| Staff / Admin | [`StaffReportPage`](../src/web/pages/StaffReport.tsx) | Three stacked forms clutter the right column. Citizen phone number is plain text instead of a clickable link ([`StaffReport.tsx:L88`](../src/web/pages/StaffReport.tsx#L88)). | Tier 2 (Medium) |
+| `/admin` | Administrator | [`AdminDashboardPage`](../src/web/pages/AdminDashboard.tsx) | Clean proportional bar metrics ([`AdminDashboard.tsx:L94-106`](../src/web/pages/AdminDashboard.tsx#L94-L106)). Lacks secondary navigation links to other admin pages. | **Tier 1 (High ROI)** |
+| `/admin/reports` | Administrator | [`AdminReportsPage`](../src/web/pages/AdminReports.tsx) | Assignment dialog works as intended ([`AdminReports.tsx:L185-220`](../src/web/pages/AdminReports.tsx#L185-L220)). Navigation relies entirely on global top header. | **Tier 1 (High ROI)** |
+| `/admin/users` | Administrator | [`AdminUsersPage`](../src/web/pages/AdminUsers.tsx) | User creation and role modification work as expected. Lacks secondary navigation links. | **Tier 1 (High ROI)** |
+| `/admin/categories`| Administrator | [`AdminCategoriesPage`](../src/web/pages/AdminCategories.tsx) | Category retirement functions correctly. Lacks secondary navigation links. | **Tier 1 (High ROI)** |
+| `/admin/logs` | Administrator | [`AdminLogsPage`](../src/web/pages/AdminLogs.tsx) | System audit log viewer. Table forces horizontal scrolling on mobile viewports ([`AdminLogs.tsx:L34`](../src/web/pages/AdminLogs.tsx#L34)). | Tier 2 (Medium) |
+| **Global Shell** | All Roles | [`Layout.tsx`](../src/web/components/Layout.tsx) | **Header Link Overload:** Admin role renders 9 items in a flat line ([`Layout.tsx:L23-30`](../src/web/components/Layout.tsx#L23-L30)), causing text to wrap on screens under 1100px.<br>**Mobile Menu Content Push:** Mobile menu pushes page content downward instead of opening an overlay sheet ([`Layout.tsx:L84`](../src/web/components/Layout.tsx#L84)). | **Tier 1 (Critical)** |
+
+---
+
+## 4. Deep-Dive Journey Findings
+
+### 4.1 Public Transparency Board ([`Board.tsx`](../src/web/pages/Board.tsx))
+- **The Mobile Map Trap:** On viewports under 1024px, the map occupies a fixed height of 320px (`h-[320px]`). On a 375x812 display, the top navigation, search filters, and map consume more than 650px. The visitor must scroll through multiple screen lengths before seeing a single report card.
+- **Card Expansion Layout Shifts:** In [`Board.tsx:L330-360`](../src/web/pages/Board.tsx#L330-L360), clicking an unselected card dynamically renders its description, address, and photo frame inside the list. This expansion causes a 200px to 300px height jump, displacing adjacent cards and shifting scroll position.
+
+### 4.2 Citizen Report Submission Wizard ([`NewReport.tsx`](../src/web/pages/NewReport.tsx))
+- **Pre-Flight Summary Incompleteness:** Step 3 (`Check before sending`, [`NewReport.tsx:L309-318`](../src/web/pages/NewReport.tsx#L309-L318)) summarizes only Category, Title, and Location. It omits the description text and photo thumbnail. Citizens cannot verify what they typed or attached without clicking the Back button multiple times.
+- **Linear Step Isolation:** Step navigation is strictly sequential. Users cannot select step headers directly to correct previously entered values.
+
+### 4.3 Administrator Sub-System Fragmentation ([`Layout.tsx`](../src/web/components/Layout.tsx) & Admin Routes)
+- **Top Header Bloat:** The global header renders flat links for all admin pages (`Dashboard`, `Reports`, `Users`, `Categories`, `Activity`), along with `Community board`, `Notifications`, and user credentials. On tablet screens (768px to 1024px), these links wrap into multiple lines.
+- **Sub-Navigation Absence:** Navigating to `/admin/categories` leaves no contextual breadcrumbs or tabs. To access `/admin/reports`, the administrator must reach back up to the primary header.
+
+### 4.4 Field Staff Operations ([`StaffQueue.tsx`](../src/web/pages/StaffQueue.tsx))
+- **Action Affordance Confusion:** Table rows display a primary action button labeled with the next transition (such as "Begin work" or "Resolve", [`StaffQueue.tsx:L127-129`](../src/web/pages/StaffQueue.tsx#L127-L129)). Clicking this button navigates to `/staff/reports/:id` rather than updating the status. This creates a cognitive mismatch for field staff.
+- **Mobile Table Formatting:** Data rows force horizontal scrolling on small devices, complicating one-hand operation on physical work sites.
+
+### 4.5 The Dual Report Detail Disconnect
+The application maintains two separate detail screens for the same underlying report:
+- [`ReportDetail.tsx`](../src/web/pages/ReportDetail.tsx) (`/reports/:id`): Citizen view with timeline and inline edit mode.
+- [`StaffReport.tsx`](../src/web/pages/StaffReport.tsx) (`/staff/reports/:id`): Staff view with stacked action forms and reporter contact information.
 
 ```mermaid
 flowchart LR
-    subgraph Current_Arch["Current Architecture"]
-        A["Citizen clicks notification"] --> B["/reports/:id (ReportDetail.tsx)"]
-        C["Staff clicks notification"] --> D["/staff/reports/:id (StaffReport.tsx)"]
-        E["Admin navigates via All Reports"] --> D
-        F["Admin clicks citizen link"] --> B
+    subgraph Current_Architecture["Current Route Architecture"]
+        A["Citizen clicks link"] --> B["/reports/:id (ReportDetail.tsx)"]
+        C["Staff clicks link"] --> D["/staff/reports/:id (StaffReport.tsx)"]
+        E["Admin opens via all reports"] --> D
+        F["Admin opens via notification"] --> B
     end
-    
-    subgraph UX_Friction["Resulting UX Friction"]
-        B -.-> G["Citizen view and inline edit mode. No staff actions."]
-        D -.-> H["Staff view and stacked action boxes. No inline edit."]
-        F -.-> I["Admin lands on read-only view. Cannot act without URL change."]
+
+    subgraph Identified_Friction["Resulting User Friction"]
+        B -.-> G["Read-only view for staff and admin. No action forms."]
+        D -.-> H["Staff action view. No inline citizen editing."]
+        F -.-> I["Admin lands on read-only view. Cannot execute action."]
     end
 ```
 
-#### Structural Comparison: [`ReportDetail.tsx`](../src/web/pages/ReportDetail.tsx) vs [`StaffReport.tsx`](../src/web/pages/StaffReport.tsx)
+---
 
-| Feature / Element | Citizen Detail (`/reports/:id`) | Staff Detail (`/staff/reports/:id`) |
+## 5. Implementation Exemplars and Anti-Patterns
+
+| Operational Area | Anti-Pattern in Codebase | Recommended Exemplar Implementation |
 | :--- | :--- | :--- |
-| **Layout** | 2-column: Metadata + Evidence on Left; Map + Timeline on Right. | 2-column: Metadata + Contact on Left; 3 Stacked Action Forms on Right. |
-| **Reporter Contact Details** | Hidden (preserves privacy). | Visible (Name, Email, Phone number). |
-| **History Display** | Full chronological timeline with vertical accent line. | Unstyled flat list of updates. |
-| **Action Capability** | Inline edit form (only when `pending`). | Advance status form, remark form, photo resolution form. |
-| **Admin Access State** | View only (action forms missing). | Full administrative update capability. |
+| **Mobile Map/List Balance** | Stacking a 320px static map above the card list on mobile ([`Board.tsx:L252`](../src/web/pages/Board.tsx#L252)), hiding cards below the fold. | Use the design system segmented control (`.seg` and `.seg-opt`, [`ds.css:L111-123`](../src/web/styles/ds.css#L111-L123)) on mobile to switch between `Map View` and `List View`. |
+| **Admin Navigation** | Rendering 5 separate administrative route links directly in the global header ([`Layout.tsx:L23-30`](../src/web/components/Layout.tsx#L23-L30)). | Render a single `Admin` link in the global header. Render an internal secondary tab bar (`Analytics`, `Reports`, `Users`, `Categories`, `Audit`) across all `/admin/*` pages. |
+| **Pre-Flight Summary** | Summarizing only 3 fields and omitting description and photo attachments ([`NewReport.tsx:L309-318`](../src/web/pages/NewReport.tsx#L309-L318)). | Render a complete pre-flight review card with category, title, coordinates, formatted address, description text, and a photo thumbnail preview. |
+| **Staff Work Queue Action** | Styling navigation links as primary state-change action buttons ([`StaffQueue.tsx:L127`](../src/web/pages/StaffQueue.tsx#L127)). | Label the button `Open report` or render a secondary inspect link, reserving primary state-change buttons for the actual execution page. |
 
 ---
 
-### E. Staff Work Queue ([`StaffQueue.tsx`](../src/web/pages/StaffQueue.tsx))
+## 6. Prioritized Execution Roadmap
 
-| Finding / Area | Current Implementation | User Experience Friction |
-| :--- | :--- | :--- |
-| **Table-First Layout** | Dense HTML table showing Reference, Title, Category, Status, Filed date, and Action button. | On mobile screens, table requires horizontal scrolling. Field workers holding a phone on site struggle to tap row-level buttons. |
-| **Single Action Direct Link** | Action button directly reflects the single legal next status (e.g., "Start review", "Begin work"). | While technically elegant, the button text does not immediately communicate that clicking it opens the report detail screen rather than immediately executing the transition. |
+### Tier 1: High-ROI, Zero-Backend-Risk Improvements
+*Focus: Resolves header crowding, completes citizen verification, and eliminates mobile map traps.*
 
----
+1. **Admin Navigation Consolidation:**
+   - Consolidate [`Layout.tsx`](../src/web/components/Layout.tsx) admin links into a single `Admin` link.
+   - Build a reusable `AdminNav` secondary tab bar across `/admin`, `/admin/reports`, `/admin/users`, `/admin/categories`, and `/admin/logs`.
+2. **Citizen Wizard Pre-Flight Completion:**
+   - Update [`NewReport.tsx`](../src/web/pages/NewReport.tsx) Step 3 to render description text and photo attachment thumbnails before submission.
+3. **Public Board Mobile Segmented View:**
+   - In [`Board.tsx`](../src/web/pages/Board.tsx), introduce a mobile segmented toggle (`Map` vs `List`) using `.seg` and `.seg-opt` classes. Ensure Leaflet recalculates dimensions with `invalidateSize()` upon selection.
 
-### F. Administrator Sub-System Fragmentation
+### Tier 2: Responsive Ergonomics and Field Usability
+*Focus: Improves touch targets and mobile field workflows for staff and citizens.*
 
-The Administrator experience spans five distinct routes:
-1. [`/admin`](../src/web/pages/AdminDashboard.tsx): Analytics Dashboard
-2. [`/admin/reports`](../src/web/pages/AdminReports.tsx): All Reports & Assignment
-3. [`/admin/users`](../src/web/pages/AdminUsers.tsx): User Provisioning & Roles
-4. [`/admin/categories`](../src/web/pages/AdminCategories.tsx): Category Setup
-5. [`/admin/logs`](../src/web/pages/AdminLogs.tsx): Activity Audit Trail
+1. **Staff Work Queue Responsiveness:**
+   - Replace table rows with touch-friendly task cards on viewports under 768px in [`StaffQueue.tsx`](../src/web/pages/StaffQueue.tsx).
+   - Clarify the action link text to indicate inspection rather than immediate transition execution.
+2. **Citizen Contact Direct Links:**
+   - In [`StaffReport.tsx:L88`](../src/web/pages/StaffReport.tsx#L88), format citizen phone numbers with clickable `tel:` and `sms:` URI links.
+3. **Citizen My-Reports Mobile Cards:**
+   - Reflow [`MyReportsPage`](../src/web/pages/MyReports.tsx) from a wide table into responsive status cards on mobile devices.
 
-#### The Friction
-There is no unified Admin Sub-Navigation bar. When an administrator navigates to `/admin/users`, the only way to return to `/admin/reports` is to reach back up into the top global site header.
+### Tier 3: Core Architectural Unification
+*Focus: Eliminates dual-route maintenance and unifies report inspection.*
 
----
-
-## 3. Consolidation and Pruning Analysis
-
-To make the application significantly cleaner, more maintainable, and impressive during presentations, the team can consider the following consolidation targets:
-
-```mermaid
-flowchart TD
-    subgraph Targets["Consolidation Targets"]
-        T1["Unify Report Detail Views"]
-        T2["Consolidate Admin Navigation"]
-        T3["Streamline Citizen Creation Wizard"]
-        T4["Responsive Map or List Toggle on Public Board"]
-    end
-
-    subgraph Benefits["Expected Benefits"]
-        B1["Removes duplicate code and routing confusion"]
-        B2["Cleans up global header with admin tabs"]
-        B3["Reduces abandonment during report creation"]
-        B4["Eliminates mobile scroll traps on public board"]
-    end
-
-    T1 --> B1
-    T2 --> B2
-    T3 --> B3
-    T4 --> B4
-```
-
-### High-Impact Consolidation Opportunities
-
-| Target Component / Screen | Current Redundancy | Proposed Consolidation Model | Complexity Impact |
-| :--- | :--- | :--- | :--- |
-| **Report Detail Unification** | Separate [`ReportDetail.tsx`](../src/web/pages/ReportDetail.tsx) and [`StaffReport.tsx`](../src/web/pages/StaffReport.tsx). | Single `/reports/:id` view that conditionally renders an **Action Rail** if the user is assigned staff or admin, and an **Edit Drawer/Modal** if the user is the owning citizen with a pending report. | Medium (Reduces codebase by ~350 lines; unifies navigation). |
-| **Admin Sub-Navigation** | 5 separate top-nav links in [`Layout.tsx`](../src/web/components/Layout.tsx). | A single `Admin` link in top nav leading to an internal Admin Shell with secondary tab navigation (`Analytics`, `Reports`, `Users`, `Categories`, `Audit`). | Low (Dramatically declutters top header for all viewports). |
-| **Photo Upload & Framing** | Dual photo rendering logic across cards, details, and proof sections. | Standardized responsive photo gallery component with built-in modal lightbox for full-resolution inspection. | Low (Improves inspection experience for damage and repair proof). |
-| **Mobile Board Viewport** | Stacked 320px map on top of card list on mobile. | Mobile segmented view toggle (`Map View` \| `List View`) or floating bottom sheet for cards over the map. | Medium (Transforms mobile experience from clunky to native-feeling). |
-
----
-
-## 4. Strategic Directions for UI/UX Prioritization
-
-These non-prescriptive directions represent options the team can choose from depending on presentation criteria.
-
-### Direction 1: The "Executive Presentation Polish" Track
-*Focus: Maximum visual impressiveness, clear storytelling, and polished interactions for reviewers.*
-- **Unified Admin Command Center:** Add an admin secondary navigation tab bar across all `/admin/*` views with breadcrumbs and live metric badges (e.g., number of pending triage reports).
-- **Interactive Full-Resolution Lightbox:** Allow evaluators to click evidence photos and proof of repair photos to view high-resolution zoomable modals with side-by-side Before/After comparison.
-- **Micro-Interaction Feedback:** Enhance status progression with immediate optimistic visual updates and clear milestone celebration (e.g., distinct banner when a report reaches `resolved`).
-
-### Direction 2: The "Mobile Citizen First" Track
-*Focus: Seamless public reporting, mobile usability, and field testing credibility.*
-- **Compact Stepper / Accordion Wizard:** Convert [`NewReport.tsx`](../src/web/pages/NewReport.tsx) into an accordion or progress stepper that allows jumping directly between location, problem details, and photos.
-- **Mobile Map-Sheet Pattern on Public Board:** Replace the stacked 320px static map on mobile with an interactive full-screen map featuring a swipeable or toggleable bottom drawer for report cards.
-- **Quick Location Pin Feedback:** Add a clear pulsating pin marker on the map picker indicating high-accuracy GPS lock.
-
-### Direction 3: The "Operational Field Worker" Track
-*Focus: Streamlining daily workflows for city engineers and field maintenance staff.*
-- **Single Adaptive Report Workspace:** Merge [`ReportDetail.tsx`](../src/web/pages/ReportDetail.tsx) and [`StaffReport.tsx`](../src/web/pages/StaffReport.tsx). Both staff and citizens visit `/reports/:id`, with contextual action sidebars appearing only for authorized roles.
-- **Card-Based Mobile Queue:** On [`StaffQueue.tsx`](../src/web/pages/StaffQueue.tsx), replace the wide horizontal table on mobile screens with responsive task cards optimized for one-thumb field interaction.
-- **Direct Citizen Dial / SMS Action:** Format the citizen contact number on staff views with `tel:` and `sms:` URI links for one-tap field communication.
+1. **Unified Report Workspace:**
+   - Merge [`ReportDetail.tsx`](../src/web/pages/ReportDetail.tsx) and [`StaffReport.tsx`](../src/web/pages/StaffReport.tsx) into a single `/reports/:id` route.
+   - Render contextual action rails conditionally for assigned staff and administrators, while preserving citizen edit modes when reports are `pending`.
