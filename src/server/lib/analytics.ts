@@ -44,7 +44,7 @@ export function calculateAnalytics(reports: AnalyticsReportRow[]): AnalyticsSumm
     // Counted from `status`, the same field the by-status breakdown uses, so the
     // dashboard's "Resolved" tile and its "Resolved" bar can never disagree. Counting
     // timestamps instead made them two independent numbers under one label: any row
-    // resolved without a `resolved_at` — a migration, a manual fix, seeded data — showed
+    // resolved without a `resolved_at` (a migration, a manual fix, seeded data) showed
     // up in one and not the other, and quietly inflated the derived "Open" figure.
     // `resolutionDays` still drives the average, because only a row with both timestamps
     // can contribute to it.

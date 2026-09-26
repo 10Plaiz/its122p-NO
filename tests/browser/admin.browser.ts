@@ -139,8 +139,8 @@ test.describe("Administrator features (FUNC-09 and FUNC-10)", () => {
     await page.goto("/admin/reports");
     await page.waitForLoadState("networkidle");
 
-    // KR-11: retired categories remain selectable here — an admin still needs to audit
-    // reports filed under them — but are marked so the list does not look like it is
+    // KR-11: retired categories remain selectable here (an admin still needs to audit
+    // reports filed under them) but are marked so the list does not look like it is
     // offering citizens a dead category.
     const categoryFilter = page.locator("#category");
     await expect(categoryFilter).toBeVisible();

@@ -236,7 +236,7 @@ export async function cancelReport({ report, user, details }: { report: Report; 
 
 // A category id passing the schema only means it is a positive integer. The foreign
 // key then guarantees the row exists, but says nothing about whether it is one a
-// citizen may still choose — so a retired category was accepted, and a missing one
+// citizen may still choose: so a retired category was accepted, and a missing one
 // surfaced as a constraint violation rather than a field error. Checked here for the
 // same reason assignStaff checks `is_active` on a staff member.
 export async function assertCategorySelectable(categoryId: number) {

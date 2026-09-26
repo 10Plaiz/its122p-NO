@@ -88,7 +88,7 @@ test.describe("Responsive Viewport Validation (FUNC-12)", () => {
     // filtered out every report in the list the visitor had just switched to.
     await page.setViewportSize({ width: 375, height: 812 });
 
-    // `view=map` is the bounds filter — the checkbox — not the pane toggle.
+    // `view=map` is the bounds filter (the checkbox), not the pane toggle.
     await page.goto("/board?view=map");
     await page.waitForLoadState("networkidle");
 
