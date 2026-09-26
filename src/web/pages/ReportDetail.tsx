@@ -22,7 +22,7 @@ import { TILE_ATTRIBUTION, TILE_URL, pinFor, reverseGeocode } from "../lib/leafl
 import { api } from "../lib/api.js";
 import { useAuth } from "../lib/auth.js";
 import { useAction, useApi } from "../lib/useApi.js";
-import { STATUS_LABEL } from "../lib/types.js";
+import { ROLE_LABEL, STATUS_LABEL } from "../lib/types.js";
 import type { Category, Report, ReportUpdate } from "../lib/types.js";
 import { getReportReturnTarget } from "../lib/navigation.js";
 
@@ -221,7 +221,7 @@ function Timeline({ updates }: { updates: ReportUpdate[] }) {
           {update.details && <p className="text-[13px] text-muted pt-0.5">{update.details}</p>}
           <p className="font-mono text-[10px] text-muted pt-1">
             {formatDateTime(update.created_at)}
-            {update.author ? ` · ${update.author.name} (${update.author.role})` : ""}
+            {update.author ? ` · ${update.author.name} (${ROLE_LABEL[update.author.role] ?? update.author.role})` : ""}
           </p>
         </li>
       ))}
