@@ -94,8 +94,8 @@ export function AdminReportsPage() {
                 they appear: reports filed under a category before it was retired still
                 exist, and an admin auditing them needs a way to select it. Marked so the
                 list does not look like it is offering a category citizens can still pick.
-                The board's public filter and the report forms both drop them — see
-                Board.tsx and NewReport.tsx. */}
+                The board's public filter and the report forms both drop them (see
+                Board.tsx and NewReport.tsx). */}
             {(categoryData?.categories ?? []).map((category) => (
               <option key={category.id} value={category.id}>
                 {category.is_active ? category.name : `${category.name} (retired)`}

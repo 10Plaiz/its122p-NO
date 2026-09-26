@@ -89,7 +89,7 @@ function UserRow({ user, onDone }: { user: Profile; onDone: () => void }) {
   const [role, setRole] = useState<Role>(user.role);
   const active = user.is_active !== false;
 
-  // An admin cannot change their own role or deactivate themselves — the server
+  // An admin cannot change their own role or deactivate themselves: the server
   // refuses both in PATCH /admin/users/:id, because an admin who demoted themselves
   // would lock everyone out. Saying so with a disabled control is the honest version:
   // offering the button and then rejecting the click taught nothing.
