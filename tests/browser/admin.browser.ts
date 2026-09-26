@@ -66,5 +66,40 @@ test.describe("Administrator features (FUNC-09 and FUNC-10)", () => {
 
     await captureEvidence(page, "ADMIN-header-tablet.png");
   });
+
+  test("KR-10: Admin report assignment button is disabled until a staff member is selected", async ({ page }) => {
+    await page.goto("/admin/reports");
+    await page.waitForLoadState("networkidle");
+
+    // Click Assign button on first available report row
+    const assignTrigger = page.locator('table tbody tr button:has-text("Assign")').first();
+    if (await assignTrigger.isVisible()) {
+      await assignTrigger.click();
+
+      // Assign dialog should open
+      const dialog = page.locator('.dialog[role="dialog"]');
+      await expect(dialog).toBeVisible();
+
+      // Submit button should be disabled when select is empty
+      const select = dialog.locator("select#staff");
+      await select.selectOption("");
+      const submitBtn = dialog.locator('button[type="button"]:has-text("Assign")');
+      await expect(submitBtn).toBeDisabled();
+
+      // When a staff member is selected, submit button becomes enabled
+      const options = await select.locator("option").all();
+      if (options.length > 1) {
+        const optionValue = await options[1].getAttribute("value");
+        if (optionValue) {
+          await select.selectOption(optionValue);
+          await expect(submitBtn).toBeEnabled();
+        }
+      }
+
+      // Close dialog
+      await dialog.locator('button:has-text("Cancel")').click();
+      await expect(dialog).toBeHidden();
+    }
+  });
 });
 

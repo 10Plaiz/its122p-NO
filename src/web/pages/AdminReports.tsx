@@ -252,7 +252,7 @@ function AssignDialog({
           <Button
             type="button"
             variant="primary"
-            disabled={pending || staff.length === 0}
+            disabled={pending || staff.length === 0 || !staffId}
             onClick={async () => {
               setTouched(true);
               if (!staffId) return;

@@ -79,13 +79,30 @@ export function StaffReportPage() {
 
           {/* Staff need a way to reach the reporter; the public board never shows this. */}
           {report.citizen && (
-            <section className="flex flex-col gap-1 border-t border-divider pt-3">
+            <section className="flex flex-col gap-2 border-t border-divider pt-3">
               <h6>Reported by</h6>
-              <p className="text-[13px]">{report.citizen.name}</p>
-              <p className="text-muted font-mono text-[11px]">
-                {report.citizen.email}
-                {report.citizen.contact_number ? ` · ${report.citizen.contact_number}` : ""}
-              </p>
+              <div>
+                <p className="text-[13px] font-medium">{report.citizen.name}</p>
+                <p className="text-muted font-mono text-[11px]">{report.citizen.email}</p>
+              </div>
+              {report.citizen.contact_number && (
+                <div className="flex flex-wrap items-center gap-2 pt-1">
+                  <a
+                    href={`tel:${report.citizen.contact_number.replace(/[^\d+]/g, "")}`}
+                    className="btn btn-secondary text-[12px] py-1.5 px-3 min-h-[36px]"
+                    aria-label={`Call citizen at ${report.citizen.contact_number}`}
+                  >
+                    Call {report.citizen.contact_number}
+                  </a>
+                  <a
+                    href={`sms:${report.citizen.contact_number.replace(/[^\d+]/g, "")}`}
+                    className="btn btn-secondary text-[12px] py-1.5 px-3 min-h-[36px]"
+                    aria-label={`Send SMS to citizen at ${report.citizen.contact_number}`}
+                  >
+                    Send SMS
+                  </a>
+                </div>
+              )}
             </section>
           )}
 
