@@ -57,6 +57,7 @@ export function BoardPage() {
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [bounds, setBounds] = useState<Bounds | null>(null);
+  const [mobileView, setMobileView] = useState<"list" | "map">("list");
 
   // Typing stays local; only the settled term reaches the URL and the API.
   const [search, setSearch] = useState(q);
@@ -247,19 +248,56 @@ export function BoardPage() {
 
       {error && <Alert title="Could not load the board">{error.message}</Alert>}
 
+      {/* Mobile view segmented control (visible only below lg breakpoint) */}
+      <div className="flex lg:hidden justify-start" data-testid="mobile-view-toggle">
+        <div className="seg w-full sm:w-auto" role="radiogroup" aria-label="Board view selection">
+          <label className="seg-opt flex-1 sm:flex-none justify-center font-medium" data-testid="mobile-view-list">
+            <input
+              type="radio"
+              name="board-mobile-view"
+              value="list"
+              checked={mobileView === "list"}
+              onChange={() => setMobileView("list")}
+            />
+            <span>List View</span>
+          </label>
+          <label className="seg-opt flex-1 sm:flex-none justify-center font-medium" data-testid="mobile-view-map">
+            <input
+              type="radio"
+              name="board-mobile-view"
+              value="map"
+              checked={mobileView === "map"}
+              onChange={() => setMobileView("map")}
+            />
+            <span>Map View</span>
+          </label>
+        </div>
+      </div>
+
       <div className="grid gap-4 lg:grid-cols-2">
-        {/* Map above the list on mobile, side by side from lg — wireframe 1d. */}
-        <div className="h-[320px] lg:h-[560px] border-2 border-divider">
+        {/* Map above the list on mobile (when Map View active), side by side from lg */}
+        <div
+          data-testid="board-map-container"
+          className={`border-2 border-divider h-[360px] lg:h-[560px] ${
+            mobileView === "list" ? "hidden lg:block" : "block"
+          }`}
+        >
           <ReportMap
             reports={reports}
             fitKey={fitKey}
             selectedId={selectedId}
             onSelect={setSelectedId}
             onMove={handleMove}
+            invalidateTrigger={mobileView}
           />
         </div>
 
-        <div className="flex flex-col gap-3 lg:max-h-[560px] lg:overflow-y-auto">
+        <div
+          data-testid="board-list-container"
+          className={`flex flex-col gap-3 lg:max-h-[560px] lg:overflow-y-auto ${
+            mobileView === "map" ? "hidden lg:flex" : "flex"
+          }`}
+        >
           <div className="flex flex-col gap-2 border-b-2 border-divider pb-2">
             <label className="flex cursor-pointer touch-manipulation select-none items-center gap-2 text-[12px]">
               <input

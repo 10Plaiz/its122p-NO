@@ -36,6 +36,48 @@ test.describe("Responsive Viewport Validation (FUNC-12)", () => {
     await expect(page.locator("button.nav-toggle")).toBeHidden();
     await expect(page.locator("#main-menu")).toBeVisible();
 
+    // On desktop, mobile segmented toggle is hidden; map and list both render side by side
+    await expect(page.locator('[data-testid="mobile-view-toggle"]')).toBeHidden();
+    await expect(page.locator('[data-testid="board-map-container"]')).toBeVisible();
+    await expect(page.locator('[data-testid="board-list-container"]')).toBeVisible();
+
     await captureEvidence(page, "FUNC-12-desktop-report.png");
+  });
+
+  test("UIUX-03: Mobile board (375x812) toggles between List View and Map View without overflow", async ({ page }) => {
+    await page.setViewportSize({ width: 375, height: 812 });
+    await page.goto("/board");
+    await page.waitForLoadState("networkidle");
+
+    const toggle = page.locator('[data-testid="mobile-view-toggle"]');
+    await expect(toggle).toBeVisible();
+
+    const mapContainer = page.locator('[data-testid="board-map-container"]');
+    const listContainer = page.locator('[data-testid="board-list-container"]');
+
+    // Default on mobile is List View: map is hidden, list is visible
+    await expect(mapContainer).toBeHidden();
+    await expect(listContainer).toBeVisible();
+    await captureEvidence(page, "BOARD-mobile-list.png");
+
+    // Toggle to Map View
+    const mapRadio = page.locator('[data-testid="mobile-view-map"]');
+    await mapRadio.click();
+
+    // Map becomes visible, list is hidden
+    await expect(mapContainer).toBeVisible();
+    await expect(listContainer).toBeHidden();
+    await captureEvidence(page, "BOARD-mobile-map.png");
+
+    // Verify absence of horizontal overflow on mobile
+    const scrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
+    const clientWidth = await page.evaluate(() => document.documentElement.clientWidth);
+    expect(scrollWidth).toBeLessThanOrEqual(clientWidth + 1);
+
+    // Toggle back to List View
+    const listRadio = page.locator('[data-testid="mobile-view-list"]');
+    await listRadio.click();
+    await expect(mapContainer).toBeHidden();
+    await expect(listContainer).toBeVisible();
   });
 });

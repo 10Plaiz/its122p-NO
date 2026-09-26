@@ -62,12 +62,37 @@ function FitToReports({ reports, fitKey }: { reports: PublicReport[]; fitKey: st
   return null;
 }
 
+function AutoInvalidate({ trigger }: { trigger?: unknown }) {
+  const map = useMap();
+
+  useEffect(() => {
+    map.invalidateSize();
+    const timer = setTimeout(() => {
+      map.invalidateSize();
+    }, 150);
+    return () => clearTimeout(timer);
+  }, [map, trigger]);
+
+  useEffect(() => {
+    const container = map.getContainer();
+    if (!container || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(() => {
+      map.invalidateSize();
+    });
+    ro.observe(container);
+    return () => ro.disconnect();
+  }, [map]);
+
+  return null;
+}
+
 export function ReportMap({
   reports,
   fitKey,
   selectedId,
   onSelect,
   onMove,
+  invalidateTrigger,
 }: {
   reports: PublicReport[];
   /** Changes only when the results genuinely differ; see FitToReports. */
@@ -75,6 +100,7 @@ export function ReportMap({
   selectedId: string | null;
   onSelect: (id: string) => void;
   onMove?: (bounds: Bounds) => void;
+  invalidateTrigger?: unknown;
 }) {
   return (
     <MapContainer
@@ -85,6 +111,7 @@ export function ReportMap({
       // Leaflet needs a real height; the parent supplies it.
       style={{ minHeight: "320px" }}
     >
+      <AutoInvalidate trigger={invalidateTrigger} />
       <TileLayer url={TILE_URL} attribution={TILE_ATTRIBUTION} />
       <FitToReports reports={reports} fitKey={fitKey} />
       {onMove && <ViewportWatcher onMove={onMove} />}
