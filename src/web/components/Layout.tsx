@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../lib/auth.js";
 import { useApi } from "../lib/useApi.js";
+import { ROLE_LABEL } from "../lib/types.js";
 import type { Notification } from "../lib/types.js";
 
 // The shell every screen renders inside. The links a visitor sees come from their
@@ -87,7 +88,7 @@ export function Layout() {
             <>
               <NotificationLink />
               <span className="text-muted font-mono text-[11px]">
-                {user.name} &middot; {user.role}
+                {user.name} &middot; {ROLE_LABEL[user.role]}
               </span>
               <button type="button" className="btn btn-ghost" onClick={handleSignOut}>
                 Sign out

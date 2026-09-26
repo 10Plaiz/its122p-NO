@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { Alert, EmptyState, Loading, Pagination, formatDateTime } from "../components/ui.js";
 import { useApi } from "../lib/useApi.js";
-import type { ActivityLog, Paged } from "../lib/types.js";
+import { ROLE_LABEL, type ActivityLog, type Paged } from "../lib/types.js";
 
 const PER_PAGE = 50;
 
@@ -52,7 +52,7 @@ export function AdminLogsPage() {
                     {log.actor ? (
                       <>
                         {log.actor.name}
-                        <span className="text-muted font-mono text-[10px]"> ({log.actor.role})</span>
+                        <span className="text-muted font-mono text-[10px]"> ({ROLE_LABEL[log.actor.role] ?? log.actor.role})</span>
                       </>
                     ) : (
                       "—"
