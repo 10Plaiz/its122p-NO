@@ -406,6 +406,35 @@ describe("FUNC-09 administrator analytics computation logic", () => {
     expect(pendingSummary.resolved_count).toBe(0);
     expect(pendingSummary.average_resolution_days).toBe(null);
   });
+
+  it("counts a resolved report with no resolved_at in resolved_count, and leaves it out of the average", () => {
+    // The dashboard shows resolved_count as a tile and by_status.resolved as a bar. A
+    // row carrying the status but no timestamp used to land in one and not the other,
+    // so the same word reported two different numbers on one screen.
+    const reports: AnalyticsReportRow[] = [
+      {
+        status: "resolved",
+        submitted_at: "2026-09-01T08:00:00Z",
+        resolved_at: "2026-09-03T08:00:00Z", // 2 days
+        category: { name: "Roads" },
+      },
+      {
+        status: "resolved",
+        submitted_at: "2026-09-01T08:00:00Z",
+        resolved_at: null, // resolved, but never stamped
+        category: { name: "Roads" },
+      },
+    ];
+
+    const summary = calculateAnalytics(reports);
+
+    expect(summary.by_status.resolved).toBe(2);
+    expect(summary.resolved_count).toBe(summary.by_status.resolved);
+    // Only the stamped row can be measured, so the average is that row's 2 days.
+    expect(summary.average_resolution_days).toBe(2);
+    // The figure the dashboard derives for "Open" stays honest.
+    expect(summary.total_reports - summary.resolved_count - summary.by_status.cancelled).toBe(0);
+  });
 });
 
 describe("FUNC-10 category management lifecycle", () => {

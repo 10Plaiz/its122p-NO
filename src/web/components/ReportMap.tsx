@@ -13,6 +13,15 @@ function ViewportWatcher({ onMove }: { onMove: (bounds: Bounds) => void }) {
 
   useEffect(() => {
     function publish() {
+      // A collapsed container reports no bounds worth having. Hiding the map — which
+      // the board's mobile pane toggle does with `display: none` — drives
+      // `clientWidth`/`clientHeight` to 0, and Leaflet's own `invalidateSize()` then
+      // fires `moveend` for the size change. Publishing at that moment hands the board
+      // a degenerate box where north equals south, which filters every report out of a
+      // list the visitor just asked to see.
+      const size = map.getSize();
+      if (size.x === 0 || size.y === 0) return;
+
       const bounds = map.getBounds();
       onMove({
         north: bounds.getNorth(),
@@ -39,9 +48,24 @@ function ViewportWatcher({ onMove }: { onMove: (bounds: Bounds) => void }) {
 // back identical, throwing away wherever the visitor had panned. The key is built
 // from the report ids, so the map moves when the results actually differ and holds
 // still when they do not.
-function FitToReports({ reports, fitKey }: { reports: PublicReport[]; fitKey: string }) {
+// `sizeKey` changes whenever the container may have been shown or hidden. A map that
+// is mounted inside a hidden pane measures 0x0, and fitting to that yields a centre and
+// zoom aimed at nothing — so the fit is deferred until the map has a size, and this is
+// what tells it to try again.
+function FitToReports({
+  reports,
+  fitKey,
+  sizeKey,
+}: {
+  reports: PublicReport[];
+  fitKey: string;
+  sizeKey?: unknown;
+}) {
   const map = useMap();
   const latest = useRef(reports);
+  // Which result set the current view was actually aimed at. A fit skipped for want of
+  // a size leaves this behind `fitKey`, so the next run still owes one.
+  const fitted = useRef<string | null>(null);
 
   // Declared first so the mirror is current before the fit below reads it.
   useEffect(() => {
@@ -49,6 +73,11 @@ function FitToReports({ reports, fitKey }: { reports: PublicReport[]; fitKey: st
   }, [reports]);
 
   useEffect(() => {
+    // Nothing to aim, or nowhere to aim it yet.
+    const size = map.getSize();
+    if (size.x === 0 || size.y === 0) return;
+    if (fitted.current === fitKey) return;
+
     const points = latest.current
       .filter((report) => report.latitude != null && report.longitude != null)
       .map((report) => [report.latitude, report.longitude] as [number, number]);
@@ -57,7 +86,8 @@ function FitToReports({ reports, fitKey }: { reports: PublicReport[]; fitKey: st
     // Unanimated on purpose: it respects a reduced-motion preference without asking,
     // and `moveend` fires at once rather than a flight later.
     map.fitBounds(points, { padding: [32, 32], maxZoom: 16, animate: false });
-  }, [map, fitKey]);
+    fitted.current = fitKey;
+  }, [map, fitKey, sizeKey]);
 
   return null;
 }
@@ -111,9 +141,11 @@ export function ReportMap({
       // Leaflet needs a real height; the parent supplies it.
       style={{ minHeight: "320px" }}
     >
+      {/* Order matters: AutoInvalidate must remeasure before FitToReports computes a
+          zoom, or the fit is still working from the collapsed size. */}
       <AutoInvalidate trigger={invalidateTrigger} />
       <TileLayer url={TILE_URL} attribution={TILE_ATTRIBUTION} />
-      <FitToReports reports={reports} fitKey={fitKey} />
+      <FitToReports reports={reports} fitKey={fitKey} sizeKey={invalidateTrigger} />
       {onMove && <ViewportWatcher onMove={onMove} />}
 
       {reports

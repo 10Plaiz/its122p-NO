@@ -90,9 +90,15 @@ export function AdminReportsPage() {
             }}
           >
             <option value="">Any category</option>
+            {/* Retired categories stay in this filter on purpose, and are the one place
+                they appear: reports filed under a category before it was retired still
+                exist, and an admin auditing them needs a way to select it. Marked so the
+                list does not look like it is offering a category citizens can still pick.
+                The board's public filter and the report forms both drop them — see
+                Board.tsx and NewReport.tsx. */}
             {(categoryData?.categories ?? []).map((category) => (
               <option key={category.id} value={category.id}>
-                {category.name}
+                {category.is_active ? category.name : `${category.name} (retired)`}
               </option>
             ))}
           </Select>
@@ -192,7 +198,6 @@ function AssignDialog({
   onDone: () => void;
 }) {
   const [staffId, setStaffId] = useState(report.assigned_staff?.id ?? "");
-  const [touched, setTouched] = useState(false);
 
   const { data, loading } = useApi<{ users: Profile[] }>("/admin/users", { role: "staff" });
   const { run, pending, error } = useAction((body: { staff_id: string }) =>
@@ -232,7 +237,9 @@ function AssignDialog({
             <Field
               label="Staff member"
               htmlFor="staff"
-              error={touched && !staffId ? "Choose who should take this." : undefined}
+              // A hint rather than an error: with Assign disabled until someone is
+              // picked, there is no failed attempt to report, only a step still to take.
+              hint={staffId ? undefined : "Choose who should take this to enable Assign."}
             >
               <Select id="staff" value={staffId} onChange={(event) => setStaffId(event.target.value)}>
                 <option value="">Choose a staff member</option>
@@ -252,9 +259,11 @@ function AssignDialog({
           <Button
             type="button"
             variant="primary"
+            // Nothing chosen is something the form already knows is not a request worth
+            // sending, so the button says so rather than accepting the click and
+            // silently doing nothing.
             disabled={pending || staff.length === 0 || !staffId}
             onClick={async () => {
-              setTouched(true);
               if (!staffId) return;
               const done = await run({ staff_id: staffId });
               if (done) onDone();

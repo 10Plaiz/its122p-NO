@@ -41,7 +41,14 @@ export function calculateAnalytics(reports: AnalyticsReportRow[]): AnalyticsSumm
     total_reports: reports.length,
     by_status: byStatus,
     by_category: byCategory,
-    resolved_count: resolutionDays.length,
+    // Counted from `status`, the same field the by-status breakdown uses, so the
+    // dashboard's "Resolved" tile and its "Resolved" bar can never disagree. Counting
+    // timestamps instead made them two independent numbers under one label: any row
+    // resolved without a `resolved_at` — a migration, a manual fix, seeded data — showed
+    // up in one and not the other, and quietly inflated the derived "Open" figure.
+    // `resolutionDays` still drives the average, because only a row with both timestamps
+    // can contribute to it.
+    resolved_count: byStatus.resolved,
     average_resolution_days: average === null ? null : Number(average.toFixed(1)),
   };
 }

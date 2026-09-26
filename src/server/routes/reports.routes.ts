@@ -14,6 +14,7 @@ import {
   assertCanEdit,
   assertCanUpdate,
   assertCanView,
+  assertCategorySelectable,
   assignStaff,
   cancelReport,
   changeStatus,
@@ -104,6 +105,7 @@ router.get("/", async (req, res) => {
 // POST /api/reports — citizens file a report, optionally with one photo.
 router.post("/", requireRole("citizen"), photoUpload.single("photo"), async (req, res) => {
   const input = parse(createSchema, req.body);
+  await assertCategorySelectable(input.category_id);
 
   const created = orThrow(
     await db
@@ -156,6 +158,10 @@ router.patch("/:id", requireRole("citizen"), async (req, res) => {
   const changes = parse(editSchema, req.body);
   const report = await findReport(req.params.id);
   assertCanEdit(report, currentUser(req));
+
+  // Only when the edit actually moves the report to another category. A report already
+  // filed under one that has since been retired keeps it untouched.
+  if (changes.category_id !== undefined) await assertCategorySelectable(changes.category_id);
 
   res.json({ report: present(await editReport({ report, user: currentUser(req), changes })) });
 });

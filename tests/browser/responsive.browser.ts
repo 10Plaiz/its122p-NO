@@ -80,4 +80,57 @@ test.describe("Responsive Viewport Validation (FUNC-12)", () => {
     await expect(mapContainer).toBeHidden();
     await expect(listContainer).toBeVisible();
   });
+
+  test("KR-02: Returning to List View with the map-view filter on still lists reports", async ({ page }) => {
+    // Regression for the empty-list bug. Hiding the map drops its container to 0x0, and
+    // Leaflet's invalidateSize() fires `moveend` for that size change. Publishing bounds
+    // from a collapsed map handed the board a box where north equalled south, which
+    // filtered out every report in the list the visitor had just switched to.
+    await page.setViewportSize({ width: 375, height: 812 });
+
+    // `view=map` is the bounds filter — the checkbox — not the pane toggle.
+    await page.goto("/board?view=map");
+    await page.waitForLoadState("networkidle");
+
+    const listContainer = page.locator('[data-testid="board-list-container"]');
+    const cards = listContainer.locator("button[aria-expanded]");
+
+    // Nothing to prove if the environment has no public reports.
+    const initialCount = await cards.count();
+    test.skip(initialCount === 0, "No public reports on this environment to filter.");
+
+    await expect(page.locator('[data-testid="mobile-view-toggle"] input[value="map"]')).toBeChecked({
+      checked: false,
+    });
+
+    // Out to the map and back again.
+    await page.locator('[data-testid="mobile-view-map"]').click();
+    await expect(page.locator('[data-testid="board-map-container"]')).toBeVisible();
+
+    await page.locator('[data-testid="mobile-view-list"]').click();
+    await expect(listContainer).toBeVisible();
+
+    // The map auto-fits to the reports it was given, so its last real viewport contains
+    // them: the list must still have rows, and must not be showing its empty state.
+    await expect(cards.first()).toBeVisible();
+    expect(await cards.count()).toBeGreaterThan(0);
+    await expect(page.locator("body")).not.toContainText("Nothing matches those filters");
+  });
+
+  test("KR-21: The mobile pane survives a reload, and is not the same thing as view=map", async ({ page }) => {
+    await page.setViewportSize({ width: 375, height: 812 });
+    await page.goto("/board");
+    await page.waitForLoadState("networkidle");
+
+    // Choosing Map writes `pane`, leaving the `view` bounds filter untouched.
+    await page.locator('[data-testid="mobile-view-map"]').click();
+    await expect(page).toHaveURL(/[?&]pane=map/);
+    await expect(page).not.toHaveURL(/[?&]view=map/);
+
+    // A shared or reloaded link opens on the pane it was left on.
+    await page.reload();
+    await page.waitForLoadState("networkidle");
+    await expect(page.locator('[data-testid="board-map-container"]')).toBeVisible();
+    await expect(page.locator('[data-testid="board-list-container"]')).toBeHidden();
+  });
 });
