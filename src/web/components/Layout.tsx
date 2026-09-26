@@ -20,13 +20,7 @@ const LINKS_BY_ROLE: Record<string, Link[]> = {
     { to: "/my-reports", label: "My reports" },
   ],
   staff: [{ to: "/staff/queue", label: "My queue" }],
-  admin: [
-    { to: "/admin", label: "Dashboard" },
-    { to: "/admin/reports", label: "Reports" },
-    { to: "/admin/users", label: "Users" },
-    { to: "/admin/categories", label: "Categories" },
-    { to: "/admin/logs", label: "Activity" },
-  ],
+  admin: [{ to: "/admin", label: "Admin" }],
 };
 
 function NotificationLink() {

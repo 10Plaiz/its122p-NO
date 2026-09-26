@@ -27,4 +27,44 @@ test.describe("Administrator features (FUNC-09 and FUNC-10)", () => {
 
     await captureEvidence(page, "FUNC-10-category-management.png");
   });
+
+  test("UIUX-01: Admin navigation consolidation and persistent sub-tabs across viewports", async ({ page }) => {
+    // Desktop viewport: verify single Admin link in global header and sub-tabs
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await page.goto("/admin");
+    await page.waitForLoadState("networkidle");
+
+    // Global header should contain single Admin link (not separate flat links)
+    const headerNav = page.locator("header nav#main-menu");
+    await expect(headerNav.locator("a:has-text('Admin')")).toBeVisible();
+    await expect(headerNav.locator("a:has-text('Categories')")).toBeHidden();
+
+    // Persistent secondary tabs should be visible
+    const subNav = page.locator("nav[aria-label='Admin navigation tabs']");
+    await expect(subNav).toBeVisible();
+    await expect(subNav.locator("a:has-text('Dashboard')")).toBeVisible();
+    await expect(subNav.locator("a:has-text('Reports')")).toBeVisible();
+    await expect(subNav.locator("a:has-text('Users')")).toBeVisible();
+    await expect(subNav.locator("a:has-text('Categories')")).toBeVisible();
+    await expect(subNav.locator("a:has-text('Activity')")).toBeVisible();
+
+    await captureEvidence(page, "ADMIN-header-desktop.png");
+
+    // Click secondary tab and verify navigation
+    await subNav.locator("a:has-text('Reports')").click();
+    await page.waitForURL(/\/admin\/reports/);
+    await expect(page.locator("h2")).toContainText("All reports");
+    await expect(subNav.locator("a:has-text('Reports')")).toHaveClass(/border-accent/);
+
+    // Tablet viewport: verify header remains clean and un-wrapped
+    await page.setViewportSize({ width: 768, height: 1024 });
+    await page.goto("/admin");
+    await page.waitForLoadState("networkidle");
+
+    await expect(headerNav.locator("a:has-text('Admin')")).toBeVisible();
+    await expect(subNav).toBeVisible();
+
+    await captureEvidence(page, "ADMIN-header-tablet.png");
+  });
 });
+

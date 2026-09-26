@@ -5,7 +5,7 @@ export default defineConfig({
   testMatch: "**/*.browser.ts",
   outputDir: "./test-results",
   use: {
-    baseURL: process.env.PLAYWRIGHT_BASE_URL ?? "https://kamoti-chi.vercel.app",
+    baseURL: process.env.PLAYWRIGHT_BASE_URL ?? "http://localhost:5173",
     screenshot: "only-on-failure",
     trace: "retain-on-failure",
     video: "off",

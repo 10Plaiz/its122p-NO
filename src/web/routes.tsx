@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { Layout } from "./components/Layout.js";
+import { AdminLayout } from "./components/AdminLayout.js";
 import { Loading } from "./components/ui.js";
 import { useAuth } from "./lib/auth.js";
 import type { Role } from "./lib/types.js";
@@ -106,42 +107,16 @@ export function AppRoutes() {
           path="admin"
           element={
             <RequireRole roles={["admin"]}>
-              <AdminDashboardPage />
+              <AdminLayout />
             </RequireRole>
           }
-        />
-        <Route
-          path="admin/reports"
-          element={
-            <RequireRole roles={["admin"]}>
-              <AdminReportsPage />
-            </RequireRole>
-          }
-        />
-        <Route
-          path="admin/users"
-          element={
-            <RequireRole roles={["admin"]}>
-              <AdminUsersPage />
-            </RequireRole>
-          }
-        />
-        <Route
-          path="admin/categories"
-          element={
-            <RequireRole roles={["admin"]}>
-              <AdminCategoriesPage />
-            </RequireRole>
-          }
-        />
-        <Route
-          path="admin/logs"
-          element={
-            <RequireRole roles={["admin"]}>
-              <AdminLogsPage />
-            </RequireRole>
-          }
-        />
+        >
+          <Route index element={<AdminDashboardPage />} />
+          <Route path="reports" element={<AdminReportsPage />} />
+          <Route path="users" element={<AdminUsersPage />} />
+          <Route path="categories" element={<AdminCategoriesPage />} />
+          <Route path="logs" element={<AdminLogsPage />} />
+        </Route>
 
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
