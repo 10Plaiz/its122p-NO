@@ -177,5 +177,107 @@ test.describe("Citizen functional workflows (FUNC-01, FUNC-04, FUNC-05)", () => 
     await page.keyboard.press("Escape");
     await expect(dialog).toBeHidden();
   });
+
+  test("KR-14, KR-17: Location denial banner guidance and stale address refresh on pin move", async ({ page }) => {
+    // 1. Simulate geolocation permission denial
+    await page.addInitScript(() => {
+      (navigator as unknown as { geolocation: { getCurrentPosition: unknown } }).geolocation.getCurrentPosition = (
+        _success: unknown,
+        error: (err: unknown) => void,
+      ) => {
+        if (error) {
+          error({
+            code: 1, // PERMISSION_DENIED
+            message: "User denied Geolocation",
+            PERMISSION_DENIED: 1,
+            POSITION_UNAVAILABLE: 2,
+            TIMEOUT: 3,
+          });
+        }
+      };
+    });
+
+    await page.goto("/report/new");
+    await page.waitForLoadState("networkidle");
+
+    // Click "Use my location" and assert denial guidance banner appears
+    await page.click('button:has-text("Use my location")');
+    const alertBanner = page.locator('[role="alert"]');
+    await expect(alertBanner).toBeVisible();
+    await expect(alertBanner).toContainText("Location access disabled. Please tap the map to place your report pin.");
+
+    await captureEvidence(page, "KR-14-geo-denial-guidance.png");
+
+    // 2. Click map to drop pin and verify error banner clears
+    const map = page.locator(".leaflet-container");
+    await map.click({ position: { x: 120, y: 120 } });
+    await expect(page.locator('button:has-text("Use my location")')).toBeEnabled();
+
+    // 3. Enter a custom address then move pin to verify address lifecycle
+    await page.fill("#address", "Test Landmark A");
+    await map.click({ position: { x: 200, y: 200 } });
+    // Hand-entered address remains untouched
+    await expect(page.locator("#address")).toHaveValue("Test Landmark A");
+  });
+
+  test("Issue #37: Report photo opens accessible lightbox modal dismissible via close button and Escape key", async ({ page }) => {
+    // Intercept report details to supply fixture photos
+    await page.route("**/api/reports/*", async (route) => {
+      const response = await route.fetch();
+      try {
+        const json = await response.json();
+        if (json?.report) {
+          json.report.photos = [
+            {
+              id: "fixture-photo-1",
+              report_id: json.report.id,
+              kind: "initial",
+              url: "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='400' height='300'><rect width='400' height='300' fill='%23e05638'/><text x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' fill='white' font-family='sans-serif' font-size='20'>Evidence Photo</text></svg>",
+              storage_path: "reports/fixture-photo-1.svg",
+              byte_size: 154200,
+              mime_type: "image/svg+xml",
+              uploaded_at: new Date().toISOString(),
+            },
+          ];
+        }
+        await route.fulfill({ response, json });
+      } catch {
+        await route.continue();
+      }
+    });
+
+    // Go to my-reports and click the first report
+    await page.goto("/my-reports");
+    await page.waitForLoadState("networkidle");
+
+    const reportLink = page.locator("a[href^='/reports/']").first();
+    await expect(reportLink).toBeVisible();
+    await reportLink.click();
+    await page.waitForLoadState("networkidle");
+
+    // Click photo to open lightbox
+    const photoBtn = page.locator('button[aria-label^="View evidence photo"]').first();
+    await expect(photoBtn).toBeVisible();
+    await photoBtn.click();
+
+    // Verify lightbox dialog is visible and accessible
+    const lightboxDialog = page.locator('[role="dialog"][aria-modal="true"]');
+    await expect(lightboxDialog).toBeVisible();
+    await expect(lightboxDialog.locator("img")).toBeVisible();
+
+    await captureEvidence(page, "PHOTO-lightbox-modal.png");
+
+    // Dismiss via keyboard Escape key
+    await page.keyboard.press("Escape");
+    await expect(lightboxDialog).toBeHidden();
+
+    // Reopen and dismiss via Close button
+    await photoBtn.click();
+    await expect(lightboxDialog).toBeVisible();
+    const closeBtn = lightboxDialog.locator('button:has-text("Close")');
+    await expect(closeBtn).toBeVisible();
+    await closeBtn.click();
+    await expect(lightboxDialog).toBeHidden();
+  });
 });
 

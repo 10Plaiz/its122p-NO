@@ -20,6 +20,7 @@ import { getReportReturnTarget } from "../lib/navigation.js";
 import { useAction, useApi } from "../lib/useApi.js";
 import { NEXT_STATUS, NEXT_STATUS_LABEL, STATUS_LABEL } from "../lib/types.js";
 import type { Report, ReportUpdate } from "../lib/types.js";
+import { PhotoLightbox } from "../components/PhotoLightbox.js";
 
 // Wireframe 1m: working a single report. Staff advance the status, leave remarks and
 // upload proof of repair. Everything here is also checked server-side by
@@ -27,6 +28,7 @@ import type { Report, ReportUpdate } from "../lib/types.js";
 export function StaffReportPage() {
   const { id } = useParams<{ id: string }>();
   const { user } = useAuth();
+  const [activePhoto, setActivePhoto] = useState<{ src: string; alt: string; title?: string } | null>(null);
   const returnTarget = getReportReturnTarget(user?.role);
 
   const { data, error, loading, reload } = useApi<{ report: Report }>(id ? `/reports/${id}` : null);
@@ -114,19 +116,25 @@ export function StaffReportPage() {
                   // `kind` is the API's word for it; the screen says what it means.
                   const kindLabel = photo.kind === "resolution" ? "Proof of repair" : "Evidence";
                   return (
-                    <a
+                    <button
                       key={photo.id}
-                      href={photo.url}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="block"
+                      type="button"
+                      onClick={() =>
+                        setActivePhoto({
+                          src: photo.url,
+                          alt: `${kindLabel} photo for report ${report.reference_code}`,
+                          title: `${kindLabel} · ${report.reference_code}`,
+                        })
+                      }
+                      className="block text-left cursor-pointer p-0 bg-transparent border-0"
+                      aria-label={`View ${kindLabel.toLowerCase()} photo in full resolution`}
                     >
                       <PhotoFrame
                         src={photo.url}
                         alt={`${kindLabel} photo for report ${report.reference_code}`}
                       />
                       <span className="font-mono text-[9px] uppercase text-muted">{kindLabel}</span>
-                    </a>
+                    </button>
                   );
                 })}
               </div>
@@ -180,6 +188,15 @@ export function StaffReportPage() {
       <Link to={returnTarget.to} className="btn btn-secondary self-start">
         {returnTarget.label}
       </Link>
+
+      {activePhoto && (
+        <PhotoLightbox
+          src={activePhoto.src}
+          alt={activePhoto.alt}
+          title={activePhoto.title}
+          onClose={() => setActivePhoto(null)}
+        />
+      )}
     </div>
   );
 }

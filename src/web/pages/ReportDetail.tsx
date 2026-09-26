@@ -25,6 +25,7 @@ import { useAction, useApi } from "../lib/useApi.js";
 import { ROLE_LABEL, STATUS_LABEL } from "../lib/types.js";
 import type { Category, Report, ReportUpdate } from "../lib/types.js";
 import { getReportReturnTarget } from "../lib/navigation.js";
+import { PhotoLightbox } from "../components/PhotoLightbox.js";
 
 // Wireframe 1j. Visible to the report's owner, to assigned staff and to admins:
 // assertCanView decides, so an id guessed from the URL returns 403 rather than data.
@@ -32,6 +33,7 @@ export function ReportDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { user } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
+  const [activePhoto, setActivePhoto] = useState<{ src: string; alt: string; title?: string } | null>(null);
   const returnTarget = getReportReturnTarget(user?.role);
 
   const { data, error, loading, reload } = useApi<{ report: Report }>(id ? `/reports/${id}` : null);
@@ -120,18 +122,24 @@ export function ReportDetailPage() {
               <h6>Evidence</h6>
               <div className="grid grid-cols-2 gap-2">
                 {initial.map((photo, index) => (
-                  <a
+                  <button
                     key={photo.id}
-                    href={photo.url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="block"
+                    type="button"
+                    onClick={() =>
+                      setActivePhoto({
+                        src: photo.url,
+                        alt: `Evidence photo ${index + 1} for report ${report.reference_code}`,
+                        title: `Evidence ${index + 1} · ${report.reference_code}`,
+                      })
+                    }
+                    className="block text-left cursor-pointer p-0 bg-transparent border-0"
+                    aria-label={`View evidence photo ${index + 1} in full resolution`}
                   >
                     <PhotoFrame
                       src={photo.url}
                       alt={`Evidence photo ${index + 1} for report ${report.reference_code}`}
                     />
-                  </a>
+                  </button>
                 ))}
               </div>
             </section>
@@ -142,18 +150,24 @@ export function ReportDetailPage() {
               <h6>Proof of repair</h6>
               <div className="grid grid-cols-2 gap-2">
                 {resolution.map((photo, index) => (
-                  <a
+                  <button
                     key={photo.id}
-                    href={photo.url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="block"
+                    type="button"
+                    onClick={() =>
+                      setActivePhoto({
+                        src: photo.url,
+                        alt: `Proof of repair photo ${index + 1} for report ${report.reference_code}`,
+                        title: `Proof of repair ${index + 1} · ${report.reference_code}`,
+                      })
+                    }
+                    className="block text-left cursor-pointer p-0 bg-transparent border-0"
+                    aria-label={`View proof of repair photo ${index + 1} in full resolution`}
                   >
                     <PhotoFrame
                       src={photo.url}
                       alt={`Proof of repair photo ${index + 1} for report ${report.reference_code}`}
                     />
-                  </a>
+                  </button>
                 ))}
               </div>
             </section>
@@ -183,6 +197,15 @@ export function ReportDetailPage() {
       <Link to={returnTarget.to} className="btn btn-secondary self-start">
         {returnTarget.label}
       </Link>
+
+      {activePhoto && (
+        <PhotoLightbox
+          src={activePhoto.src}
+          alt={activePhoto.alt}
+          title={activePhoto.title}
+          onClose={() => setActivePhoto(null)}
+        />
+      )}
     </div>
   );
 }

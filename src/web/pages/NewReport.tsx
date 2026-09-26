@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { MapPicker } from "../components/MapPicker.js";
 import type { Point } from "../components/MapPicker.js";
-import { ALLOWED_TYPES, MAX_PHOTO_BYTES, PhotoPicker } from "../components/PhotoPicker.js";
+import { ALLOWED_TYPES, MAX_PHOTO_BYTES, PhotoPicker, formatFileSize, formatMimeType } from "../components/PhotoPicker.js";
 import { Alert, Button, Field, Input, Select, Textarea } from "../components/ui.js";
 import { api } from "../lib/api.js";
 import { reverseGeocode } from "../lib/leaflet.js";
@@ -76,6 +76,7 @@ export function NewReportPage() {
   // overwritten by a later lookup.
   const [addressAuto, setAddressAuto] = useState(false);
   const [locating, setLocating] = useState(false);
+  const [geoError, setGeoError] = useState<string | null>(null);
   const addressTouched = useRef(false);
 
   const { run, pending, error } = useAction((formData: FormData) =>
@@ -108,19 +109,26 @@ export function NewReportPage() {
   }, [values.point]);
 
   function useMyLocation() {
-    if (!navigator.geolocation) return;
+    if (!navigator.geolocation) {
+      setGeoError("Location access disabled. Please tap the map to place your report pin.");
+      return;
+    }
     setLocating(true);
+    setGeoError(null);
     navigator.geolocation.getCurrentPosition(
       (position) => {
         setValues((current) => ({
           ...current,
           point: { lat: position.coords.latitude, lng: position.coords.longitude },
+          address: addressTouched.current ? current.address : "",
         }));
+        if (!addressTouched.current) setAddressAuto(false);
         setLocating(false);
       },
-      // Denied or unavailable is not an error worth interrupting for — the map is
-      // still there to tap.
-      () => setLocating(false),
+      () => {
+        setLocating(false);
+        setGeoError("Location access disabled. Please tap the map to place your report pin.");
+      },
       { enableHighAccuracy: true, timeout: 10_000 },
     );
   }
@@ -129,11 +137,9 @@ export function NewReportPage() {
     setTouched(true);
     if (Object.keys(validateStep(step, values)).length > 0) return;
     setTouched(false);
-    setStep((current) => {
-      const nextStep = Math.min(current + 1, STEPS.length - 1);
-      setMaxStep((prev) => Math.max(prev, nextStep));
-      return nextStep;
-    });
+    const nextStep = Math.min(step + 1, STEPS.length - 1);
+    setMaxStep((prev) => Math.max(prev, nextStep));
+    setStep(nextStep);
   }
 
   function back() {
@@ -234,7 +240,15 @@ export function NewReportPage() {
           <div className="h-[300px] md:h-[420px] border-2 border-divider">
             <MapPicker
               value={values.point}
-              onChange={(point) => setValues((current) => ({ ...current, point }))}
+              onChange={(point) => {
+                setGeoError(null);
+                setValues((current) => ({
+                  ...current,
+                  point,
+                  address: addressTouched.current ? current.address : "",
+                }));
+                if (!addressTouched.current) setAddressAuto(false);
+              }}
             />
           </div>
 
@@ -248,6 +262,12 @@ export function NewReportPage() {
               </span>
             )}
           </div>
+
+          {geoError && (
+            <Alert title="Location access disabled">
+              {geoError}
+            </Alert>
+          )}
 
           {shown.point && (
             <span role="alert" className="text-[11px] text-accent-700">
@@ -368,8 +388,12 @@ export function NewReportPage() {
                   <PhotoThumbnail file={values.photo} />
                   <div className="flex flex-col text-[12px]">
                     <span className="font-semibold text-text truncate max-w-[220px]">{values.photo.name}</span>
-                    <span className="text-muted font-mono text-[11px]">
-                      {formatBytes(values.photo.size)} &middot; {values.photo.type}
+                    <span className="text-muted font-mono text-[11px] flex items-center gap-1.5 pt-0.5">
+                      <span>{formatFileSize(values.photo.size)}</span>
+                      <span>&middot;</span>
+                      <span className="tag tag-neutral text-[9px] uppercase font-mono py-0 px-1.5">
+                        {formatMimeType(values.photo.type)}
+                      </span>
                     </span>
                   </div>
                 </div>
@@ -434,8 +458,3 @@ function PhotoThumbnail({ file }: { file: File }) {
   );
 }
 
-function formatBytes(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
-}

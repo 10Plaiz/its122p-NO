@@ -9,22 +9,34 @@ import { Button, Field, PhotoFrame } from "./ui.js";
 export const MAX_PHOTO_BYTES = 3 * 1024 * 1024;
 export const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
 
-const UNITS = ["B", "KB", "MB"] as const;
+export const UNITS = ["B", "KB", "MB"] as const;
 
-function formatSize(bytes: number) {
-  let value = bytes;
-  let unit = 0;
-  while (value >= 1024 && unit < UNITS.length - 1) {
-    value /= 1024;
-    unit += 1;
+// Decimal (base-1000) formatting for user-facing file size indicators (KR-18).
+export function formatFileSize(bytes: number): string {
+  if (bytes < 1000) return `${bytes}\u00a0B`;
+  if (bytes < 1_000_000) {
+    const kb = (bytes / 1000).toFixed(1).replace(/\.0$/, "");
+    return `${kb}\u00a0KB`;
   }
+  const mb = (bytes / 1_000_000).toFixed(2).replace(/\.?0+$/, "");
+  return `${mb}\u00a0MB`;
+}
 
-  const number = new Intl.NumberFormat(undefined, {
-    maximumFractionDigits: unit > 0 && value < 10 ? 1 : 0,
-  }).format(value);
-
-  // Non-breaking space: a size must never wrap away from its unit.
-  return `${number}\u00a0${UNITS[unit]}`;
+// Map MIME types to friendly format badges (KR-19).
+export function formatMimeType(mime: string): string {
+  switch (mime.toLowerCase()) {
+    case "image/jpeg":
+    case "image/jpg":
+      return "JPEG";
+    case "image/png":
+      return "PNG";
+    case "image/webp":
+      return "WebP";
+    default: {
+      const sub = mime.split("/")[1];
+      return sub ? sub.toUpperCase() : mime;
+    }
+  }
 }
 
 type PhotoPickerProps = {
@@ -120,7 +132,7 @@ export function PhotoPicker({ id, label, purpose, error, value, onChange }: Phot
               <span className="truncate text-[13px]" title={value.name}>
                 {value.name}
               </span>
-              <span className="text-muted font-mono text-[11px]">{formatSize(value.size)}</span>
+              <span className="text-muted font-mono text-[11px]">{formatFileSize(value.size)}</span>
 
               <span className="flex flex-wrap gap-2 pt-1">
                 <Button type="button" onClick={() => inputRef.current?.click()}>
@@ -147,7 +159,7 @@ export function PhotoPicker({ id, label, purpose, error, value, onChange }: Phot
 
         {/* The choice happens outside the normal flow of the form, so it is announced. */}
         <span aria-live="polite" className="sr-only">
-          {value ? `${value.name} selected, ${formatSize(value.size)}` : "No photo selected"}
+          {value ? `${value.name} selected, ${formatFileSize(value.size)}` : "No photo selected"}
         </span>
       </div>
     </Field>
