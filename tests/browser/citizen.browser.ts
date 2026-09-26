@@ -79,4 +79,53 @@ test.describe("Citizen functional workflows (FUNC-01, FUNC-04, FUNC-05)", () => 
     await page.click('button:has-text("Yes, cancel")');
     await page.waitForTimeout(1000);
   });
+
+  test("UIUX-02: Wizard step 3 pre-flight review displays description, photo state, and allows step navigation", async ({ page }) => {
+    await page.goto("/report/new");
+    await page.waitForLoadState("networkidle");
+
+    // 1. Select location in Step 1
+    const map = page.locator(".leaflet-container");
+    await map.click({ position: { x: 150, y: 150 } });
+    await page.waitForTimeout(500);
+
+    await page.click('button:has-text("Continue")');
+    await expect(page.locator("h2")).toContainText("What is wrong?");
+
+    // 2. Fill category, title, description in Step 2
+    const categorySelect = page.locator("#category");
+    await categorySelect.selectOption({ index: 1 });
+    await page.fill("#title", "[UIUX-02] Road damage pre-flight verification");
+    await page.fill(
+      "#description",
+      "Detailed description of hazardous road fissure that requires immediate public works intervention.",
+    );
+
+    await page.click('button:has-text("Continue")');
+    await expect(page.locator("h2")).toContainText("Show us");
+
+    // 3. Verify Step 3 summary displays Title, Location, Description, and photo status
+    const summaryCard = page.locator("[data-testid='preflight-summary']");
+    await expect(summaryCard).toBeVisible();
+    await expect(summaryCard).toContainText("[UIUX-02] Road damage pre-flight verification");
+    await expect(summaryCard).toContainText("Detailed description of hazardous road fissure");
+    await expect(summaryCard).toContainText("No photo attached");
+
+    // Capture visual proof of pre-flight review
+    await captureEvidence(page, "CITIZEN-wizard-step3-summary.png");
+
+    // 4. Test direct navigation back to Step 1 via step header button
+    const step1Btn = page.locator("nav[aria-label='Wizard steps'] button:has-text('Step 1')");
+    await expect(step1Btn).toBeEnabled();
+    await step1Btn.click();
+    await expect(page.locator("h2")).toContainText("Where is it?");
+
+    // Return to Step 2
+    const step2Btn = page.locator("nav[aria-label='Wizard steps'] button:has-text('Step 2')");
+    await expect(step2Btn).toBeEnabled();
+    await step2Btn.click();
+    await expect(page.locator("h2")).toContainText("What is wrong?");
+    await expect(page.locator("#title")).toHaveValue("[UIUX-02] Road damage pre-flight verification");
+  });
 });
+

@@ -61,6 +61,7 @@ export function NewReportPage() {
   const { data: categoryData } = useApi<{ categories: Category[] }>("/categories");
 
   const [step, setStep] = useState(0);
+  const [maxStep, setMaxStep] = useState(0);
   const [touched, setTouched] = useState(false);
   const [values, setValues] = useState<Values>({
     point: null,
@@ -128,7 +129,11 @@ export function NewReportPage() {
     setTouched(true);
     if (Object.keys(validateStep(step, values)).length > 0) return;
     setTouched(false);
-    setStep((current) => Math.min(current + 1, STEPS.length - 1));
+    setStep((current) => {
+      const nextStep = Math.min(current + 1, STEPS.length - 1);
+      setMaxStep((prev) => Math.max(prev, nextStep));
+      return nextStep;
+    });
   }
 
   function back() {
@@ -172,15 +177,52 @@ export function NewReportPage() {
         </span>
         <h2>{STEPS[step]}</h2>
 
-        {/* Progress as filled rules — zero radius, like everything else. */}
-        <div className="flex gap-1" role="presentation">
-          {STEPS.map((label, index) => (
-            <span
-              key={label}
-              className={index <= step ? "h-1 flex-1 bg-accent" : "h-1 flex-1 bg-neutral-300"}
-            />
-          ))}
-        </div>
+        {/* Clickable step indicators allowing quick return to previous steps */}
+        <nav aria-label="Wizard steps" className="flex items-center gap-2">
+          {STEPS.map((label, index) => {
+            const isCurrent = index === step;
+            const isUnlocked = index <= maxStep;
+            return (
+              <button
+                key={label}
+                type="button"
+                disabled={!isUnlocked || isCurrent}
+                onClick={() => {
+                  if (isUnlocked && !isCurrent) {
+                    setTouched(false);
+                    setStep(index);
+                  }
+                }}
+                className={`flex-1 text-left py-1.5 px-2 border-t-4 transition-colors ${
+                  isCurrent
+                    ? "border-accent cursor-default bg-surface"
+                    : isUnlocked
+                    ? "border-neutral-500 hover:border-accent cursor-pointer"
+                    : "border-neutral-300 opacity-50 cursor-not-allowed"
+                }`}
+              >
+                <span
+                  className={`block font-mono text-[10px] uppercase tracking-wider ${
+                    isCurrent
+                      ? "text-accent font-bold"
+                      : isUnlocked
+                      ? "text-text font-semibold"
+                      : "text-muted"
+                  }`}
+                >
+                  Step {index + 1}
+                </span>
+                <span
+                  className={`block text-[12px] font-heading truncate ${
+                    isCurrent ? "font-bold text-text" : "text-muted"
+                  }`}
+                >
+                  {label}
+                </span>
+              </button>
+            );
+          })}
+        </nav>
       </header>
 
       {step === 0 && (
@@ -306,7 +348,7 @@ export function NewReportPage() {
             onChange={(photo) => setValues((current) => ({ ...current, photo }))}
           />
 
-          <div className="border-2 border-divider p-4 flex flex-col gap-2">
+          <div data-testid="preflight-summary" className="border-2 border-divider p-4 flex flex-col gap-3 bg-surface">
             <h6>Check before sending</h6>
             <Summary label="Category">
               {categoryData?.categories.find((c) => String(c.id) === values.categoryId)?.name ?? "—"}
@@ -314,6 +356,26 @@ export function NewReportPage() {
             <Summary label="Title">{values.title || "—"}</Summary>
             <Summary label="Location">
               {values.address || (values.point ? `${values.point.lat.toFixed(5)}, ${values.point.lng.toFixed(5)}` : "—")}
+            </Summary>
+            <Summary label="Description">
+              <p className="whitespace-pre-wrap text-[13px] text-text break-words mb-0">
+                {values.description || "—"}
+              </p>
+            </Summary>
+            <Summary label="Photo">
+              {values.photo ? (
+                <div className="flex items-center gap-3">
+                  <PhotoThumbnail file={values.photo} />
+                  <div className="flex flex-col text-[12px]">
+                    <span className="font-semibold text-text truncate max-w-[220px]">{values.photo.name}</span>
+                    <span className="text-muted font-mono text-[11px]">
+                      {formatBytes(values.photo.size)} &middot; {values.photo.type}
+                    </span>
+                  </div>
+                </div>
+              ) : (
+                <span className="text-muted text-[13px] italic">No photo attached</span>
+              )}
             </Summary>
           </div>
         </div>
@@ -344,10 +406,36 @@ export function NewReportPage() {
 function Summary({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="flex gap-3 text-[13px]">
-      <span className="font-mono text-[10px] uppercase tracking-wider text-muted w-20 shrink-0 pt-1">
+      <span className="font-mono text-[10px] uppercase tracking-wider text-muted w-24 shrink-0 pt-1">
         {label}
       </span>
       <span className="flex-1">{children}</span>
     </div>
   );
+}
+
+function PhotoThumbnail({ file }: { file: File }) {
+  const [preview, setPreview] = useState<string | null>(null);
+
+  useEffect(() => {
+    const url = URL.createObjectURL(file);
+    setPreview(url);
+    return () => URL.revokeObjectURL(url);
+  }, [file]);
+
+  if (!preview) return null;
+
+  return (
+    <img
+      src={preview}
+      alt={file.name}
+      className="w-16 h-16 object-cover border-2 border-divider"
+    />
+  );
+}
+
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
 }
