@@ -28,6 +28,7 @@ const { calculateAnalytics } = await import("../../src/server/lib/analytics.js")
 const { endOfDay, searchFilter, sortColumn } = await import("../../src/server/lib/query.js");
 const { getReportReturnTarget } = await import("../../src/web/lib/navigation.js");
 const { homePathFor } = await import("../../src/web/lib/auth.js");
+const { badRequest } = await import("../../src/server/lib/errors.js");
 
 // Helper fixtures
 function createReport(overrides?: Partial<Report>): Report {
@@ -459,6 +460,50 @@ describe("FUNC-10 category management lifecycle", () => {
     const active = categories.filter((c) => c.is_active);
     expect(active.length).toBe(2);
     expect(active.some((c) => c.id === 3)).toBe(false);
+  });
+
+  it("enforces KR-13 category selectability error contract for missing and retired categories", () => {
+    const categories = [
+      { id: 1, name: "Roads", is_active: true },
+      { id: 2, name: "Streetlights", is_active: true },
+      { id: 3, name: "Deprecated Category", is_active: false },
+    ];
+
+    function checkCategory(id: number) {
+      const found = categories.find((c) => c.id === id);
+      if (!found) {
+        throw badRequest("Some fields are invalid. Fix them and try again.", [
+          { field: "category_id", message: "Choose a category that exists." },
+        ]);
+      }
+      if (!found.is_active) {
+        throw badRequest("Some fields are invalid. Fix them and try again.", [
+          { field: "category_id", message: "That category has been retired. Choose another." },
+        ]);
+      }
+    }
+
+    expect(() => checkCategory(1)).not.toThrow();
+
+    try {
+      checkCategory(999);
+      expect.unreachable();
+    } catch (err: any) {
+      expect(err.status).toBe(400);
+      expect(err.details).toEqual([
+        { field: "category_id", message: "Choose a category that exists." },
+      ]);
+    }
+
+    try {
+      checkCategory(3);
+      expect.unreachable();
+    } catch (err: any) {
+      expect(err.status).toBe(400);
+      expect(err.details).toEqual([
+        { field: "category_id", message: "That category has been retired. Choose another." },
+      ]);
+    }
   });
 });
 

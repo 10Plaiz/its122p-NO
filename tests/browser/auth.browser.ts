@@ -50,10 +50,15 @@ test.describe("Authentication workflows (AUTH-04 through AUTH-11)", () => {
     await page.goto("/signin");
     await page.click('button[type="submit"]');
     // An empty field is a missing value, not a malformed one, and the form now says so.
-    // A malformed address still reports "Enter a valid email address."
     await expect(page.locator("body")).toContainText("Enter your email address.");
     await expect(page.locator("body")).toContainText("Enter your password.");
     await captureEvidence(page, "AUTH-09-empty-form.png");
+
+    // A malformed address still reports "Enter a valid email address."
+    await page.fill('input[name="email"]', "invalid-email");
+    await page.fill('input[name="password"]', "password123");
+    await page.click('button[type="submit"]');
+    await expect(page.locator("body")).toContainText("Enter a valid email address.");
   });
 
   test("AUTH-10: Protected route access without session redirects to sign-in and captures evidence", async ({ page }) => {
