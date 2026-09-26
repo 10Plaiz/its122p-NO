@@ -39,7 +39,17 @@ export function SignInPage() {
     }
   }, [loading, user, navigate, state?.from]);
 
-  const emailError = touched && !email.trim() ? "Enter a valid email address." : undefined;
+  // Empty and malformed are different problems and now say so: the old message
+  // claimed a blank field was badly formatted, and never checked the format at all.
+  // The pattern is the one registerSchema applies on the server, so the field cannot
+  // pass here and fail there.
+  function emailProblem() {
+    if (!email.trim()) return "Enter your email address.";
+    if (!/^\S+@\S+\.\S+$/.test(email.trim())) return "Enter a valid email address.";
+    return undefined;
+  }
+
+  const emailError = touched ? emailProblem() : undefined;
   const passwordError = touched && !password ? "Enter your password." : undefined;
   const shownEmailError = emailError ?? error?.fieldErrors?.email;
   const shownPasswordError = passwordError ?? error?.fieldErrors?.password;
@@ -47,11 +57,17 @@ export function SignInPage() {
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
     setTouched(true);
-    if (!email.trim() || !password) {
-      focusFirstError({
-        ...(email.trim() ? {} : { email: "" }),
-        ...(password ? {} : { password: "" }),
-      });
+
+    // Submit stays enabled even while these fail. Only the server can tell whether a
+    // filled-in address and password actually match, and a disabled sign-in button is
+    // the one that browser autofill strands: the fields look filled while React has
+    // seen no change event, so the person is left pressing a dead control.
+    const problems = {
+      ...(emailProblem() ? { email: "" } : {}),
+      ...(password ? {} : { password: "" }),
+    };
+    if (Object.keys(problems).length > 0) {
+      focusFirstError(problems);
       return;
     }
 
@@ -84,6 +100,7 @@ export function SignInPage() {
             name="email"
             type="email"
             autoComplete="email"
+            spellCheck={false}
             value={email}
             onChange={(event) => setEmail(event.target.value)}
           />

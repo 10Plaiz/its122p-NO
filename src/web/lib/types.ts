@@ -24,6 +24,15 @@ export const STATUS_LABEL: Record<ReportStatus, string> = {
   cancelled: "Cancelled",
 };
 
+// Roles follow the same rule as statuses above. `admin` reads as "Administrator"
+// rather than "Admin" because that is the word the proposal and every screen title
+// use for the role.
+export const ROLE_LABEL: Record<Role, string> = {
+  citizen: "Citizen",
+  staff: "Staff",
+  admin: "Administrator",
+};
+
 // Mirrors NEXT_STATUS in src/server/services/reports.service.ts: one step at a time,
 // no skipping and no going back. The server enforces this in changeStatus(); the UI
 // reads it only so it can offer the single legal step rather than a list to choose

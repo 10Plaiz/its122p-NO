@@ -3,8 +3,9 @@ import { ContactNumberField, validateContactNumber } from "../components/Contact
 import { useToast } from "../components/Toast.js";
 import { Alert, Button, Field, Input, Loading, Select, focusFirstError, formatDate } from "../components/ui.js";
 import { api } from "../lib/api.js";
+import { useAuth } from "../lib/auth.js";
 import { useAction, useApi } from "../lib/useApi.js";
-import { ROLES } from "../lib/types.js";
+import { ROLES, ROLE_LABEL } from "../lib/types.js";
 import type { Profile, Role } from "../lib/types.js";
 
 // Wireframe 1q. Public registration always creates a citizen, so staff and admin
@@ -45,7 +46,7 @@ export function AdminUsersPage() {
             <option value="">Every role</option>
             {ROLES.map((role) => (
               <option key={role} value={role}>
-                {role}
+                {ROLE_LABEL[role]}
               </option>
             ))}
           </Select>
@@ -83,9 +84,16 @@ export function AdminUsersPage() {
 
 function UserRow({ user, onDone }: { user: Profile; onDone: () => void }) {
   const toast = useToast();
+  const { user: currentUser } = useAuth();
   const [editing, setEditing] = useState(false);
   const [role, setRole] = useState<Role>(user.role);
   const active = user.is_active !== false;
+
+  // An admin cannot change their own role or deactivate themselves — the server
+  // refuses both in PATCH /admin/users/:id, because an admin who demoted themselves
+  // would lock everyone out. Saying so with a disabled control is the honest version:
+  // offering the button and then rejecting the click taught nothing.
+  const isSelf = currentUser?.id === user.id;
 
   const { run, pending, error } = useAction((body: Record<string, unknown>) =>
     api.patch<{ user: Profile }>(`/admin/users/${user.id}`, body),
@@ -109,15 +117,19 @@ function UserRow({ user, onDone }: { user: Profile; onDone: () => void }) {
       <td className="font-mono text-[11px]">{user.contact_number ?? "—"}</td>
       <td>
         {editing ? (
-          <Select value={role} onChange={(event) => setRole(event.target.value as Role)}>
+          <Select
+            aria-label={`Role for ${user.name}`}
+            value={role}
+            onChange={(event) => setRole(event.target.value as Role)}
+          >
             {ROLES.map((option) => (
               <option key={option} value={option}>
-                {option}
+                {ROLE_LABEL[option]}
               </option>
             ))}
           </Select>
         ) : (
-          <span className="tag tag-outline">{user.role}</span>
+          <span className="tag tag-outline">{ROLE_LABEL[user.role]}</span>
         )}
       </td>
       <td className="text-[13px]">{active ? "Active" : "Deactivated"}</td>
@@ -126,26 +138,45 @@ function UserRow({ user, onDone }: { user: Profile; onDone: () => void }) {
         <div className="flex gap-2 flex-wrap">
           {editing ? (
             <>
-              <Button type="button" variant="primary" disabled={pending} onClick={() => save({ role }, "Role updated.")}>
+              <Button
+                type="button"
+                variant="primary"
+                disabled={pending || role === user.role}
+                onClick={() => save({ role }, "Role updated.")}
+              >
                 Save
               </Button>
-              <Button type="button" onClick={() => setEditing(false)}>
+              {/* Restores the dropdown as well as closing it. Leaving the picked role in
+                  state meant reopening the row showed a change nobody had saved, and the
+                  next Save applied it. */}
+              <Button
+                type="button"
+                onClick={() => {
+                  setRole(user.role);
+                  setEditing(false);
+                }}
+              >
                 Cancel
               </Button>
             </>
           ) : (
             <>
-              <Button type="button" onClick={() => setEditing(true)}>
+              <Button type="button" disabled={isSelf} onClick={() => setEditing(true)}>
                 Change role
               </Button>
               {/* Accounts are deactivated, never deleted, so their reports and
                   activity history survive. */}
-              <Button type="button" disabled={pending} onClick={() => save({ is_active: !active })}>
+              <Button
+                type="button"
+                disabled={pending || isSelf}
+                onClick={() => save({ is_active: !active })}
+              >
                 {active ? "Deactivate" : "Reactivate"}
               </Button>
             </>
           )}
         </div>
+        {isSelf && <span className="text-muted text-[11px]">This is your own account.</span>}
         {error && <span className="text-[11px] text-accent-700">{error.message}</span>}
       </td>
     </tr>
@@ -183,10 +214,16 @@ function CreateUser({ onDone }: { onDone: () => void }) {
     <section className="border-2 border-divider p-4 flex flex-col gap-4">
       <h6>New account</h6>
 
+      {/* These fields describe somebody else's account, not the signed-in administrator's,
+          so autofill is turned away from all three: a password manager offering the
+          admin's own address here would quietly create the wrong account, and
+          `new-password` stops it treating the field as a login to fill or to save. */}
       <div className="grid gap-3 md:grid-cols-2">
         <Field label="Full name" htmlFor="new-name" error={shown.name} count={values.name.length} max={80}>
           <Input
             id="new-name"
+            name="new-name"
+            autoComplete="off"
             maxLength={80}
             value={values.name}
             onChange={(event) => setValues((v) => ({ ...v, name: event.target.value }))}
@@ -196,7 +233,9 @@ function CreateUser({ onDone }: { onDone: () => void }) {
         <Field label="Email" htmlFor="new-email" error={shown.email} count={values.email.length} max={254}>
           <Input
             id="new-email"
+            name="new-email"
             type="email"
+            autoComplete="off"
             maxLength={254}
             spellCheck={false}
             value={values.email}
@@ -208,7 +247,9 @@ function CreateUser({ onDone }: { onDone: () => void }) {
         <Field label="Password" htmlFor="new-password" hint="At least 8 characters" error={shown.password}>
           <Input
             id="new-password"
+            name="new-password"
             type="password"
+            autoComplete="new-password"
             maxLength={72}
             value={values.password}
             onChange={(event) => setValues((v) => ({ ...v, password: event.target.value }))}
@@ -230,7 +271,7 @@ function CreateUser({ onDone }: { onDone: () => void }) {
           >
             {ROLES.map((role) => (
               <option key={role} value={role}>
-                {role}
+                {ROLE_LABEL[role]}
               </option>
             ))}
           </Select>

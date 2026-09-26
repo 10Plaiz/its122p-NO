@@ -234,6 +234,27 @@ export async function cancelReport({ report, user, details }: { report: Report; 
   return updated as unknown as Report;
 }
 
+// A category id passing the schema only means it is a positive integer. The foreign
+// key then guarantees the row exists, but says nothing about whether it is one a
+// citizen may still choose — so a retired category was accepted, and a missing one
+// surfaced as a constraint violation rather than a field error. Checked here for the
+// same reason assignStaff checks `is_active` on a staff member.
+export async function assertCategorySelectable(categoryId: number) {
+  const { data: category } = await db
+    .from("categories")
+    .select("id, is_active")
+    .eq("id", categoryId)
+    .single();
+
+  if (!category) throw badRequest("Some fields are invalid. Fix them and try again.", [
+    { field: "category_id", message: "Choose a category that exists." },
+  ]);
+
+  if (!category.is_active) throw badRequest("Some fields are invalid. Fix them and try again.", [
+    { field: "category_id", message: "That category has been retired. Choose another." },
+  ]);
+}
+
 export async function assignStaff({ report, user, staffId }: { report: Report; user: AuthUser; staffId: string }) {
   const { data: staff } = await db
     .from("profiles")

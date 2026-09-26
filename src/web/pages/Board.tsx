@@ -47,17 +47,25 @@ function readParams(params: URLSearchParams) {
     page: Number.isInteger(page) && page > 0 ? page : 1,
     // Off unless asked for. Narrowing by map view is useful, but as a default it let a
     // filter change be swallowed by wherever the map happened to be pointing.
+    //
+    // `view` and `pane` are different questions and are deliberately separate params:
+    // `view=map` asks "narrow the list to the map's current viewport", while `pane`
+    // below asks "which of the two does this narrow screen show". One filters data,
+    // the other only chooses what is on screen.
     inView: params.get("view") === "map",
+    // Which pane a narrow viewport shows. The list leads, because burying the cards
+    // under a map was the problem the toggle was added to solve. Ignored from `lg` up,
+    // where both panes render side by side.
+    pane: params.get("pane") === "map" ? ("map" as const) : ("list" as const),
   };
 }
 
 export function BoardPage() {
   const [params, setParams] = useSearchParams();
-  const { q, status, categoryId, sort, page, inView } = readParams(params);
+  const { q, status, categoryId, sort, page, inView, pane } = readParams(params);
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [bounds, setBounds] = useState<Bounds | null>(null);
-  const [mobileView, setMobileView] = useState<"list" | "map">("list");
 
   // Typing stays local; only the settled term reaches the URL and the API.
   const [search, setSearch] = useState(q);
@@ -128,7 +136,12 @@ export function BoardPage() {
   function resetFilters() {
     setSearch("");
     setBounds(null);
-    setParams(new URLSearchParams(), { replace: true });
+    // Which pane is on screen is not a filter, so clearing the filters leaves it
+    // alone: a visitor on the map should not be thrown back to the list for asking
+    // to see everything.
+    const kept = new URLSearchParams();
+    if (pane === "map") kept.set("pane", "map");
+    setParams(kept, { replace: true });
   }
 
   const categoryName = (categoryData?.categories ?? []).find(
@@ -248,26 +261,28 @@ export function BoardPage() {
 
       {error && <Alert title="Could not load the board">{error.message}</Alert>}
 
-      {/* Mobile view segmented control (visible only below lg breakpoint) */}
+      {/* Which pane a narrow screen shows. Below lg only: both render together above it.
+          Written to the URL like every other control here, so a board someone shares
+          from their phone opens on the pane they were looking at. */}
       <div className="flex lg:hidden justify-start" data-testid="mobile-view-toggle">
         <div className="seg w-full sm:w-auto" role="radiogroup" aria-label="Board view selection">
           <label className="seg-opt flex-1 sm:flex-none justify-center font-medium" data-testid="mobile-view-list">
             <input
               type="radio"
-              name="board-mobile-view"
+              name="board-pane"
               value="list"
-              checked={mobileView === "list"}
-              onChange={() => setMobileView("list")}
+              checked={pane === "list"}
+              onChange={() => update({ pane: null })}
             />
             <span>List View</span>
           </label>
           <label className="seg-opt flex-1 sm:flex-none justify-center font-medium" data-testid="mobile-view-map">
             <input
               type="radio"
-              name="board-mobile-view"
+              name="board-pane"
               value="map"
-              checked={mobileView === "map"}
-              onChange={() => setMobileView("map")}
+              checked={pane === "map"}
+              onChange={() => update({ pane: "map" })}
             />
             <span>Map View</span>
           </label>
@@ -279,7 +294,7 @@ export function BoardPage() {
         <div
           data-testid="board-map-container"
           className={`border-2 border-divider h-[360px] lg:h-[560px] ${
-            mobileView === "list" ? "hidden lg:block" : "block"
+            pane === "list" ? "hidden lg:block" : "block"
           }`}
         >
           <ReportMap
@@ -288,14 +303,14 @@ export function BoardPage() {
             selectedId={selectedId}
             onSelect={setSelectedId}
             onMove={handleMove}
-            invalidateTrigger={mobileView}
+            invalidateTrigger={pane}
           />
         </div>
 
         <div
           data-testid="board-list-container"
           className={`flex flex-col gap-3 lg:max-h-[560px] lg:overflow-y-auto ${
-            mobileView === "map" ? "hidden lg:flex" : "flex"
+            pane === "map" ? "hidden lg:flex" : "flex"
           }`}
         >
           <div className="flex flex-col gap-2 border-b-2 border-divider pb-2">

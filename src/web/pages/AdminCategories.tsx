@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Alert, Button, Field, Input, Loading, focusFirstError } from "../components/ui.js";
+import { Alert, Button, Field, Input, Loading } from "../components/ui.js";
 import { useToast } from "../components/Toast.js";
 import { api } from "../lib/api.js";
 import { useAction, useApi } from "../lib/useApi.js";
@@ -68,9 +68,9 @@ function CategoryRow({
 }) {
   const toast = useToast();
   const [editing, setEditing] = useState(false);
+  const [confirmingRetire, setConfirmingRetire] = useState(false);
   const [name, setName] = useState(category.name);
   const [description, setDescription] = useState(category.description ?? "");
-  const [nameError, setNameError] = useState<string | undefined>();
 
   const update = useAction((body: Record<string, unknown>) =>
     api.patch<{ category: Category }>(`/categories/${category.id}`, body),
@@ -79,14 +79,15 @@ function CategoryRow({
   // under this category keep their category.
   const retire = useAction(() => api.delete<{ ok: true }>(`/categories/${category.id}`));
 
-  async function save() {
-    // Was a bare `return`, so Save looked broken rather than wrong.
-    if (name.trim().length < 2) {
-      setNameError("Enter a category name of at least 2 characters.");
-      return;
-    }
+  // Too short to be a name, or nothing actually changed: either way there is no
+  // request worth sending, and Save is disabled rather than accepting the click.
+  const tooShort = name.trim().length < 2;
+  const unchanged =
+    name.trim() === category.name && description.trim() === (category.description ?? "");
 
-    setNameError(undefined);
+  async function save() {
+    if (tooShort || unchanged) return;
+
     const done = await update.run({ name: name.trim(), description: description.trim() || null });
     if (done) {
       setEditing(false);
@@ -106,10 +107,8 @@ function CategoryRow({
               value={name}
               onChange={(event) => setName(event.target.value)}
             />
-            {nameError && (
-              <span role="alert" className="text-[11px] text-accent-700">
-                {nameError}
-              </span>
+            {tooShort && (
+              <span className="text-muted text-[11px]">At least 2 characters.</span>
             )}
           </span>
         ) : (
@@ -134,7 +133,12 @@ function CategoryRow({
         <div className="flex gap-2 flex-wrap">
           {editing ? (
             <>
-              <Button type="button" variant="primary" disabled={update.pending} onClick={save}>
+              <Button
+                type="button"
+                variant="primary"
+                disabled={update.pending || tooShort || unchanged}
+                onClick={save}
+              >
                 Save
               </Button>
               <Button
@@ -150,20 +154,48 @@ function CategoryRow({
             </>
           ) : (
             <>
-              <Button type="button" onClick={() => setEditing(true)}>
+              <Button
+                type="button"
+                onClick={() => {
+                  // Drops a half-answered retire prompt, so leaving the editor does not
+                  // bring it back as though it were still waiting.
+                  setConfirmingRetire(false);
+                  setEditing(true);
+                }}
+              >
                 Edit
               </Button>
               {category.is_active ? (
-                <Button
-                  type="button"
-                  disabled={retire.pending}
-                  onClick={async () => {
-                    const done = await retire.run();
-                    if (done) onDone();
-                  }}
-                >
-                  Retire
-                </Button>
+                // Retiring takes a category out of every citizen's report form, so it
+                // asks first. Same inline confirm the citizen's own cancel flow uses in
+                // MyReports, rather than a second pattern for the same kind of decision.
+                confirmingRetire ? (
+                  <>
+                    <span className="text-[12px]">Retire this category?</span>
+                    <Button
+                      type="button"
+                      variant="primary"
+                      disabled={retire.pending}
+                      onClick={async () => {
+                        const done = await retire.run();
+                        if (done) {
+                          setConfirmingRetire(false);
+                          toast("Category retired. Reports filed under it are unchanged.");
+                          onDone();
+                        }
+                      }}
+                    >
+                      {retire.pending ? "Retiring…" : "Yes, retire"}
+                    </Button>
+                    <Button type="button" onClick={() => setConfirmingRetire(false)}>
+                      Keep it
+                    </Button>
+                  </>
+                ) : (
+                  <Button type="button" onClick={() => setConfirmingRetire(true)}>
+                    Retire
+                  </Button>
+                )
               ) : (
                 <Button
                   type="button"
@@ -193,16 +225,16 @@ function CreateCategory({ onDone }: { onDone: () => void }) {
   const toast = useToast();
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
-  const [touched, setTouched] = useState(false);
 
   const { run, pending, error } = useAction((body: Record<string, unknown>) =>
     api.post<{ category: Category }>("/categories", body),
   );
 
   // Matches the server's min(2) rather than merely checking for blank, so a
-  // single-character name is caught here instead of coming back as a 400.
-  const nameError =
-    touched && name.trim().length < 2 ? "Enter a category name of at least 2 characters." : undefined;
+  // single-character name is caught here instead of coming back as a 400. Stated as a
+  // requirement on the field and enforced by disabling Add, rather than reported as an
+  // error after a click the form already knew would fail.
+  const incomplete = name.trim().length < 2;
 
   return (
     <section className="border-2 border-divider p-4 flex flex-col gap-3">
@@ -212,7 +244,8 @@ function CreateCategory({ onDone }: { onDone: () => void }) {
         <Field
           label="Name"
           htmlFor="cat-name"
-          error={error?.fieldErrors?.name ?? nameError}
+          hint="At least 2 characters."
+          error={error?.fieldErrors?.name}
           count={name.length}
           max={60}
         >
@@ -245,13 +278,9 @@ function CreateCategory({ onDone }: { onDone: () => void }) {
       <Button
         type="button"
         variant="primary"
-        disabled={pending}
+        disabled={pending || incomplete}
         onClick={async () => {
-          setTouched(true);
-          if (name.trim().length < 2) {
-            focusFirstError({ name: "" }, { name: "cat-name" });
-            return;
-          }
+          if (incomplete) return;
 
           const done = await run({
             name: name.trim(),
@@ -260,7 +289,6 @@ function CreateCategory({ onDone }: { onDone: () => void }) {
           if (done) {
             setName("");
             setDescription("");
-            setTouched(false);
             toast("Category added.");
             onDone();
           }
