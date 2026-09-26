@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import {
   Alert,
   Button,
+  Card,
   EmptyState,
   Field,
   Input,
@@ -26,6 +27,7 @@ export function MyReportsPage() {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("");
   const [page, setPage] = useState(1);
+  const [cancellingReport, setCancellingReport] = useState<Report | null>(null);
 
   const query = useMemo(
     () => ({ q: search.trim(), status, page, per_page: PER_PAGE }),
@@ -120,52 +122,109 @@ export function MyReportsPage() {
         </EmptyState>
       )}
 
-      {/* One row per report, scrolling sideways rather than reflowing: a citizen
-          comparing their own reports is comparing the same field down a column. */}
+      {/* Reports view: responsive status cards on viewports under 768px,
+          full table layout preserved on 768px and up. */}
       {reports.length > 0 && (
-        <div className="overflow-x-auto">
-          <table className="table w-full">
-            <caption className="sr-only">
-              Reports you have filed, {data?.total ?? 0} in total.
-            </caption>
-            <thead>
-              <tr>
-                <th scope="col">Reference</th>
-                <th scope="col">Title</th>
-                <th scope="col">Category</th>
-                <th scope="col">Status</th>
-                <th scope="col">Filed</th>
-                <th scope="col">
-                  <span className="sr-only">Actions</span>
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {reports.map((report) => (
-                <tr key={report.id}>
-                  <td className="font-mono text-[11px] whitespace-nowrap">{report.reference_code}</td>
-                  <td className="max-w-[32ch] min-w-[16ch]">
-                    <Link to={`/reports/${report.id}`} className="block truncate" title={report.title}>
-                      {report.title}
-                    </Link>
-                  </td>
-                  <td className="text-[13px] whitespace-nowrap">{report.category?.name ?? "Uncategorised"}</td>
-                  <td>
-                    <StatusBadge status={report.status} />
-                  </td>
-                  <td className="font-mono text-[11px] whitespace-nowrap">{formatDate(report.submitted_at)}</td>
-                  <td>
-                    {/* Only a pending report is still the citizen's to change; once staff
-                        pick it up they may already be acting on what it says. */}
-                    {report.status === "pending" && (
-                      <CancelButton reportId={report.id} onDone={reload} />
-                    )}
-                  </td>
+        <>
+          {/* Desktop table on viewports 768px and up (>=md) */}
+          <div className="hidden md:block overflow-x-auto">
+            <table className="table w-full">
+              <caption className="sr-only">
+                Reports you have filed, {data?.total ?? 0} in total.
+              </caption>
+              <thead>
+                <tr>
+                  <th scope="col">Reference</th>
+                  <th scope="col">Title</th>
+                  <th scope="col">Category</th>
+                  <th scope="col">Status</th>
+                  <th scope="col">Filed</th>
+                  <th scope="col">
+                    <span className="sr-only">Actions</span>
+                  </th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {reports.map((report) => (
+                  <tr key={report.id}>
+                    <td className="font-mono text-[11px] whitespace-nowrap">{report.reference_code}</td>
+                    <td className="max-w-[32ch] min-w-[16ch]">
+                      <Link to={`/reports/${report.id}`} className="block truncate" title={report.title}>
+                        {report.title}
+                      </Link>
+                    </td>
+                    <td className="text-[13px] whitespace-nowrap">{report.category?.name ?? "Uncategorised"}</td>
+                    <td>
+                      <StatusBadge status={report.status} />
+                    </td>
+                    <td className="font-mono text-[11px] whitespace-nowrap">{formatDate(report.submitted_at)}</td>
+                    <td>
+                      {report.status === "pending" && (
+                        <Button type="button" onClick={() => setCancellingReport(report)}>
+                          Cancel report
+                        </Button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Mobile task cards on viewports under 768px (<md) */}
+          <div className="flex flex-col gap-3 md:hidden">
+            {reports.map((report) => (
+              <Card key={report.id} className="p-4 flex flex-col gap-2.5 border border-divider">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-mono text-[11px] text-muted">{report.reference_code}</span>
+                  <StatusBadge status={report.status} />
+                </div>
+
+                <div className="flex flex-col gap-1">
+                  <Link
+                    to={`/reports/${report.id}`}
+                    className="card-title text-[15px] font-semibold text-text hover:text-accent"
+                  >
+                    {report.title}
+                  </Link>
+                  <div className="flex items-center gap-2 flex-wrap text-muted text-[11px]">
+                    <span className="tag tag-outline text-[10px] uppercase">
+                      {report.category?.name ?? "Uncategorised"}
+                    </span>
+                    <span>&middot;</span>
+                    <span>Filed {formatDate(report.submitted_at)}</span>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between gap-2 pt-2 border-t border-divider">
+                  <Link to={`/reports/${report.id}`} className="btn btn-secondary text-[12px] py-1 px-3">
+                    View details
+                  </Link>
+                  {report.status === "pending" && (
+                    <Button
+                      type="button"
+                      className="text-[12px] py-1 px-3"
+                      onClick={() => setCancellingReport(report)}
+                    >
+                      Cancel report
+                    </Button>
+                  )}
+                </div>
+              </Card>
+            ))}
+          </div>
+        </>
+      )}
+
+      {cancellingReport && (
+        <CancelDialog
+          report={cancellingReport}
+          onClose={() => setCancellingReport(null)}
+          onDone={() => {
+            setCancellingReport(null);
+            reload();
+          }}
+        />
       )}
 
       {data && <Pagination page={data.page} perPage={data.per_page} total={data.total} onPage={setPage} />}
@@ -173,47 +232,65 @@ export function MyReportsPage() {
   );
 }
 
-// A cancelled report is kept, never deleted, so its history survives — but it is
-// still a one-way door for the citizen, hence the inline confirm.
-function CancelButton({ reportId, onDone }: { reportId: string; onDone: () => void }) {
+// Dedicated confirmation dialog when withdrawing a pending report.
+function CancelDialog({
+  report,
+  onClose,
+  onDone,
+}: {
+  report: Report;
+  onClose: () => void;
+  onDone: () => void;
+}) {
   const toast = useToast();
-  const [confirming, setConfirming] = useState(false);
   const { run, pending, error } = useAction(() =>
-    api.post<{ report: Report }>(`/reports/${reportId}/cancel`),
+    api.post<{ report: Report }>(`/reports/${report.id}/cancel`),
   );
 
-  if (!confirming) {
-    return (
-      <Button type="button" onClick={() => setConfirming(true)}>
-        Cancel report
-      </Button>
-    );
-  }
-
   return (
-    <span className="flex items-center gap-2 flex-wrap">
-      <span className="text-[12px]">Withdraw this report?</span>
-
-      <Button
-        type="button"
-        variant="primary"
-        disabled={pending}
-        onClick={async () => {
-          const cancelled = await run();
-          if (cancelled) {
-            toast("Report cancelled. Its history is kept.");
-            onDone();
-          }
-        }}
+    <div className="dialog-backdrop z-[1100]" role="presentation" onClick={onClose}>
+      <div
+        className="dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="cancel-dialog-title"
+        onClick={(event) => event.stopPropagation()}
       >
-        {pending ? "Cancelling…" : "Yes, cancel"}
-      </Button>
+        <h4 id="cancel-dialog-title" className="dialog-title">
+          Withdraw this report?
+        </h4>
 
-      <Button type="button" onClick={() => setConfirming(false)}>
-        Keep it
-      </Button>
+        <div className="dialog-body flex flex-col gap-3">
+          <p className="text-[13px] text-muted">
+            Are you sure you want to withdraw <strong>{report.title}</strong> ({report.reference_code})?
+          </p>
+          <p className="text-[12px] text-muted">
+            The report will be marked as cancelled. Its history will be preserved, but municipal staff will no longer act on it.
+          </p>
 
-      {error && <span className="text-[11px] text-accent-700">{error.message}</span>}
-    </span>
+          {error && <Alert title="Could not cancel report">{error.message}</Alert>}
+        </div>
+
+        <div className="dialog-actions flex gap-3">
+          <Button
+            type="button"
+            variant="primary"
+            disabled={pending}
+            onClick={async () => {
+              const cancelled = await run();
+              if (cancelled) {
+                toast("Report cancelled. Its history is kept.");
+                onDone();
+              }
+            }}
+          >
+            {pending ? "Cancelling…" : "Yes, cancel"}
+          </Button>
+          <Button type="button" onClick={onClose} disabled={pending}>
+            Keep it
+          </Button>
+        </div>
+      </div>
+    </div>
   );
 }
