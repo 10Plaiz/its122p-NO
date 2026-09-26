@@ -13,8 +13,8 @@ function ViewportWatcher({ onMove }: { onMove: (bounds: Bounds) => void }) {
 
   useEffect(() => {
     function publish() {
-      // A collapsed container reports no bounds worth having. Hiding the map — which
-      // the board's mobile pane toggle does with `display: none` — drives
+      // A collapsed container reports no bounds worth having. Hiding the map (which
+      // the board's mobile pane toggle does with `display: none`) drives
       // `clientWidth`/`clientHeight` to 0, and Leaflet's own `invalidateSize()` then
       // fires `moveend` for the size change. Publishing at that moment hands the board
       // a degenerate box where north equals south, which filters every report out of a
@@ -50,7 +50,7 @@ function ViewportWatcher({ onMove }: { onMove: (bounds: Bounds) => void }) {
 // still when they do not.
 // `sizeKey` changes whenever the container may have been shown or hidden. A map that
 // is mounted inside a hidden pane measures 0x0, and fitting to that yields a centre and
-// zoom aimed at nothing — so the fit is deferred until the map has a size, and this is
+// zoom aimed at nothing, so the fit is deferred until the map has a size, and this is
 // what tells it to try again.
 function FitToReports({
   reports,
@@ -73,20 +73,28 @@ function FitToReports({
   }, [reports]);
 
   useEffect(() => {
-    // Nothing to aim, or nowhere to aim it yet.
-    const size = map.getSize();
-    if (size.x === 0 || size.y === 0) return;
-    if (fitted.current === fitKey) return;
+    function tryFit() {
+      // Nothing to aim, or nowhere to aim it yet.
+      const size = map.getSize();
+      if (size.x === 0 || size.y === 0) return;
+      if (fitted.current === fitKey) return;
 
-    const points = latest.current
-      .filter((report) => report.latitude != null && report.longitude != null)
-      .map((report) => [report.latitude, report.longitude] as [number, number]);
+      const points = latest.current
+        .filter((report) => report.latitude != null && report.longitude != null)
+        .map((report) => [report.latitude, report.longitude] as [number, number]);
 
-    if (points.length === 0) return;
-    // Unanimated on purpose: it respects a reduced-motion preference without asking,
-    // and `moveend` fires at once rather than a flight later.
-    map.fitBounds(points, { padding: [32, 32], maxZoom: 16, animate: false });
-    fitted.current = fitKey;
+      if (points.length === 0) return;
+      // Unanimated on purpose: it respects a reduced-motion preference without asking,
+      // and `moveend` fires at once rather than a flight later.
+      map.fitBounds(points, { padding: [32, 32], maxZoom: 16, animate: false });
+      fitted.current = fitKey;
+    }
+
+    tryFit();
+    map.on("resize", tryFit);
+    return () => {
+      map.off("resize", tryFit);
+    };
   }, [map, fitKey, sizeKey]);
 
   return null;
