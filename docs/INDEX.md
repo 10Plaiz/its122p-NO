@@ -19,6 +19,8 @@ Use this page to find the document that owns the information you need.
 | [Architecture](ARCHITECTURE.md) | Code boundaries, request path, and deployment layout |
 | [API guide](API.md) | API integrations, endpoint contracts, database migrations, access rules, and example requests |
 | [API documentation](API_Documentation.md) | Frozen Phase 3 API submission snapshot |
+| [Developer journeys](DEVELOPER_JOURNEYS.md) | Technical persona journeys, report state machine, and verification matrix |
+| [UI/UX analysis](UI_UX_ANALYSIS.md) | Interface findings, screen consolidation opportunities, and presentation directions |
 
 Each row identifies one durable document and its responsibility. GitHub Issues
 own current work, blockers, and priority. Pull requests own implementation and
