@@ -17,6 +17,7 @@ documented Vercel request path backed by an approved test Supabase project.
 | **Stable test URL** | `https://kamoti-chi.vercel.app` | Public production deployment on Vercel |
 | **Baseline commit SHA** | `ccad629` | Remote `origin/main` Phase 4 baseline |
 | **Hosting platform** | Vercel | Vite frontend static assets with serverless Node.js API functions |
+| **Serverless region** | Singapore (`sin1`) | Co-located with Supabase cluster to minimize query roundtrips |
 | **Database target** | Supabase (`chqyxlyrmudmkanqmpil`) | Dedicated development/test project containing synthetic data only |
 | **Environment purpose** | Phase 4 verification | Functional testing, security checks, and peer usability testing |
 | **Configuration owner** | Project Lead / Deployment Owner | Owns Vercel environment variables and Supabase credentials |
@@ -24,6 +25,15 @@ documented Vercel request path backed by an approved test Supabase project.
 All sensitive keys (`SUPABASE_SECRET_KEY`, database passwords, service role keys)
 remain strictly in private environment settings and must never be committed to
 repository files, issue descriptions, logs, or evidence captures.
+
+## Vercel deployment configuration
+
+The repository owns the deployment specification in [`vercel.json`](../vercel.json):
+
+1. **Compute Region:** Serverless functions are pinned to Singapore (`regions: ["sin1"]`), co-locating the API runtime with the Supabase database cluster in Southeast Asia. This avoids transatlantic roundtrips and keeps API latency under 50ms.
+2. **Git Branch Policy:** Preview deployments on non-main branches are disabled (`git.deploymentEnabled: { "**": false, "main": true }`). This prevents failed preview deployments on contributor branches and pull requests due to private repository seat restrictions, while preserving production deployments from `main`. Pull requests are validated in CI via GitHub Actions (`.github/workflows/ci.yml`).
+3. **HTTP Response Security Headers:** Standard security headers (`X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: strict-origin-when-cross-origin`) are applied across all routes.
+4. **URL Rewrites:** Maps `/api/*` to the serverless entry point in `api/index.ts` and falls back all client routes to `index.html` for single-page client routing.
 
 ## Database migrations status
 
