@@ -367,7 +367,7 @@ export function BoardPage() {
                 key={report.id}
                 report={report}
                 isSelected={report.id === selectedId}
-                onToggle={(id) => setSelectedId(selectedId === id ? null : id)}
+                onToggle={(id) => setSelectedId((prev) => (prev === id ? null : id))}
               />
             ))}
           </div>
