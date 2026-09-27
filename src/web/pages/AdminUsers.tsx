@@ -253,7 +253,7 @@ function CreateUser({ onDone }: { onDone: () => void }) {
         </Field>
 
         {/* Capped but not counted: a length readout on a secret is not worth showing. */}
-        <Field label="Password" htmlFor="new-password" hint="At least 8 characters" error={shown.password}>
+        <Field label="Password" htmlFor="new-password" hint="At least 8 characters." error={shown.password}>
           <Input
             id="new-password"
             name="new-password"

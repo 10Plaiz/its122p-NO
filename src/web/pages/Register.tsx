@@ -91,7 +91,7 @@ export function RegisterPage() {
         />
 
         {/* Capped but not counted: a length readout on a secret is not worth showing. */}
-        <Field label="Password" htmlFor="password" hint="At least 8 characters" error={shown.password}>
+        <Field label="Password" htmlFor="password" hint="At least 8 characters." error={shown.password}>
           <Input
             id="password"
             name="password"
