@@ -12,6 +12,7 @@ import {
   StatusBadge,
   Textarea,
   formatDateTime,
+  useLeftFields,
 } from "../components/ui.js";
 import { api } from "../lib/api.js";
 import { useAuth } from "../lib/auth.js";
@@ -272,22 +273,23 @@ function AdvanceStatus({ report, onDone }: { report: Report; onDone: () => void 
 function AddRemark({ reportId, onDone }: { reportId: string; onDone: () => void }) {
   const toast = useToast();
   const [details, setDetails] = useState("");
-  const [touched, setTouched] = useState(false);
+  const fields = useLeftFields();
 
   const { run, pending, error } = useAction((body: { details: string }) =>
     api.post<{ ok: true }>(`/reports/${reportId}/remarks`, body),
   );
 
   const invalid = details.trim().length === 0;
+  const shown = fields.visible(invalid ? { remark: "Write the remark before saving it." } : {});
 
   return (
-    <section className="border-2 border-divider p-4 flex flex-col gap-3">
+    <section className="border-2 border-divider p-4 flex flex-col gap-3" onBlur={fields.onBlur}>
       <h6>Add a remark</h6>
 
       <Field
         label="Remark"
         htmlFor="remark"
-        error={touched && invalid ? "Write the remark before saving it." : undefined}
+        error={shown.remark}
         count={details.length}
         max={500}
       >
@@ -304,14 +306,13 @@ function AddRemark({ reportId, onDone }: { reportId: string; onDone: () => void 
 
       <Button
         type="button"
-        disabled={pending}
+        disabled={pending || invalid}
         onClick={async () => {
-          setTouched(true);
           if (invalid) return;
           const done = await run({ details: details.trim() });
           if (done) {
             setDetails("");
-            setTouched(false);
+            fields.reset();
             toast("Remark saved.");
             onDone();
           }

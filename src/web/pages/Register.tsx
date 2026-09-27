@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import type { ChangeEvent, FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { ContactNumberField, validateContactNumber } from "../components/ContactNumberField.js";
-import { Alert, Button, Field, Input, focusFirstError } from "../components/ui.js";
+import { Alert, Button, Field, Input, useLeftFields } from "../components/ui.js";
 import { homePathFor, useAuth } from "../lib/auth.js";
 import { useAction } from "../lib/useApi.js";
 
@@ -28,7 +28,7 @@ export function RegisterPage() {
   const { run, pending, error } = useAction(register);
 
   const [values, setValues] = useState({ name: "", email: "", password: "", contact: "" });
-  const [touched, setTouched] = useState(false);
+  const fields = useLeftFields();
 
   // A signed-in user has no reason to see this screen.
   useEffect(() => {
@@ -38,8 +38,9 @@ export function RegisterPage() {
   }, [loading, user, navigate]);
 
   const errors = validate(values);
+  const invalid = Object.keys(errors).length > 0;
   // Whatever the server rejected wins over the local guess for that field.
-  const shown = { ...(touched ? errors : {}), ...(error?.fieldErrors ?? {}) };
+  const shown = { ...fields.visible(errors, { contact_number: "contact" }), ...(error?.fieldErrors ?? {}) };
 
   function set(field: keyof typeof values) {
     return (event: ChangeEvent<HTMLInputElement>) =>
@@ -48,11 +49,7 @@ export function RegisterPage() {
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
-    setTouched(true);
-    if (Object.keys(errors).length > 0) {
-      focusFirstError(errors, { contact_number: "contact" });
-      return;
-    }
+    if (invalid) return;
 
     const contact = values.contact.trim();
     const created = await run({
@@ -76,8 +73,8 @@ export function RegisterPage() {
       <h2>Register</h2>
       <p className="text-muted text-[13px]">Public sign-up always creates a citizen account.</p>
 
-      <form className="flex flex-col gap-4" onSubmit={handleSubmit} noValidate>
-        <Field label="Full name" htmlFor="name" error={shown.name} count={values.name.length} max={80}>
+      <form className="flex flex-col gap-4" onSubmit={handleSubmit} onBlur={fields.onBlur} noValidate>
+        <Field label="Full name" htmlFor="name" hint="At least 2 characters." error={shown.name} count={values.name.length} max={80}>
           <Input id="name" name="name" autoComplete="name" maxLength={80} value={values.name} onChange={set("name")} />
         </Field>
 
@@ -108,7 +105,7 @@ export function RegisterPage() {
 
         {error && <Alert title="Could not create your account">{error.message}</Alert>}
 
-        <Button type="submit" variant="primary" block disabled={pending}>
+        <Button type="submit" variant="primary" block disabled={pending || invalid}>
           {pending ? "Creating account…" : "Create account"}
         </Button>
       </form>
