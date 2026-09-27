@@ -70,6 +70,24 @@ Initial reports present in the test environment:
 The fixture retains its safe-target guard (`--target <REF>`) to ensure data is
 never applied to an unapproved database target.
 
+### Makati presentation dataset
+
+On 2026-09-27, the separate `makati-demo-v1` seed added 36 demo accounts and
+150 synthetic Makati reports to this project. It includes 30 pending, 30 under
+review, 30 in progress, 50 resolved, and 10 cancelled reports, with history,
+notifications, and labelled illustrative images. Existing records were
+preserved. These are initial seed counts; normal demo interactions can change
+the report states later.
+
+The first apply verified that all 269 pre-existing application rows remained
+unchanged. All six migrations were confirmed applied before seeding. The seed
+does not deploy frontend changes to Vercel or remove older `ZZ TEST` content.
+
+Use the [Makati demo seed instructions](LOCAL_DEV.md#makati-demo-seed) for
+generation, preview, application, verification, private credentials, and retry
+behavior. Demo passwords are separate from fixture passwords and are not
+recorded in this document.
+
 ## Smoke verification procedure
 
 To verify that the deployed test site is healthy and accessible:
