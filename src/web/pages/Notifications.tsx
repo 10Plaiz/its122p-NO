@@ -41,10 +41,12 @@ export function NotificationsPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <header className="flex flex-wrap items-end justify-between gap-3">
+      <header className="flex flex-wrap items-end justify-between gap-4 pb-4 border-b border-divider">
         <div className="flex flex-col gap-1">
-          <h2>Notifications</h2>
-          <p className="text-muted text-[13px]">
+          <h2 className="text-[28px] sm:text-[32px] font-bold text-text leading-tight !m-0">
+            Notifications
+          </h2>
+          <p className="text-neutral-700 text-[13px] font-medium !m-0">
             {unread > 0 ? `${unread} unread` : "You are up to date."}
           </p>
         </div>
@@ -52,11 +54,13 @@ export function NotificationsPage() {
         {unread > 0 && (
           <Button
             type="button"
+            variant="secondary"
             disabled={markAll.pending}
             onClick={async () => {
               const done = await markAll.run();
               if (done) reload();
             }}
+            className="text-[13px]"
           >
             {markAll.pending ? "Marking…" : "Mark all as read"}
           </Button>
@@ -73,56 +77,90 @@ export function NotificationsPage() {
         </EmptyState>
       )}
 
-      <ul className="flex flex-col gap-2">
+      <ul className="flex flex-col gap-3 list-none !p-0 !m-0">
         {notifications.map((notification) => (
-          <li
-            key={notification.id}
-            className={
-              notification.is_read
-                ? "border border-divider p-3 flex flex-col gap-1"
-                : "border-2 border-accent p-3 flex flex-col gap-1"
-            }
-          >
-            <div className="flex items-start justify-between gap-3 flex-wrap">
-              <p className="text-[14px] flex-1 min-w-[12rem]">{notification.message}</p>
-
-              {!notification.is_read && (
-                <Button
-                  type="button"
-                  disabled={markOne.pending}
-                  onClick={async () => {
-                    const done = await markOne.run(notification.id);
-                    if (done) reload();
-                  }}
-                >
-                  Mark read
-                </Button>
-              )}
-            </div>
-
-            <div className="flex items-center gap-3 flex-wrap">
-              <span className="font-mono text-[10px] text-muted">
-                {formatDateTime(notification.created_at)}
-              </span>
-              {notification.report_id && (
-                // A notification about work should land where the work can be done:
-                // staff and admins act on a report from the staff view, while a
-                // citizen only reads their own.
-                <Link
-                  to={
-                    user && user.role !== "citizen"
-                      ? `/staff/reports/${notification.report_id}`
-                      : `/reports/${notification.report_id}`
-                  }
-                  className="text-[12px]"
-                >
-                  Open the report
-                </Link>
-              )}
-            </div>
+          <li key={notification.id} className="list-none !p-0 !m-0">
+            <NotificationCard
+              notification={notification}
+              role={user?.role}
+              onMarkRead={async (id) => {
+                const done = await markOne.run(id);
+                if (done) reload();
+              }}
+              isPending={markOne.pending}
+            />
           </li>
         ))}
       </ul>
     </div>
+  );
+}
+
+interface NotificationCardProps {
+  notification: Notification;
+  role?: Role;
+  onMarkRead: (id: number) => void;
+  isPending: boolean;
+}
+
+function NotificationCard({ notification, role, onMarkRead, isPending }: NotificationCardProps) {
+  const reportTarget =
+    role && role !== "citizen"
+      ? `/staff/reports/${notification.report_id}`
+      : `/reports/${notification.report_id}`;
+
+  return (
+    <article
+      className={`card p-4 flex flex-col gap-3 transition-colors border ${
+        notification.is_read
+          ? "border-divider bg-surface opacity-80 hover:opacity-100"
+          : "border-divider border-l-4 border-l-accent bg-surface shadow-xs"
+      }`}
+    >
+      {/* Unit 1: Identity & Controls */}
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex flex-col gap-1.5 flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            {!notification.is_read && (
+              <span className="tag tag-accent text-[11px] font-bold tracking-wide">
+                New
+              </span>
+            )}
+            <time className="text-[11px] font-mono font-medium text-neutral-600 select-text">
+              {formatDateTime(notification.created_at)}
+            </time>
+          </div>
+
+          <p className="text-[14px] font-medium text-text select-text cursor-text leading-snug break-words !m-0">
+            {notification.message}
+          </p>
+        </div>
+
+        {!notification.is_read && (
+          <Button
+            type="button"
+            variant="secondary"
+            disabled={isPending}
+            onClick={() => onMarkRead(notification.id)}
+            className="text-[12px] py-1 px-3 shrink-0 touch-manipulation cursor-pointer"
+            aria-label="Mark notification as read"
+          >
+            {isPending ? "Marking…" : "Mark read"}
+          </Button>
+        )}
+      </div>
+
+      {/* Unit 2: Action Tray */}
+      {notification.report_id && (
+        <div className="pt-2 border-t border-divider/60 flex items-center justify-between">
+          <Link
+            to={reportTarget}
+            className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-accent hover:underline select-text"
+          >
+            Open report <span aria-hidden="true">&rarr;</span>
+          </Link>
+        </div>
+      )}
+    </article>
   );
 }
