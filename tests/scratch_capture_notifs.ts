@@ -33,6 +33,16 @@ async function main() {
   await page.waitForLoadState("networkidle");
   await page.waitForTimeout(1000);
 
+  if (mode === "after") {
+    // Click "Mark read" on the first notification to verify read state bottom-right anchor
+    const firstMarkRead = page.locator('button:has-text("Mark read")').first();
+    if (await firstMarkRead.isVisible()) {
+      console.log("Marking first notification as read to test read-state anchor...");
+      await firstMarkRead.click();
+      await page.waitForTimeout(1000);
+    }
+  }
+
   // Desktop (1280x800)
   await page.setViewportSize({ width: 1280, height: 800 });
   const desktopPath = `${EVIDENCE_DIR}/NOTIFS-feed-desktop${suffix}`;
