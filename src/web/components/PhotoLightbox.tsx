@@ -1,5 +1,4 @@
 import { useEffect, useRef } from "react";
-import { Button } from "./ui.js";
 
 type PhotoLightboxProps = {
   src: string;
@@ -14,8 +13,11 @@ export function PhotoLightbox({ src, alt, title, onClose }: PhotoLightboxProps) 
   const closeButtonRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
-    // Focus close button on mount
+    const previouslyFocused = document.activeElement as HTMLElement | null;
     closeButtonRef.current?.focus();
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
 
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {
@@ -25,7 +27,11 @@ export function PhotoLightbox({ src, alt, title, onClose }: PhotoLightboxProps) 
     }
 
     window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      document.body.style.overflow = previousOverflow;
+      previouslyFocused?.focus();
+    };
   }, [onClose]);
 
   return (
