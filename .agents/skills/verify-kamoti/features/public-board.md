@@ -1,0 +1,56 @@
+# Feature Map: Public Transparency Board
+
+Route: `/board`
+Persona: Public Visitor / Citizen
+
+## Sub-features
+- **Public Report Feed:** Chronological cards displaying reviewed public issues with status tags and thumbnail photos.
+- **Filter and Search Bar:** Category dropdown (`#category`), status toggle, and keyword search persisting parameters to URL query params.
+- **Interactive Map:** Leaflet map rendering issue pins with popup previews synchronized with selected card.
+- **Mobile Segmented View:** Responsive toggle switching between Map view and List view on viewports under 1024px (`[data-testid="mobile-view-toggle"]`).
+- **Card Expansion:** Clicking a card button expands detailed notes, photo thumbnail, and highlights corresponding map marker.
+
+## How to get to it (user POV)
+1. Navigate to `/` as an unauthenticated visitor.
+2. Click "Browse community board" or select "Community board" from the top navigation.
+3. The board displays published reports (`under_review`, `in_progress`, `resolved`). PII is scrubbed.
+
+## Driving it with Playwright
+
+```typescript
+import { test, expect } from "@playwright/test";
+import { captureEvidence } from "./helpers.js";
+
+test("Public Board: Browsing, filtering, and responsive toggle", async ({ page }) => {
+  // Mobile test
+  await page.setViewportSize({ width: 375, height: 812 });
+  await page.goto("/board");
+  await page.waitForLoadState("networkidle");
+
+  // Verify header and report list
+  await expect(page.locator("h2, h1")).toContainText("Public transparency board");
+  
+  // Capture mobile baseline
+  await captureEvidence(page, "BOARD-mobile-list.png");
+
+  // Desktop test
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.goto("/board");
+  await page.waitForLoadState("networkidle");
+
+  // Filter by category using id selector
+  const categorySelect = page.locator("#category");
+  if (await categorySelect.isVisible()) {
+    await categorySelect.selectOption({ index: 1 });
+    await page.waitForLoadState("networkidle");
+  }
+
+  await captureEvidence(page, "BOARD-desktop-filtered.png");
+});
+```
+
+## Gotchas
+- **Mobile Pane versus Map Filter:** The query parameter `pane=map` controls the mobile segmented toggle between map and list views. The parameter `view=map` controls geographic bounding-box filtering. These two parameters are distinct.
+- **Leaflet Container Invalidation:** Hiding the map drops its container to zero dimensions. Switching back to list view requires bounds guards to avoid filtering out all reports (`KR-02`).
+- **Category Dropdown Selector:** The category filter input renders with `id="category"`. Do not use `name="category"` in automation scripts.
+- **Inline Card Expansion:** Clicking a card toggles inline expansion with `aria-expanded` state. It does not navigate to a new route.

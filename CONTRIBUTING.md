@@ -42,7 +42,7 @@ the pull request.
 - Validate every completion criterion in the linked issue before opening the
   pull request. Report the result and evidence for each criterion.
 - Describe shared API, database, environment, or architecture changes clearly.
-- Include screenshots or other visual evidence for visible frontend changes.
+- Include screenshots or other visual evidence for visible frontend changes. Use the `/verify-kamoti` skill (`bun run test:browser`) to capture evidence into `tests/evidence/`.
 - Explain any check that could not run and any remaining limitation.
 
 Branch protection is not enabled yet. Use pull requests and CI as the team
