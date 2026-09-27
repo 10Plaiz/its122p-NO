@@ -27,18 +27,25 @@ describe("KR-19: Friendly MIME type format badges", () => {
   test("maps JPEG MIME types to JPEG badge", () => {
     expect(formatMimeType("image/jpeg")).toBe("JPEG");
     expect(formatMimeType("image/jpg")).toBe("JPEG");
+    expect(formatMimeType("IMAGE/JPEG")).toBe("JPEG");
   });
 
   test("maps PNG MIME type to PNG badge", () => {
     expect(formatMimeType("image/png")).toBe("PNG");
+    expect(formatMimeType("IMAGE/PNG")).toBe("PNG");
   });
 
   test("maps WebP MIME type to WebP badge", () => {
     expect(formatMimeType("image/webp")).toBe("WebP");
+    expect(formatMimeType("IMAGE/WEBP")).toBe("WebP");
   });
 
   test("falls back to uppercase subtype or raw string", () => {
     expect(formatMimeType("image/gif")).toBe("GIF");
     expect(formatMimeType("plain")).toBe("plain");
+  });
+
+  test("handles empty or missing MIME string gracefully", () => {
+    expect(formatMimeType("")).toBe("");
   });
 });
