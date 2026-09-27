@@ -10,21 +10,21 @@ test.describe("Authentication workflows (AUTH-04 through AUTH-11)", () => {
   test("AUTH-04: Valid citizen login routes to citizen workspace and captures evidence", async ({ page }) => {
     await signIn(page, USERS.citizen1, FIXTURE_PASSWORD);
     await expect(page).toHaveURL(/.*my-reports/);
-    await expect(page.locator("body")).toContainText("citizen");
+    await expect(page.locator('[data-testid="user-identity"]')).toContainText("Citizen");
     await captureEvidence(page, "AUTH-04-citizen-login.png");
   });
 
   test("AUTH-05: Valid staff login routes to staff queue and captures evidence", async ({ page }) => {
     await signIn(page, USERS.staff1, FIXTURE_PASSWORD);
     await expect(page).toHaveURL(/.*staff\/queue/);
-    await expect(page.locator("body")).toContainText("staff");
+    await expect(page.locator('[data-testid="user-identity"]')).toContainText("Staff");
     await captureEvidence(page, "AUTH-05-staff-login.png");
   });
 
   test("AUTH-06: Valid administrator login routes to admin dashboard and captures evidence", async ({ page }) => {
     await signIn(page, USERS.admin, FIXTURE_PASSWORD);
     await expect(page).toHaveURL(/.*admin/);
-    await expect(page.locator("body")).toContainText("admin");
+    await expect(page.locator('[data-testid="user-identity"]')).toContainText("Administrator");
     await captureEvidence(page, "AUTH-06-admin-login.png");
   });
 
