@@ -72,10 +72,10 @@ describe("demo seed generator", () => {
     for (const report of reports) {
       expect(accountByKey.get(report.ownerKey)?.role).toBe("citizen");
       if (report.staffKey) expect(accountByKey.get(report.staffKey)?.role).toBe("staff");
-      expect(report.title.startsWith("[DEMO]")).toBe(true);
-      expect(report.title).not.toBe(`[DEMO] ${report.category} concern near ${report.address_text.split(",")[0]}`);
-      expect(report.description).toContain("does not describe a verified incident");
-      expect(report.address_text).toContain("synthetic demo location");
+      expect(report.title).not.toMatch(/\[demo\]|synthetic/i);
+      expect(report.description).not.toMatch(/demo|synthetic|illustrative/i);
+      expect(report.address_text).not.toMatch(/demo|synthetic/i);
+      expect(report.title).not.toBe(`${report.category} concern near ${report.address_text.split(",")[0]}`);
       const locationName = report.address_text.split(",")[0] ?? "";
       const anchor = areaAnchors[locationName];
       if (!anchor) throw new Error(`Unknown demo area: ${locationName}`);
@@ -143,16 +143,19 @@ describe("demo seed generator", () => {
       if (remarks > 0) expect(report.notifications.some((notification) => notification.userKey === report.ownerKey && notification.message.includes("inspection note"))).toBe(true);
       for (const notification of report.notifications) {
         expect(accountByKey.has(notification.userKey)).toBe(true);
+        expect(notification.message).not.toMatch(/demo|synthetic/i);
         if (notification.message.includes("assigned to you")) expect(report.staffKey !== null && notification.userKey === report.staffKey).toBe(true);
         if (notification.message.includes("now ")) expect(notification.userKey).toBe(report.ownerKey);
         expect(Date.parse(notification.created_at)).toBeLessThanOrEqual(upperBound);
       }
+      for (const update of report.updates) expect(update.details).not.toMatch(/demo|synthetic/i);
       for (const photo of report.photos) {
         expect(photo.asset).toMatch(/^(road|streetlight|drainage|signage|sidewalk|other)-(initial|resolution)\.png$/);
         expect(Date.parse(photo.created_at)).toBeLessThanOrEqual(upperBound);
       }
       expect(Date.parse(report.updated_at)).toBeGreaterThanOrEqual(lastTime);
     }
+    for (const account of accounts) expect(account.name).not.toMatch(/demo|synthetic/i);
   });
 
   it("rejects malformed options instead of normalizing them silently", () => {

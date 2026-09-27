@@ -55,6 +55,7 @@ const INCIDENTS: Record<Category, { title: string; description: string }[]> = {
 
 const FIRST_NAMES = ["Ana", "Ben", "Carlo", "Dina", "Emil", "Farah", "Gio", "Hana", "Ira", "Jules"] as const;
 const LAST_NAMES = ["Santos", "Reyes", "Cruz", "Garcia", "Lim", "Mendoza", "Navarro", "Ramos", "Tan", "Villanueva"] as const;
+const STAFF_NAMES = ["Mariel Dela Cruz", "Paolo Bautista", "Liza Mercado", "Ramon Flores", "Celia Aquino"] as const;
 
 type Role = "citizen" | "staff" | "admin";
 type Status = (typeof STATUSES)[number];
@@ -157,9 +158,9 @@ export function generateSeed({ seed = 42, asOf = "2026-09-27" }: DemoSeedOptions
   const randomValue = random(seed);
   const sixMonthsAgo = Date.parse(`${asOf}T00:00:00.000Z`) - 183 * 24 * 60 * 60 * 1000;
   const accounts: Account[] = [
-    { key: "admin", email: "demo-makati-admin@kamoti.invalid", name: "Demo Makati Administrator", role: "admin", created_at: iso(sixMonthsAgo - 14 * 86400000) },
-    ...Array.from({ length: 5 }, (_, i) => ({ key: `staff-${i + 1}`, email: `demo-makati-staff-${i + 1}@kamoti.invalid`, name: `Demo Makati Staff ${i + 1}`, role: "staff" as const, created_at: iso(sixMonthsAgo - (12 - i) * 86400000) })),
-    ...Array.from({ length: 30 }, (_, i) => ({ key: `citizen-${i + 1}`, email: `demo-makati-citizen-${i + 1}@kamoti.invalid`, name: `Demo ${FIRST_NAMES[i % FIRST_NAMES.length]} ${LAST_NAMES[Math.floor(i / FIRST_NAMES.length)]}`, role: "citizen" as const, created_at: iso(sixMonthsAgo - Math.floor(randomValue() * 10) * 86400000) })),
+    { key: "admin", email: "demo-makati-admin@kamoti.invalid", name: "Nina Valdez", role: "admin", created_at: iso(sixMonthsAgo - 14 * 86400000) },
+    ...Array.from({ length: 5 }, (_, i) => ({ key: `staff-${i + 1}`, email: `demo-makati-staff-${i + 1}@kamoti.invalid`, name: STAFF_NAMES[i] ?? "Makati Staff", role: "staff" as const, created_at: iso(sixMonthsAgo - (12 - i) * 86400000) })),
+    ...Array.from({ length: 30 }, (_, i) => ({ key: `citizen-${i + 1}`, email: `demo-makati-citizen-${i + 1}@kamoti.invalid`, name: `${FIRST_NAMES[i % FIRST_NAMES.length]} ${LAST_NAMES[Math.floor(i / FIRST_NAMES.length)]}`, role: "citizen" as const, created_at: iso(sixMonthsAgo - Math.floor(randomValue() * 10) * 86400000) })),
   ];
 
   const reports: DemoReport[] = Array.from({ length: 150 }, (_, i) => {
@@ -181,19 +182,19 @@ export function generateSeed({ seed = 42, asOf = "2026-09-27" }: DemoSeedOptions
     const history: ReportUpdate[] = [];
     const notifications: DemoReport["notifications"] = [{
       id: stableId(`${key}:notice:submitted`), userKey: "admin",
-      message: `A demo report near ${area.name} was filed and is waiting for assignment.`,
+      message: `A report near ${area.name} was filed and is waiting for assignment.`,
       is_read: status !== "pending", created_at: iso(submittedMs),
     }];
     if (staffKey) {
       const assignedAt = submittedMs + 3600000;
-      history.push({ id: stableId(`${key}:assignment`), actorKey: "admin", update_type: "assignment", previous_status: null, new_status: null, details: `Assigned to ${staffKey}.`, created_at: iso(assignedAt) });
-      notifications.push({ id: stableId(`${key}:notice:assignment`), userKey: staffKey, message: "A demo Makati report was assigned to you.", is_read: false, created_at: iso(assignedAt) });
-      notifications.push({ id: stableId(`${key}:notice:owner-assignment`), userKey: ownerKey, message: "Your demo report has been assigned to a staff member.", is_read: status === "resolved", created_at: iso(assignedAt) });
+      history.push({ id: stableId(`${key}:assignment`), actorKey: "admin", update_type: "assignment", previous_status: null, new_status: null, details: `Assigned to ${STAFF_NAMES[staffNumber - 1]}.`, created_at: iso(assignedAt) });
+      notifications.push({ id: stableId(`${key}:notice:assignment`), userKey: staffKey, message: "A Makati report was assigned to you.", is_read: false, created_at: iso(assignedAt) });
+      notifications.push({ id: stableId(`${key}:notice:owner-assignment`), userKey: ownerKey, message: "Your report has been assigned to a staff member.", is_read: status === "resolved", created_at: iso(assignedAt) });
     }
     const hasResolutionPhoto = status === "resolved" && (i + Math.floor(i / 6)) % 3 === 0;
     const hasInitialPhoto = i % 5 === 0 || hasResolutionPhoto;
     if (hasInitialPhoto) {
-      history.push({ id: stableId(`${key}:photo-event:initial`), actorKey: ownerKey, update_type: "photo", previous_status: null, new_status: null, details: "Reporter added a synthetic demo photo.", created_at: iso(submittedMs + 2000) });
+      history.push({ id: stableId(`${key}:photo-event:initial`), actorKey: ownerKey, update_type: "photo", previous_status: null, new_status: null, details: "Reporter added a photo of the issue.", created_at: iso(submittedMs + 2000) });
     }
     const phases = transitions(status);
     let previous: Status = "pending";
@@ -205,16 +206,16 @@ export function generateSeed({ seed = 42, asOf = "2026-09-27" }: DemoSeedOptions
         : submittedMs + Math.floor((finalMs - submittedMs) * (step + 1) / phases.length);
       const details = phase === "under_review" ? "Intake check: location and category are ready for staff review."
         : phase === "in_progress" ? "Work note: the maintenance team has planned an inspection or repair."
-          : phase === "resolved" ? "Resolution note: demo maintenance work has been completed and checked."
+          : phase === "resolved" ? "Resolution note: maintenance work has been completed and checked."
             : "Cancelled by the reporter.";
       history.push({ id: stableId(`${key}:status:${phase}`), actorKey, update_type: "status_change", previous_status: previous, new_status: phase, details, created_at: iso(at) });
-      if (actorKey !== ownerKey) notifications.push({ id: stableId(`${key}:notice:${phase}`), userKey: ownerKey, message: `Your demo report is now ${phase.replaceAll("_", " ")}.`, is_read: step % 2 === 0, created_at: iso(at) });
+      if (actorKey !== ownerKey) notifications.push({ id: stableId(`${key}:notice:${phase}`), userKey: ownerKey, message: `Your report is now ${phase.replaceAll("_", " ")}.`, is_read: step % 2 === 0, created_at: iso(at) });
       previous = phase;
     });
     if (status === "in_progress" && i % 2 === 0) {
       const remarkAt = finalMs + 1000;
-      history.push({ id: stableId(`${key}:remark`), actorKey: staffKey ?? "staff-1", update_type: "remark", previous_status: null, new_status: null, details: "Demo inspection recorded; repair work is planned.", created_at: iso(remarkAt) });
-      notifications.push({ id: stableId(`${key}:notice:remark`), userKey: ownerKey, message: "A demo staff member added an inspection note to your report.", is_read: false, created_at: iso(remarkAt) });
+      history.push({ id: stableId(`${key}:remark`), actorKey: staffKey ?? "staff-1", update_type: "remark", previous_status: null, new_status: null, details: "Inspection recorded; repair work is planned.", created_at: iso(remarkAt) });
+      notifications.push({ id: stableId(`${key}:notice:remark`), userKey: ownerKey, message: "A staff member added an inspection note to your report.", is_read: false, created_at: iso(remarkAt) });
     }
     history.sort((a, b) => a.created_at.localeCompare(b.created_at));
     notifications.sort((a, b) => a.created_at.localeCompare(b.created_at));
@@ -226,15 +227,15 @@ export function generateSeed({ seed = 42, asOf = "2026-09-27" }: DemoSeedOptions
       const uploadedByKey = staffKey ?? "staff-1";
       const photoAt = Date.parse(resolvedAt ?? iso(finalMs)) + 1000;
       photos.push({ id: stableId(`${key}:photo:resolution`), kind: "resolution", uploadedByKey, asset: `${categorySlug}-resolution.png`, created_at: iso(photoAt) });
-      history.push({ id: stableId(`${key}:photo-event:resolution`), actorKey: uploadedByKey, update_type: "photo", previous_status: null, new_status: null, details: "Staff added a synthetic demo resolution photo.", created_at: iso(photoAt) });
+      history.push({ id: stableId(`${key}:photo-event:resolution`), actorKey: uploadedByKey, update_type: "photo", previous_status: null, new_status: null, details: "Staff added a resolution photo after the repair.", created_at: iso(photoAt) });
     }
     return {
       id: stableId(key), key, ownerKey, staffKey, category,
-      title: `[DEMO] ${incident.title} near ${area.name}`,
-      description: `Synthetic Makati City demo example near ${area.name}: ${incident.description} This record is illustrative and does not describe a verified incident.`,
+      title: `${incident.title} near ${area.name}`,
+      description: incident.description,
       latitude: Number((area.latitude + (randomValue() - 0.5) * 0.001).toFixed(6)),
       longitude: Number((area.longitude + (randomValue() - 0.5) * 0.001).toFixed(6)),
-      address_text: `${area.name}, Makati City (synthetic demo location)`,
+      address_text: `${area.name}, Makati City`,
       status, is_public: status === "under_review" || status === "in_progress" || status === "resolved",
       submitted_at: iso(submittedMs), updated_at: iso(Math.max(submittedMs, ...history.map((entry) => Date.parse(entry.created_at)))),
       resolved_at: resolvedAt, updates: history, notifications, photos,
