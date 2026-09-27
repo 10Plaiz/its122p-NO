@@ -201,6 +201,13 @@ function AssignDialog({
   const [staffId, setStaffId] = useState(report.assigned_staff?.id ?? "");
   const dialogRef = useRef<HTMLDivElement>(null);
 
+  const { data, loading } = useApi<{ users: Profile[] }>("/admin/users", { role: "staff" });
+  const { run, pending, error } = useAction((body: { staff_id: string }) =>
+    api.patch<{ report: Report }>(`/reports/${report.id}/assign`, body),
+  );
+
+  const staff = (data?.users ?? []).filter((user) => user.is_active !== false);
+
   useEffect(() => {
     const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     const dialog = dialogRef.current;
@@ -215,7 +222,9 @@ function AssignDialog({
       if (event.key !== "Tab" || !dialog) return;
 
       const controls = Array.from(
-        dialog.querySelectorAll<HTMLElement>("button:not([disabled]), select:not([disabled])"),
+        dialog.querySelectorAll<HTMLElement>(
+          "button:not([disabled]), select:not([disabled]), [href], input:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex='-1'])",
+        ),
       );
       if (controls.length === 0) return;
       const first = controls[0];
@@ -239,12 +248,19 @@ function AssignDialog({
     };
   }, [onClose]);
 
-  const { data, loading } = useApi<{ users: Profile[] }>("/admin/users", { role: "staff" });
-  const { run, pending, error } = useAction((body: { staff_id: string }) =>
-    api.patch<{ report: Report }>(`/reports/${report.id}/assign`, body),
-  );
-
-  const staff = (data?.users ?? []).filter((user) => user.is_active !== false);
+  useEffect(() => {
+    if (!loading && staff.length > 0) {
+      const dialog = dialogRef.current;
+      const staffSelect = dialog?.querySelector<HTMLElement>("#staff");
+      const active = document.activeElement;
+      if (
+        staffSelect &&
+        (active?.textContent?.trim() === "Cancel" || !dialog?.contains(active))
+      ) {
+        staffSelect.focus();
+      }
+    }
+  }, [loading, staff.length]);
 
   return (
     // ds.css already makes .dialog-backdrop a fixed, centred overlay. Only the
