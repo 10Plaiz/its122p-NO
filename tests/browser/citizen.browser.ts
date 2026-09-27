@@ -212,6 +212,7 @@ test.describe("Citizen functional workflows (FUNC-01, FUNC-04, FUNC-05)", () => 
     const map = page.locator(".leaflet-container");
     await map.click({ position: { x: 120, y: 120 } });
     await expect(page.locator('button:has-text("Use my location")')).toBeEnabled();
+    await expect(alertBanner).toBeHidden();
 
     // 3. Enter a custom address then move pin to verify address lifecycle
     await page.fill("#address", "Test Landmark A");
