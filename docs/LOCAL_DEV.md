@@ -115,7 +115,9 @@ The browser automation suite lives in `tests/browser/` and runs Playwright
 tests against Chromium. It exercises citizen report submission, editing,
 cancellation, staff queue transitions, remarks, admin metrics, and multi-viewport
 responsive layouts across mobile (375x812), tablet (768x1024), and desktop (1280x800).
-It automatically captures full-page evidence screenshots to `tests/evidence/`.
+It captures full-page evidence screenshots to `tests/evidence/`, or to the folder
+named by `EVIDENCE_DIR`. The Phase 4 report cites the set in
+`tests/evidence-deployed/`, captured against the deployed site.
 
 ```bash
 bunx playwright install chromium
@@ -129,7 +131,9 @@ account; otherwise it prints why and deletes nothing. `[FIXTURE]` reports are ke
 Run `bun run test:cleanup` to do the same cleanup without running the tests.
 
 Configuration and runtime parameters:
-- `PLAYWRIGHT_BASE_URL`: Base target deployment (defaults to `https://kamoti-chi.vercel.app`).
+- `PLAYWRIGHT_BASE_URL`: Site under test (defaults to `http://localhost:5173`, so start
+  `bun run dev` first). Set it to `https://kamoti-chi.vercel.app` to test the deployed site.
+- `EVIDENCE_DIR`: Folder for evidence screenshots (defaults to `tests/evidence`).
 - `FIXTURE_PASSWORD`: Fixture account password (defaults to `Password123!`).
 
 Test case identifiers, results, evidence, and defects belong in the

@@ -148,9 +148,9 @@ flowchart LR
 
 | Feature Slice | Issue | Visual Evidence | Verification Test | Result |
 | :--- | :--- | :--- | :--- | :--- |
-| **Admin Navigation Header & Tabs** | [#32](https://github.com/10Plaiz/its122p-NO/issues/32) | [`ADMIN-header-desktop.png`](../tests/evidence/ADMIN-header-desktop.png)<br>[`ADMIN-header-tablet.png`](../tests/evidence/ADMIN-header-tablet.png) | `tests/browser/admin.browser.ts:UIUX-01` | Passed |
-| **Citizen Wizard Step 3 Review** | [#33](https://github.com/10Plaiz/its122p-NO/issues/33) | [`CITIZEN-wizard-step3-summary.png`](../tests/evidence/CITIZEN-wizard-step3-summary.png) | `tests/browser/citizen.browser.ts:UIUX-02` | Passed |
-| **Mobile Board Segmented Toggle** | [#34](https://github.com/10Plaiz/its122p-NO/issues/34) | [`BOARD-mobile-list.png`](../tests/evidence/BOARD-mobile-list.png)<br>[`BOARD-mobile-map.png`](../tests/evidence/BOARD-mobile-map.png) | `tests/browser/responsive.browser.ts:UIUX-03` | Passed |
+| **Admin Navigation Header & Tabs** | [#32](https://github.com/10Plaiz/its122p-NO/issues/32) | [`ADMIN-header-desktop.png`](../tests/evidence-deployed/ADMIN-header-desktop.png)<br>[`ADMIN-header-tablet.png`](../tests/evidence-deployed/ADMIN-header-tablet.png) | `tests/browser/admin.browser.ts:UIUX-01` | Passed |
+| **Citizen Wizard Step 3 Review** | [#33](https://github.com/10Plaiz/its122p-NO/issues/33) | [`CITIZEN-wizard-step3-summary.png`](../tests/evidence-deployed/CITIZEN-wizard-step3-summary.png) | `tests/browser/citizen.browser.ts:UIUX-02` | Passed |
+| **Mobile Board Segmented Toggle** | [#34](https://github.com/10Plaiz/its122p-NO/issues/34) | [`BOARD-mobile-list.png`](../tests/evidence-deployed/BOARD-mobile-list.png)<br>[`BOARD-mobile-map.png`](../tests/evidence-deployed/BOARD-mobile-map.png) | `tests/browser/responsive.browser.ts:UIUX-03` | Passed |
 
 ### Tier 2: Responsive Ergonomics and Field Usability
 *Focus: Improves touch targets and mobile field workflows for staff and citizens.*
@@ -169,7 +169,7 @@ flowchart LR
 
 | Feature Slice | Issue | Visual Evidence | Verification Test | Result |
 | :--- | :--- | :--- | :--- | :--- |
-| **Citizen My-Reports Mobile Cards & Cancellation Modal** | [#36](https://github.com/10Plaiz/its122p-NO/issues/36) | [`CITIZEN-mobile-my-reports.png`](../tests/evidence/CITIZEN-mobile-my-reports.png)<br>[`CITIZEN-cancel-dialog-modal.png`](../tests/evidence/CITIZEN-cancel-dialog-modal.png) | `tests/browser/citizen.browser.ts:UIUX-05` | Passed |
+| **Citizen My-Reports Mobile Cards & Cancellation Modal** | [#36](https://github.com/10Plaiz/its122p-NO/issues/36) | [`CITIZEN-mobile-my-reports.png`](../tests/evidence-deployed/CITIZEN-mobile-my-reports.png)<br>[`CITIZEN-cancel-dialog-modal.png`](../tests/evidence-deployed/CITIZEN-cancel-dialog-modal.png) | `tests/browser/citizen.browser.ts:UIUX-05` | Passed |
 
 ### Tier 3: Core Architectural Unification
 *Focus: Eliminates dual-route maintenance and unifies report inspection.*

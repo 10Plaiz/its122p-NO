@@ -14,10 +14,11 @@ That day's browser run targeted the deployed test site
 `https://kamoti-chi.vercel.app`, and the security suite ran against the approved
 test project `chqyxlyrmudmkanqmpil`.
 
-The screenshots committed in `tests/evidence/` do not all come from this run.
-Most were recaptured on 27 September against a local server. The
-[evidence index](Phase4_Test_Report.md#evidence-index) records where each set
-was captured and the `PLAYWRIGHT_BASE_URL` needed to reproduce it.
+The screenshots the report cites are in `tests/evidence-deployed/`. They were
+recaptured on 27 September against the deployed site, serving `main` at
+`dcd08d3`, where all 33 browser tests passed. The
+[evidence index](Phase4_Test_Report.md#evidence-index) lists every file and the
+command that reproduces the set. The older `tests/evidence/` folder is not cited.
 
 | Suite | Command | Result |
 | :--- | :--- | :--- |
@@ -64,7 +65,8 @@ Two setup notes for anyone re-running the suites:
 ### Member 2: Authentication
 
 - **Evidence:** `tests/fast/auth.test.ts`, the `AUTH-04` to `AUTH-11` rows of
-  the security run, and screenshots `AUTH-04` to `AUTH-11` in `tests/evidence/`.
+  the security run, and screenshots `AUTH-04` to `AUTH-11` in
+  `tests/evidence-deployed/`.
 - **Present:** valid login for each role, wrong password, unknown email, empty
   form, protected-page redirect, and logout.
 - **Explain:** wrong password and unknown email return the same message, so an
@@ -78,20 +80,23 @@ Two setup notes for anyone re-running the suites:
   member denied a report, and citizens and staff denied `/api/admin/users`.
 - **Explain:** scopes come from the signed-in session (`req.user`), never from
   a query parameter.
-- **Gap:** none of the `AUTHZ` cases has a screenshot. The browser run for
-  `FUNC-06` exercises the unassigned-staff denial and could produce one.
+- **Screenshot:** `FUNC-06-unassigned-staff-denied.png` shows an unassigned
+  staff member refused, the behaviour `AUTHZ-09` tests through the API.
+- **Gap:** the other `AUTHZ` cases have no screenshot.
 
 ### Member 4: Cross-site scripting and functional testing
 
 - **Evidence:** the `XSS-01` to `XSS-04` rows of the security run,
   `tests/fast/functional.test.ts`, and screenshots `FUNC-01a` to `FUNC-12` in
-  `tests/evidence/`.
+  `tests/evidence-deployed/`.
 - **Present:** the full citizen report lifecycle (create, edit while pending,
   cancel), staff remark and status advance, the public board, admin analytics,
   category management, and the three responsive viewports.
 - **Explain:** the three "How input is kept as data" points in section E.
-- **Gap:** `FUNC-03`, `FUNC-06`, and `FUNC-11` have no screenshot. The `XSS`
-  cases have no screenshot of a payload shown as plain text in the browser.
+- **Gap:** `FUNC-11` has no screenshot. The `FUNC-03` screenshot shows only
+  that the interface offers the next stage alone; the server-side rejection is
+  proven by the fast suite. The `XSS` cases have no screenshot of a payload
+  shown as plain text in the browser.
 
 ### Member 5: Usability, bug log, summary, and peer evaluation
 
@@ -111,5 +116,3 @@ Two setup notes for anyone re-running the suites:
 - [ ] Run and record usability sessions `USE-S1` to `USE-S3`.
 - [ ] Fill in the peer evaluation table.
 - [ ] Decide whether to add screenshots for the gaps listed above.
-- [ ] Refresh or retire the root `PHASE4_SUBMISSION.md` (21 September, baseline
-  `ccad629`), so this page and the test report are the only submission sources.

@@ -48,6 +48,11 @@ automated test that covers it, so all four can be matched without guessing.
 - **Evidence filenames.** `PREFIX-NN-short-slug.ext`, for example
   `VAL-04-blank-title-error.png`. One case may have several files: number them
   `VAL-04a`, `VAL-04b`.
+- **Interface screenshots.** A browser screenshot that shows an interface
+  behaviour rather than a test case above is named after the area it shows
+  (`ADMIN-`, `BOARD-`, `CITIZEN-`, `PHOTO-`) or the review finding it verifies
+  (`KR-NN-`). These are listed in their own table in the
+  [evidence index](#evidence-index) and prove no Phase 4 case.
 - **Usability sessions.** Section G names sessions `USE-S1` to `USE-S3` and the
   tasks in the shared script `USE-01` upward, so a rating, an observation, an
   evidence file, and a defect all point at the same session and task. Evidence
@@ -125,8 +130,11 @@ These are allocated by `tests/fast/` and `tests/integration/security.ts`. Do not
 
 ## Evidence rules
 
-- Automated Playwright screenshots are committed to `tests/evidence/` and are
-  reproduced by `bun run test:browser`. Manual and usability evidence
+- Automated Playwright screenshots for this report are committed to
+  `tests/evidence-deployed/`. They were captured against the deployed test site
+  and are reproduced by the command in the [evidence index](#evidence-index).
+  The older `tests/evidence/` folder holds an earlier, mostly local set and is
+  not cited by this report. Manual and usability evidence
   (screenshots, recordings, questionnaires) is **not committed**; it is kept in
   the team's shared evidence folder and referenced from the
   [evidence index](#evidence-index) by name and link.
@@ -249,7 +257,7 @@ Cover every core feature named in the [proposal](Final_Project.md).
 | `FUNC-09` | Admin analytics computation | Compute status distribution, category breakdown, and average resolution duration via `calculateAnalytics` | Accurate counts and average duration calculated from submitted/resolved timestamps | Production `calculateAnalytics` aggregations match expected sums; average resolution days correct; empty list returns null | Automated | `tests/fast/functional.test.ts` | `PASS` |
 | `FUNC-10` | Category lifecycle & selection | Validate production `categorySchema` bounds and active vs inactive category filtering | Valid bounds enforced; inactive categories omitted from user selection list | Bounds enforced (2-60 chars name, <= 300 desc) using production schema; inactive categories filtered | Automated | `tests/fast/functional.test.ts` | `PASS` |
 | `FUNC-11` | Notification recipient routing | Route notifications on status update and assignment; suppress actor self-notification via `filterNotificationRecipients` | Citizens and staff notified as appropriate; acting user receives no self-notification | Production `filterNotificationRecipients` targets proper recipients; actor filtered out; undefined userId entries excluded | Automated | `tests/fast/functional.test.ts` | `PASS` |
-| `FUNC-12` | Role-based navigation routes and responsive rendering | Check role-based route return destinations and role home paths using production `getReportReturnTarget`; verify nav renders correctly across 375 px (mobile), 768 px (tablet), and 1280 px (desktop) viewports via Playwright | Role-appropriate workspaces and return paths resolved; nav renders at all tested breakpoints | Correct paths returned for each role; Playwright confirms layout renders at mobile, tablet, and desktop viewports | Automated (fast suite + browser) | `tests/fast/functional.test.ts`, `tests/browser/responsive.browser.ts`, `tests/evidence/FUNC-12-*.png` | `PASS` |
+| `FUNC-12` | Role-based navigation routes and responsive rendering | Check role-based route return destinations and role home paths using production `getReportReturnTarget`; verify nav renders correctly across 375 px (mobile), 768 px (tablet), and 1280 px (desktop) viewports via Playwright | Role-appropriate workspaces and return paths resolved; nav renders at all tested breakpoints | Correct paths returned for each role; Playwright confirms layout renders at mobile, tablet, and desktop viewports | Automated (fast suite + browser) | `tests/fast/functional.test.ts`, `tests/browser/responsive.browser.ts`, `tests/evidence-deployed/FUNC-12-*.png` | `PASS` |
 
 ## G. Usability test
 
@@ -332,57 +340,103 @@ only once.
 
 ## Evidence index
 
-One row per evidence file. Automated Playwright screenshots are committed to `tests/evidence/` and are reproduced by running `bun run test:browser`. Manual screenshots (if any) are stored outside the repository.
+**Where the screenshots were captured.** Every screenshot in
+`tests/evidence-deployed/` was captured on 27 September 2026 against the
+deployed test site `https://kamoti-chi.vercel.app`, which was then serving the
+code of `main` at `dcd08d3`. All 33 browser tests passed. Reproduce the set
+with:
 
-**Where the screenshots were captured.** `playwright.config.ts` reads the target
-from `PLAYWRIGHT_BASE_URL`, and its default changed in `f579ee0`:
+```bash
+PLAYWRIGHT_BASE_URL=https://kamoti-chi.vercel.app EVIDENCE_DIR=tests/evidence-deployed bun run test:browser
+```
 
-| Screenshot set | Captured against | Reproduce with |
-| :--- | :--- | :--- |
-| `AUTH-05`, `AUTH-07`, `AUTH-08`, `AUTH-10`, `AUTH-11`, `FUNC-12-mobile-nav` (committed 21 September in `c6b3700`) | Deployed site `https://kamoti-chi.vercel.app` | `PLAYWRIGHT_BASE_URL=https://kamoti-chi.vercel.app bun run test:browser` |
-| Every other file in `tests/evidence/` (committed 27 September) | Local server `http://localhost:5173` from `bun run dev`, using the same test Supabase project | `bun run dev`, then `bun run test:browser` |
+The browser tests write `[TEST]` reports and a staff remark to the deployed
+project while they run. The suite deletes them when it finishes (see the
+[local-development guide](LOCAL_DEV.md#run-and-verify)).
 
-**Expected duplicates.** Three pairs are byte-identical because both tests end on
-the same screen. This is not missing evidence:
+The folder `tests/evidence/` is the earlier set, captured between 21 and 27
+September, mostly against a local server. Several of its images were taken
+before the action they name. It is kept for history only.
+
+**Expected duplicates.** Some tests end on the same screen, so their files are
+byte-identical. This is not missing evidence:
 
 | Files | Shared screen |
 | :--- | :--- |
 | `AUTH-10-protected-redirect.png`, `AUTH-11-logout.png` | The signed-out `/signin` page |
-| `FUNC-09-admin-analytics.png`, `ADMIN-header-desktop.png` | The admin dashboard at `/admin` |
+| `AUTH-06-admin-login.png`, `FUNC-09-admin-analytics.png`, `ADMIN-header-desktop.png` | The admin dashboard at `/admin`, where an administrator lands after sign-in |
 | `FUNC-08-public-board.png`, `FUNC-12-desktop-board.png` | The public board at desktop width |
 
-| Evidence name | Case ID | Type | Location |
-| :--- | :--- | :--- | :--- |
-| `VAL-01-to-09-fast-suite.log` | `VAL-01` to `VAL-09` | Test Execution Log | Automated test output from `bun run test` |
-| `VAL-10-api-validation.log` | `VAL-10` | Test Execution Log | Automated test output from `bun run test:security` |
-| `SQLI-01-to-05-query-safety.log` | `SQLI-01` to `SQLI-05` | Test Execution Log | Automated test output from `tests/fast/query-safety.test.ts` |
-| `SQLI-06-to-10-live-injection.log` | `SQLI-06` to `SQLI-10` | Test Execution Log | Automated test output from `tests/integration/security.ts` |
-| `AUTH-01-to-03-fast-auth.log` | `AUTH-01` to `AUTH-03` | Test Execution Log | Automated test output from `tests/fast/auth.test.ts` |
-| `AUTH-04-to-11-live-auth.log` | `AUTH-04` to `AUTH-11` | Test Execution Log | Automated test output from `tests/integration/security.ts` |
-| `AUTHZ-01-to-05-fast-authz.log` | `AUTHZ-01` to `AUTHZ-05` | Test Execution Log | Automated test output from `tests/fast/permissions.test.ts` |
-| `AUTHZ-06-to-15-live-authz.log` | `AUTHZ-06` to `AUTHZ-15` | Test Execution Log | Automated test output from `tests/integration/security.ts` |
-| `XSS-01-to-04-live-xss.log` | `XSS-01` to `XSS-04` | Test Execution Log | Automated test output from `tests/integration/security.ts` |
-| `FUNC-01-to-12-functional-suite.log` | `FUNC-01` to `FUNC-12` | Test Execution Log | Automated test output from `tests/fast/functional.test.ts` |
-| `AUTH-04-citizen-login.png` | `AUTH-04` | Browser Screenshot | `tests/evidence/` (committed; run `bun run test:browser` to regenerate) |
-| `AUTH-05-staff-login.png` | `AUTH-05` | Browser Screenshot | `tests/evidence/` |
-| `AUTH-06-admin-login.png` | `AUTH-06` | Browser Screenshot | `tests/evidence/` |
-| `AUTH-07-invalid-password.png` | `AUTH-07` | Browser Screenshot | `tests/evidence/` |
-| `AUTH-08-unknown-email.png` | `AUTH-08` | Browser Screenshot | `tests/evidence/` |
-| `AUTH-09-empty-form.png` | `AUTH-09` | Browser Screenshot | `tests/evidence/` |
-| `AUTH-10-protected-redirect.png` | `AUTH-10` | Browser Screenshot | `tests/evidence/` |
-| `AUTH-11-logout.png` | `AUTH-11` | Browser Screenshot | `tests/evidence/` |
-| `FUNC-01a-report-create.png` | `FUNC-01` | Browser Screenshot | `tests/evidence/` |
-| `FUNC-01b-coordinate-error.png` | `FUNC-01` | Browser Screenshot | `tests/evidence/` |
-| `FUNC-02-status-progression.png` | `FUNC-02` | Browser Screenshot | `tests/evidence/` |
-| `FUNC-04-edit-pending.png` | `FUNC-04` | Browser Screenshot | `tests/evidence/` |
-| `FUNC-05-cancelled-report.png` | `FUNC-05` | Browser Screenshot | `tests/evidence/` |
-| `FUNC-07-staff-remark.png` | `FUNC-07` | Browser Screenshot | `tests/evidence/` |
-| `FUNC-08-public-board.png` | `FUNC-08` | Browser Screenshot | `tests/evidence/` |
-| `FUNC-09-admin-analytics.png` | `FUNC-09` | Browser Screenshot | `tests/evidence/` |
-| `FUNC-10-category-management.png` | `FUNC-10` | Browser Screenshot | `tests/evidence/` |
-| `FUNC-12-mobile-nav.png` | `FUNC-12` | Browser Screenshot | `tests/evidence/` |
-| `FUNC-12-tablet-board.png` | `FUNC-12` | Browser Screenshot | `tests/evidence/` |
-| `FUNC-12-desktop-board.png` | `FUNC-12` | Browser Screenshot | `tests/evidence/` |
+### Test case screenshots
+
+All files are in `tests/evidence-deployed/`.
+
+| Evidence name | Case ID | What it shows |
+| :--- | :--- | :--- |
+| `AUTH-04-citizen-login.png` | `AUTH-04` | Citizen lands on My reports after sign-in |
+| `AUTH-05-staff-login.png` | `AUTH-05` | Staff member lands on My queue after sign-in |
+| `AUTH-06-admin-login.png` | `AUTH-06` | Administrator lands on the dashboard after sign-in |
+| `AUTH-07-invalid-password.png` | `AUTH-07` | Wrong password rejected with a generic message |
+| `AUTH-08-unknown-email.png` | `AUTH-08` | Unknown email rejected with the same generic message |
+| `AUTH-09-empty-form.png` | `AUTH-09` | Empty sign-in form shows a required-field error on each field |
+| `AUTH-10-protected-redirect.png` | `AUTH-10` | Signed-out visit to `/admin` redirected to sign-in |
+| `AUTH-11-logout.png` | `AUTH-11` | Sign-in page after signing out |
+| `FUNC-01a-report-create.png` | `FUNC-01` | The filed report, `Pending`, after Submit |
+| `FUNC-01b-no-pin-continue-disabled.png` | `FUNC-01` | Wizard step 1 with no pin: Continue disabled, later steps locked |
+| `FUNC-02-status-progression.png` | `FUNC-02` | A resolved report's history: Pending → Under review → In progress → Resolved |
+| `FUNC-03-only-next-step-offered.png` | `FUNC-03` | Staff view offers one move only, the next stage (Under review → In progress) |
+| `FUNC-04a-edit-pending-form.png` | `FUNC-04` | Owner editing a pending report |
+| `FUNC-04b-edit-pending-saved.png` | `FUNC-04` | The report after the edit is saved |
+| `FUNC-05a-cancel-confirm.png` | `FUNC-05` | Withdraw confirmation dialog |
+| `FUNC-05b-cancelled-report.png` | `FUNC-05` | The report listed as `Cancelled` after confirming |
+| `FUNC-06-unassigned-staff-denied.png` | `FUNC-06` | Unassigned staff member refused: "You can only view reports assigned to you." |
+| `FUNC-07-staff-remark.png` | `FUNC-07` | Saved remark shown in the report history |
+| `FUNC-08-public-board.png` | `FUNC-08` | Public board with reviewed reports only |
+| `FUNC-09-admin-analytics.png` | `FUNC-09` | Admin dashboard counts by status and category |
+| `FUNC-10-category-management.png` | `FUNC-10` | Category management table |
+| `FUNC-12-mobile-nav.png` | `FUNC-12` | Mobile (375 px) navigation menu open |
+| `FUNC-12-mobile-queue.png` | `FUNC-12` | Mobile staff queue as cards |
+| `FUNC-12-tablet-board.png` | `FUNC-12` | Public board at tablet width (768 px) |
+| `FUNC-12-desktop-board.png` | `FUNC-12` | Public board at desktop width (1280 px) |
+
+`FUNC-03` is enforced by the server; the screenshot shows only that the
+interface never offers an illegal move. The rejection of skipped and terminal
+transitions is proven by the fast suite. `FUNC-11` and the `VAL`, `SQLI`,
+`AUTHZ` and `XSS` cases have no screenshot; their evidence is the test output
+below. `FUNC-06-unassigned-staff-denied.png` also shows the behaviour that
+`AUTHZ-09` tests through the API.
+
+### Interface screenshots
+
+These follow the interface screenshot naming rule. They prove no Phase 4 case.
+
+| Evidence name | What it shows | Test |
+| :--- | :--- | :--- |
+| `ADMIN-header-desktop.png`, `ADMIN-header-tablet.png` | Admin navigation tabs at desktop and tablet width | `UIUX-01` in `tests/browser/admin.browser.ts` |
+| `BOARD-mobile-list.png`, `BOARD-mobile-map.png` | Mobile board list and map views | `UIUX-03` in `tests/browser/responsive.browser.ts` |
+| `CITIZEN-wizard-step3-summary.png` | Wizard step 3 check-before-sending summary | `UIUX-02` in `tests/browser/citizen.browser.ts` |
+| `CITIZEN-mobile-my-reports.png`, `CITIZEN-cancel-dialog-modal.png` | Mobile My reports cards and the withdraw dialog | `UIUX-05` in `tests/browser/citizen.browser.ts` |
+| `KR-14-geo-denial-guidance.png` | Guidance shown when location access is denied | `KR-14` in `tests/browser/citizen.browser.ts` |
+| `KR-23-staff-contact-links.png` | Citizen phone number as call and text links | `KR-23` in `tests/browser/staff.browser.ts` |
+| `PHOTO-lightbox-modal.png` | Report photo opened in the lightbox | Issue #37 test in `tests/browser/citizen.browser.ts` |
+
+### Test output
+
+These are not files in the repository. Each is the console output of the
+command shown, and is regenerated by running it.
+
+| Output | Case IDs | Command |
+| :--- | :--- | :--- |
+| Validation cases | `VAL-01` to `VAL-09` | `bun run test` (`tests/fast/validation.test.ts`) |
+| API validation | `VAL-10` | `bun run test:security` |
+| Query safety | `SQLI-01` to `SQLI-05` | `bun run test` (`tests/fast/query-safety.test.ts`) |
+| Live injection | `SQLI-06` to `SQLI-10` | `bun run test:security` |
+| Authentication logic | `AUTH-01` to `AUTH-03` | `bun run test` (`tests/fast/auth.test.ts`) |
+| Live authentication | `AUTH-04` to `AUTH-11` | `bun run test:security` |
+| Permission logic | `AUTHZ-01` to `AUTHZ-05` | `bun run test` (`tests/fast/permissions.test.ts`) |
+| Live authorization | `AUTHZ-06` to `AUTHZ-15` | `bun run test:security` |
+| Live cross-site scripting | `XSS-01` to `XSS-04` | `bun run test:security` |
+| Functional suite | `FUNC-01` to `FUNC-12` | `bun run test` (`tests/fast/functional.test.ts`) |
 
 ## Bug and issue log
 
