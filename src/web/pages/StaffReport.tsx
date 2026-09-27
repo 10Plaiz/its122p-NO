@@ -97,13 +97,6 @@ export function StaffReportPage() {
                   >
                     Call {report.citizen.contact_number}
                   </a>
-                  <a
-                    href={`sms:${report.citizen.contact_number.replace(/[^\d+]/g, "")}`}
-                    className="btn btn-secondary text-[12px] py-1.5 px-3 min-h-[36px]"
-                    aria-label={`Send SMS to citizen at ${report.citizen.contact_number}`}
-                  >
-                    Send SMS
-                  </a>
                 </div>
               )}
             </section>

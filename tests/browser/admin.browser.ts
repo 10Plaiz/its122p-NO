@@ -172,5 +172,21 @@ test.describe("Administrator features (FUNC-09 and FUNC-10)", () => {
     await dialog.locator("button:has-text('Cancel')").click();
     await expect(dialog).toBeHidden();
   });
-});
 
+  test("Assign dialog traps keyboard focus and restores it after Escape", async ({ page }) => {
+    await page.goto("/admin/reports");
+    const trigger = page.locator("table button:has-text('Assign')").first();
+    await trigger.focus();
+    await page.keyboard.press("Enter");
+    const dialog = page.getByRole("dialog", { name: "Assign this report" });
+    await expect(dialog).toBeVisible();
+    await expect(dialog.locator(":focus")).toHaveCount(1);
+    await captureEvidence(page, "ADMIN-assign-keyboard-dialog.png");
+
+    await page.keyboard.press("Shift+Tab");
+    await expect(dialog.locator(":focus")).toHaveCount(1);
+    await page.keyboard.press("Escape");
+    await expect(dialog).toBeHidden();
+    await expect(trigger).toBeFocused();
+  });
+});

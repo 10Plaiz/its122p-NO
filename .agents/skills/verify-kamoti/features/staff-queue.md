@@ -7,7 +7,7 @@ Persona: Staff Member (`fixture-staff-1@kamoti.invalid`)
 - **Assigned Queue:** Work queue filtered strictly to reports assigned to the signed-in staff member, sorted oldest first.
 - **Responsive Mobile Task Cards:** Stacked mobile cards on screens under 768px (`.md:hidden .card`) preventing horizontal scrollbars (`UIUX-04`).
 - **Inspect Action Affordance:** Clear table and card action links labeled "Inspect report" navigating to report details.
-- **Citizen Contact Links:** Direct `tel:` and `sms:` clickable communication links on the inspection view (`KR-23`).
+- **Citizen Contact Link:** A direct `tel:` call link on the inspection view (`KR-23`). There is no SMS action.
 - **Operational Remarks Journal:** Field notes textarea (`#remark`). The Save remark button is disabled while the field is empty, unchanged, or sending.
 - **Resolution Photo Proof:** Mandatory repair proof photo upload before advancing report status to `resolved`.
 - **Photo Lightbox Modal:** Full-screen modal on evidence photos with focus restoration and Escape key dismissal.

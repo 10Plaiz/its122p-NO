@@ -75,6 +75,11 @@ When a user directly accesses a protected report-detail URL for a report they ar
   shareable and browser navigation restores them.
 - The report form keeps reverse-geocoded addresses editable. Coordinates remain
   the report location when the third-party lookup is unavailable.
+- The report map supports pointer placement and a keyboard path: arrow keys move
+  the map, then Place pin at map center selects its coordinates.
+- Assignment dialogs move focus inside, contain Tab navigation, close with Escape,
+  and return focus to the Assign control. Staff contact offers calling through
+  `tel:` only.
 - Citizens who own a pending report can edit details and pin location inline on
   `/reports/:id` before staff handling begins. Saving updates the record and
   refreshes the timeline.

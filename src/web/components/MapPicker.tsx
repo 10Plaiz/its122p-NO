@@ -2,9 +2,10 @@ import { useEffect, useState } from "react";
 import { MapContainer, Marker, TileLayer, useMap, useMapEvents } from "react-leaflet";
 import L from "leaflet";
 import { DEFAULT_CENTER, DEFAULT_ZOOM, TILE_ATTRIBUTION, TILE_URL } from "../lib/leaflet.js";
+import { Button } from "./ui.js";
 
-// Pin drop for the report wizard. The caller owns the coordinates; this only reports
-// where the pin was put, by click or by drag.
+// Pin drop for the report wizard. The caller owns the coordinates; this reports
+// where the pin was put by click, drag, or the keyboard-accessible map-center button.
 
 // A crosshair rather than the status square used on the board — this pin is being
 // placed, not reported on, and it should not read as an existing report.
@@ -57,32 +58,49 @@ export function MapPicker({
   value: Point | null;
   onChange: (point: Point) => void;
 }) {
-  return (
-    <MapContainer
-      center={value ? [value.lat, value.lng] : DEFAULT_CENTER}
-      zoom={value ? 16 : DEFAULT_ZOOM}
-      scrollWheelZoom
-      className="h-full w-full"
-      style={{ minHeight: "300px" }}
-    >
-      <TileLayer url={TILE_URL} attribution={TILE_ATTRIBUTION} />
-      <ClickToPlace onPick={onChange} />
-      <Recentre value={value} />
+  const [map, setMap] = useState<L.Map | null>(null);
 
-      {value && (
-        <Marker
-          position={[value.lat, value.lng]}
-          icon={PICKER_ICON}
-          draggable
-          eventHandlers={{
-            dragend(event) {
-              const { lat, lng } = event.target.getLatLng();
-              onChange({ lat, lng });
-            },
-          }}
-        />
-      )}
-    </MapContainer>
+  return (
+    <div className="relative h-full">
+      <MapContainer
+        ref={setMap}
+        center={value ? [value.lat, value.lng] : DEFAULT_CENTER}
+        zoom={value ? 16 : DEFAULT_ZOOM}
+        scrollWheelZoom
+        className="h-full w-full"
+        style={{ minHeight: "300px" }}
+      >
+        <TileLayer url={TILE_URL} attribution={TILE_ATTRIBUTION} />
+        <ClickToPlace onPick={onChange} />
+        <Recentre value={value} />
+
+        {value && (
+          <Marker
+            position={[value.lat, value.lng]}
+            icon={PICKER_ICON}
+            draggable
+            eventHandlers={{
+              dragend(event) {
+                const { lat, lng } = event.target.getLatLng();
+                onChange({ lat, lng });
+              },
+            }}
+          />
+        )}
+      </MapContainer>
+      <Button
+        type="button"
+        className="absolute bottom-8 left-2 z-[1000] bg-surface shadow-md"
+        disabled={!map}
+        onClick={() => {
+          if (!map) return;
+          const center = map.getCenter();
+          onChange({ lat: center.lat, lng: center.lng });
+        }}
+      >
+        Place pin at map center
+      </Button>
+    </div>
   );
 }
 

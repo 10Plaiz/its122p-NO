@@ -20,6 +20,27 @@ test.describe("Citizen functional workflows (FUNC-01, FUNC-04, FUNC-05)", () => 
     await captureEvidence(page, "FUNC-01b-no-pin-continue-disabled.png");
   });
 
+  test("A keyboard user can place and adjust the report pin", async ({ page }) => {
+    await page.setViewportSize({ width: 375, height: 812 });
+    await page.goto("/report/new");
+    const continueButton = page.getByRole("button", { name: "Continue" });
+    const placePin = page.getByRole("button", { name: "Place pin at map center" });
+    await expect(continueButton).toBeDisabled();
+    await placePin.focus();
+    await expect(placePin).toBeFocused();
+    await page.keyboard.press("Enter");
+    await expect(continueButton).toBeEnabled();
+    const firstCoordinates = await page.getByTestId("selected-coordinates").innerText();
+
+    await page.locator(".leaflet-container").focus();
+    await page.keyboard.press("ArrowRight");
+    await placePin.focus();
+    await page.keyboard.press("Space");
+    const nextCoordinates = await page.getByTestId("selected-coordinates").innerText();
+    expect(nextCoordinates).not.toBe(firstCoordinates);
+    await captureEvidence(page, "CITIZEN-keyboard-pin-mobile.png");
+  });
+
   test("FUNC-01a, FUNC-04, FUNC-05: Complete citizen report lifecycle", async ({ page }) => {
     // 1. Create Report (FUNC-01a)
     await page.goto("/report/new");
@@ -227,7 +248,7 @@ test.describe("Citizen functional workflows (FUNC-01, FUNC-04, FUNC-05)", () => 
     await page.click('button:has-text("Use my location")');
     const alertBanner = page.locator('[role="alert"]');
     await expect(alertBanner).toBeVisible();
-    await expect(alertBanner).toContainText("Location access disabled. Please tap the map to place your report pin.");
+    await expect(alertBanner).toContainText("Tap the map or use Place pin at map center.");
 
     await captureEvidence(page, "KR-14-geo-denial-guidance.png");
 
@@ -304,4 +325,3 @@ test.describe("Citizen functional workflows (FUNC-01, FUNC-04, FUNC-05)", () => 
     await expect(lightboxDialog).toBeHidden();
   });
 });
-
