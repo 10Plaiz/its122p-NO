@@ -5,7 +5,7 @@ evidence index, the bug log, the summary metrics, and the peer evaluation are
 all recorded here rather than in separate files, so one document can be
 submitted and reviewed as a whole.
 
-The [Phase 4 instructions](Phase4_Instructions.md) own what must be tested and
+The [Phase 4 instructions](Phase_Instructions.md#phase-4-security--testing) own what must be tested and
 submitted. The [local-development guide](LOCAL_DEV.md#run-and-verify) owns the
 test commands and the environment each suite needs. This report owns the test
 cases, their results, and the evidence that supports them.
@@ -125,8 +125,10 @@ These are allocated by `tests/fast/` and `tests/integration/security.ts`. Do not
 
 ## Evidence rules
 
-- Screenshots and recordings are **not committed to this repository**. They are
-  kept in the team's shared evidence folder and referenced from the
+- Automated Playwright screenshots are committed to `tests/evidence/` and are
+  reproduced by `bun run test:browser`. Manual and usability evidence
+  (screenshots, recordings, questionnaires) is **not committed**; it is kept in
+  the team's shared evidence folder and referenced from the
   [evidence index](#evidence-index) by name and link.
 - Every file is named after the case it proves, following the filename rule
   above.
@@ -332,6 +334,23 @@ only once.
 
 One row per evidence file. Automated Playwright screenshots are committed to `tests/evidence/` and are reproduced by running `bun run test:browser`. Manual screenshots (if any) are stored outside the repository.
 
+**Where the screenshots were captured.** `playwright.config.ts` reads the target
+from `PLAYWRIGHT_BASE_URL`, and its default changed in `f579ee0`:
+
+| Screenshot set | Captured against | Reproduce with |
+| :--- | :--- | :--- |
+| `AUTH-05`, `AUTH-07`, `AUTH-08`, `AUTH-10`, `AUTH-11`, `FUNC-12-mobile-nav` (committed 21 September in `c6b3700`) | Deployed site `https://kamoti-chi.vercel.app` | `PLAYWRIGHT_BASE_URL=https://kamoti-chi.vercel.app bun run test:browser` |
+| Every other file in `tests/evidence/` (committed 27 September) | Local server `http://localhost:5173` from `bun run dev`, using the same test Supabase project | `bun run dev`, then `bun run test:browser` |
+
+**Expected duplicates.** Three pairs are byte-identical because both tests end on
+the same screen. This is not missing evidence:
+
+| Files | Shared screen |
+| :--- | :--- |
+| `AUTH-10-protected-redirect.png`, `AUTH-11-logout.png` | The signed-out `/signin` page |
+| `FUNC-09-admin-analytics.png`, `ADMIN-header-desktop.png` | The admin dashboard at `/admin` |
+| `FUNC-08-public-board.png`, `FUNC-12-desktop-board.png` | The public board at desktop width |
+
 | Evidence name | Case ID | Type | Location |
 | :--- | :--- | :--- | :--- |
 | `VAL-01-to-09-fast-suite.log` | `VAL-01` to `VAL-09` | Test Execution Log | Automated test output from `bun run test` |
@@ -363,7 +382,7 @@ One row per evidence file. Automated Playwright screenshots are committed to `te
 | `FUNC-10-category-management.png` | `FUNC-10` | Browser Screenshot | `tests/evidence/` |
 | `FUNC-12-mobile-nav.png` | `FUNC-12` | Browser Screenshot | `tests/evidence/` |
 | `FUNC-12-tablet-board.png` | `FUNC-12` | Browser Screenshot | `tests/evidence/` |
-| `FUNC-12-desktop-report.png` | `FUNC-12` | Browser Screenshot | `tests/evidence/` |
+| `FUNC-12-desktop-board.png` | `FUNC-12` | Browser Screenshot | `tests/evidence/` |
 
 ## Bug and issue log
 
@@ -381,10 +400,16 @@ pull request that fixed it.
 | Metric | Count |
 | :--- | :--- |
 | Total test cases | 65 |
-| Passed | 65 |
+| Passed | 62 |
 | Failed | 0 |
+| Not run | 3 |
 | Fixed | 1 |
-| Remaining issues | 0 |
+| Remaining issues | 3 |
+
+The 65 cases are the 62 documented cases in Sections A to F plus the three
+usability sessions `USE-S1` to `USE-S3`. All 62 documented cases pass. The three
+sessions have not been run (see [Section G](#g-usability-test)), so they are
+counted as not run and as the remaining issues, not as passed.
 
 ## Peer evaluation and contributions
 

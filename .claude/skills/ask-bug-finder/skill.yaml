@@ -1,0 +1,15 @@
+name: ask-bug-finder
+version: 1.0.0
+category: coding
+description: Best practices for systematic bug hunting and debugging
+tags:
+  - debugging
+  - bug-hunting
+  - troubleshooting
+  - code-analysis
+agents:
+  - codex
+  - gemini
+  - claude
+  - antigravity
+  - cursor

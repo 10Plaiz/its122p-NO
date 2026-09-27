@@ -1,4 +1,5 @@
-import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode, SelectHTMLAttributes, TextareaHTMLAttributes } from "react";
+import { cloneElement, isValidElement, useState } from "react";
+import type { ButtonHTMLAttributes, FocusEvent, InputHTMLAttributes, ReactNode, SelectHTMLAttributes, TextareaHTMLAttributes } from "react";
 import { STATUS_LABEL } from "../lib/types.js";
 import type { ReportStatus } from "../lib/types.js";
 
@@ -43,16 +44,42 @@ export function Field({
   // to count.
   const showCount = max !== undefined && count !== undefined && count > 0;
   const note = error ?? hint;
+  const noteId = htmlFor && note ? fieldNoteId(htmlFor) : undefined;
+
+  const existingDescribedBy =
+    isValidElement<{ "aria-describedby"?: string }>(children) ? children.props["aria-describedby"] : undefined;
+  const describedBy = noteId
+    ? Array.from(
+        new Set(
+          [
+            ...(existingDescribedBy ? existingDescribedBy.split(/\s+/) : []),
+            noteId,
+          ].filter(Boolean),
+        ),
+      ).join(" ") || undefined
+    : existingDescribedBy || undefined;
+
+  // Marks the control itself as invalid, so a screen reader says which field the
+  // error belongs to. Only when the direct child is the labelled control; a
+  // component that wraps its control sets the same attributes on it directly.
+  const control =
+    isValidElement<{ id?: string; "aria-describedby"?: string }>(children) && children.props.id === htmlFor
+      ? cloneElement(children, {
+          "aria-invalid": error ? true : undefined,
+          "aria-describedby": describedBy,
+        } as object)
+      : children;
 
   return (
     <div className="field flex flex-col gap-1.5">
       <label htmlFor={htmlFor}>{label}</label>
-      {children}
+      {control}
 
       {(note || showCount) && (
         <div className="flex items-baseline justify-between gap-3">
           {note ? (
             <span
+              id={noteId}
               role={error ? "alert" : undefined}
               className={error ? "text-[11px] text-accent-700" : "text-muted text-[11px]"}
             >
@@ -75,6 +102,11 @@ export function Field({
       )}
     </div>
   );
+}
+
+/** The id of a Field's hint or error text, for controls that set aria-describedby themselves. */
+export function fieldNoteId(htmlFor: string) {
+  return `${htmlFor}-note`;
 }
 
 export function Input({ className = "", ...props }: InputHTMLAttributes<HTMLInputElement>) {
@@ -214,9 +246,8 @@ export function PhotoFrame({
   );
 }
 
-// Sends focus to the first control a form rejected. On a short form the message is
-// already in view, but on the two-column admin forms the rejected field can sit
-// above the fold with nothing but the banner at the bottom to hint at it.
+// Sends focus to the first control a form rejected. Only sign-in still needs it: it
+// is the one form whose submit stays enabled (see useLeftFields).
 //
 // Key order follows the order the validator checks fields in, which is the order
 // they appear on screen. `ids` maps an error key to its control id where the two
@@ -225,4 +256,37 @@ export function focusFirstError(errors: Record<string, string>, ids: Record<stri
   const [first] = Object.keys(errors);
   if (!first) return;
   document.getElementById(ids[first] ?? first)?.focus();
+}
+
+/** Filters an error record down to the controls that have already been left/blurred. */
+export function filterLeftErrors(
+  errors: Record<string, string>,
+  left: ReadonlySet<string>,
+  ids: Record<string, string> = {},
+): Record<string, string> {
+  return Object.fromEntries(Object.entries(errors).filter(([key]) => left.has(ids[key] ?? key)));
+}
+
+// The one form rule (KR-07): an action button is disabled while its form is invalid,
+// so an error is never the result of a click. A field's error appears once the
+// person leaves it, which is what explains the disabled button. Sign-in is the one
+// exception: only the server can judge a password, and a disabled button is what
+// browser autofill strands. Put `onBlur` on the
+// form's container; `visible` keeps only the errors of controls already left.
+// `ids` maps an error key to its control id where the two differ.
+export function useLeftFields() {
+  const [left, setLeft] = useState<ReadonlySet<string>>(() => new Set());
+
+  return {
+    onBlur(event: FocusEvent<HTMLElement>) {
+      const { id } = event.target;
+      if (id) setLeft((current) => (current.has(id) ? current : new Set(current).add(id)));
+    },
+    visible(errors: Record<string, string>, ids: Record<string, string> = {}) {
+      return filterLeftErrors(errors, left, ids);
+    },
+    reset() {
+      setLeft(new Set());
+    },
+  };
 }

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { ContactNumberField, validateContactNumber } from "../components/ContactNumberField.js";
 import { useToast } from "../components/Toast.js";
-import { Alert, Button, Field, Input, Loading, Select, focusFirstError, formatDate } from "../components/ui.js";
+import { Alert, Button, Field, Input, Loading, Select, formatDate, useLeftFields } from "../components/ui.js";
 import { api } from "../lib/api.js";
 import { useAuth } from "../lib/auth.js";
 import { useAction, useApi } from "../lib/useApi.js";
@@ -177,7 +177,7 @@ function UserRow({ user, onDone }: { user: Profile; onDone: () => void }) {
           )}
         </div>
         {isSelf && <span className="text-muted text-[11px]">This is your own account.</span>}
-        {error && <span className="text-[11px] text-accent-700">{error.message}</span>}
+        {error && <span role="alert" className="text-[11px] text-accent-700">{error.message}</span>}
       </td>
     </tr>
   );
@@ -192,7 +192,7 @@ function CreateUser({ onDone }: { onDone: () => void }) {
     contact_number: "",
     role: "staff" as Role,
   });
-  const [touched, setTouched] = useState(false);
+  const fields = useLeftFields();
 
   const { run, pending, error } = useAction((body: Record<string, unknown>) =>
     api.post<{ user: Profile }>("/admin/users", body),
@@ -208,10 +208,19 @@ function CreateUser({ onDone }: { onDone: () => void }) {
   const contactError = validateContactNumber(values.contact_number);
   if (contactError) errors.contact_number = contactError;
 
-  const shown = { ...(touched ? errors : {}), ...(error?.fieldErrors ?? {}) };
+  const invalid = Object.keys(errors).length > 0;
+  const shown = {
+    ...fields.visible(errors, {
+      name: "new-name",
+      email: "new-email",
+      password: "new-password",
+      contact_number: "new-contact",
+    }),
+    ...(error?.fieldErrors ?? {}),
+  };
 
   return (
-    <section className="border-2 border-divider p-4 flex flex-col gap-4">
+    <section className="border-2 border-divider p-4 flex flex-col gap-4" onBlur={fields.onBlur}>
       <h6>New account</h6>
 
       {/* These fields describe somebody else's account, not the signed-in administrator's,
@@ -219,7 +228,7 @@ function CreateUser({ onDone }: { onDone: () => void }) {
           admin's own address here would quietly create the wrong account, and
           `new-password` stops it treating the field as a login to fill or to save. */}
       <div className="grid gap-3 md:grid-cols-2">
-        <Field label="Full name" htmlFor="new-name" error={shown.name} count={values.name.length} max={80}>
+        <Field label="Full name" htmlFor="new-name" hint="At least 2 characters." error={shown.name} count={values.name.length} max={80}>
           <Input
             id="new-name"
             name="new-name"
@@ -244,7 +253,7 @@ function CreateUser({ onDone }: { onDone: () => void }) {
         </Field>
 
         {/* Capped but not counted: a length readout on a secret is not worth showing. */}
-        <Field label="Password" htmlFor="new-password" hint="At least 8 characters" error={shown.password}>
+        <Field label="Password" htmlFor="new-password" hint="At least 8 characters." error={shown.password}>
           <Input
             id="new-password"
             name="new-password"
@@ -283,18 +292,9 @@ function CreateUser({ onDone }: { onDone: () => void }) {
       <Button
         type="button"
         variant="primary"
-        disabled={pending}
+        disabled={pending || invalid}
         onClick={async () => {
-          setTouched(true);
-          if (Object.keys(errors).length > 0) {
-            focusFirstError(errors, {
-              name: "new-name",
-              email: "new-email",
-              password: "new-password",
-              contact_number: "new-contact",
-            });
-            return;
-          }
+          if (invalid) return;
 
           const contact = values.contact_number.trim();
           const done = await run({
@@ -308,7 +308,7 @@ function CreateUser({ onDone }: { onDone: () => void }) {
             // Was left filled in, so the new account's password stayed on screen and a
             // second click would try to create it again.
             setValues({ name: "", email: "", password: "", contact_number: "", role: "staff" });
-            setTouched(false);
+            fields.reset();
             toast(`Account created for ${done.user.name}.`);
             onDone();
           }

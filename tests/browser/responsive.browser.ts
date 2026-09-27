@@ -41,7 +41,7 @@ test.describe("Responsive Viewport Validation (FUNC-12)", () => {
     await expect(page.locator('[data-testid="board-map-container"]')).toBeVisible();
     await expect(page.locator('[data-testid="board-list-container"]')).toBeVisible();
 
-    await captureEvidence(page, "FUNC-12-desktop-report.png");
+    await captureEvidence(page, "FUNC-12-desktop-board.png");
   });
 
   test("UIUX-03: Mobile board (375x812) toggles between List View and Map View without overflow", async ({ page }) => {

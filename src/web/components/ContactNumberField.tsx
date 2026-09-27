@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { ChangeEvent } from "react";
-import { Field, Input } from "./ui.js";
+import { Field, Input, fieldNoteId } from "./ui.js";
 
 // A Philippine mobile number: exactly eleven digits beginning 09. Mirrored by
 // `contactNumber` in src/server/lib/validate.ts, message for message, so the field
@@ -57,6 +57,8 @@ export function ContactNumberField({
           autoComplete="tel"
           spellCheck={false}
           placeholder="09171234567"
+          aria-invalid={error ? true : undefined}
+          aria-describedby={error || hint ? fieldNoteId(id) : undefined}
           value={value}
           onChange={handleChange}
         />

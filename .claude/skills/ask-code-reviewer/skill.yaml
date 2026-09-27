@@ -1,0 +1,16 @@
+name: ask-code-reviewer
+version: 1.0.0
+category: coding
+description: An AI code reviewer that provides constructive feedback on code changes.
+tags:
+  - code-review
+  - quality
+  - best-practices
+  - security
+  - performance
+agents:
+  - codex
+  - gemini
+  - claude
+  - antigravity
+  - cursor

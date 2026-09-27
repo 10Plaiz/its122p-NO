@@ -12,8 +12,8 @@ import {
   Select,
   StatusBadge,
   Textarea,
-  focusFirstError,
   formatDateTime,
+  useLeftFields,
 } from "../components/ui.js";
 import { MapPicker } from "../components/MapPicker.js";
 import type { Point } from "../components/MapPicker.js";
@@ -271,7 +271,7 @@ function EditReport({
   const [address, setAddress] = useState(report.address_text ?? "");
   const [point, setPoint] = useState<Point>({ lat: report.latitude, lng: report.longitude });
   const [locating, setLocating] = useState(false);
-  const [touched, setTouched] = useState(false);
+  const fields = useLeftFields();
 
   const pointChangedByUser = useRef(false);
   const addressTouched = useRef(false);
@@ -329,23 +329,8 @@ function EditReport({
     return errors;
   }
 
-  const errors = validate();
-  const shown = { ...(touched ? errors : {}), ...(error?.fieldErrors ?? {}) };
-
-  async function handleSubmit(event: FormEvent) {
-    event.preventDefault();
-    setTouched(true);
-    const validationErrors = validate();
-    if (Object.keys(validationErrors).length > 0) {
-      focusFirstError(validationErrors, {
-        title: "edit-title",
-        category_id: "edit-category",
-        description: "edit-description",
-        address_text: "edit-address",
-      });
-      return;
-    }
-
+  // Only what differs from the saved report is sent.
+  function changedFields() {
     const changes: Record<string, unknown> = {};
     if (title.trim() !== report.title) changes.title = title.trim();
     if (description.trim() !== report.description) changes.description = description.trim();
@@ -361,11 +346,27 @@ function EditReport({
     if (cleanAddress !== (report.address_text ?? "")) {
       changes.address_text = cleanAddress || null;
     }
+    return changes;
+  }
 
-    if (Object.keys(changes).length === 0) {
-      onCancel();
-      return;
-    }
+  const errors = validate();
+  const changes = changedFields();
+  // Same rule as every other form: Save is disabled while invalid or unchanged.
+  const invalid = Object.keys(errors).length > 0;
+  const unchanged = Object.keys(changes).length === 0;
+  const shown = {
+    ...fields.visible(errors, {
+      title: "edit-title",
+      category_id: "edit-category",
+      description: "edit-description",
+      address_text: "edit-address",
+    }),
+    ...(error?.fieldErrors ?? {}),
+  };
+
+  async function handleSubmit(event: FormEvent) {
+    event.preventDefault();
+    if (invalid || unchanged) return;
 
     const updated = await run(changes);
     if (updated) {
@@ -378,7 +379,7 @@ function EditReport({
     categoryData?.categories.filter((c) => c.is_active || c.id === report.category?.id) ?? [];
 
   return (
-    <form className="flex flex-col gap-6" onSubmit={handleSubmit} noValidate>
+    <form className="flex flex-col gap-6" onSubmit={handleSubmit} onBlur={fields.onBlur} noValidate>
       <header className="flex flex-col gap-1 border-b border-divider pb-4">
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <span className="font-mono text-[11px] text-muted">Editing {report.reference_code}</span>
@@ -392,7 +393,7 @@ function EditReport({
 
       <div className="grid gap-6 lg:grid-cols-2">
         <div className="flex flex-col gap-4">
-          <Field label="Title" htmlFor="edit-title" count={title.length} max={150} error={shown.title}>
+          <Field label="Title" htmlFor="edit-title" hint="At least 3 characters." count={title.length} max={150} error={shown.title}>
             <Input
               id="edit-title"
               name="title"
@@ -421,6 +422,7 @@ function EditReport({
           <Field
             label="What is wrong?"
             htmlFor="edit-description"
+            hint="At least 10 characters."
             count={description.length}
             max={1000}
             error={shown.description}
@@ -477,7 +479,7 @@ function EditReport({
       {error && <Alert title="Could not update report">{error.message}</Alert>}
 
       <div className="flex items-center gap-3 pt-2 border-t border-divider">
-        <Button type="submit" variant="primary" disabled={pending}>
+        <Button type="submit" variant="primary" disabled={pending || invalid || unchanged}>
           {pending ? "Saving changes…" : "Save changes"}
         </Button>
         <Button type="button" variant="secondary" disabled={pending} onClick={onCancel}>

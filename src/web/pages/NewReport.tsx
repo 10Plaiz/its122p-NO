@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { MapPicker } from "../components/MapPicker.js";
 import type { Point } from "../components/MapPicker.js";
 import { ALLOWED_TYPES, MAX_PHOTO_BYTES, PhotoPicker, formatFileSize, formatMimeType } from "../components/PhotoPicker.js";
-import { Alert, Button, Field, Input, Select, Textarea } from "../components/ui.js";
+import { Alert, Button, Field, Input, Select, Textarea, useLeftFields } from "../components/ui.js";
 import { api } from "../lib/api.js";
 import { reverseGeocode } from "../lib/leaflet.js";
 import { useAction, useApi } from "../lib/useApi.js";
@@ -62,7 +62,7 @@ export function NewReportPage() {
 
   const [step, setStep] = useState(0);
   const [maxStep, setMaxStep] = useState(0);
-  const [touched, setTouched] = useState(false);
+  const fields = useLeftFields();
   const [values, setValues] = useState<Values>({
     point: null,
     address: "",
@@ -84,7 +84,16 @@ export function NewReportPage() {
   );
 
   const errors = validateStep(step, values);
-  const shown = { ...(touched ? errors : {}), ...(error?.fieldErrors ?? {}) };
+  const stepInvalid = Object.keys(errors).length > 0;
+  // No step past an invalid one can be reached, so Submit is only enabled once every
+  // step passes. -1 when all do.
+  const firstInvalid = STEPS.findIndex((_, index) => Object.keys(validateStep(index, values)).length > 0);
+  // A chosen photo is checked at once: picking a file is already the finished action.
+  const shown: Record<string, string> = {
+    ...fields.visible(errors, { category_id: "category", address_text: "address" }),
+    ...(errors.photo ? { photo: errors.photo } : {}),
+    ...(error?.fieldErrors ?? {}),
+  };
 
   // Reverse-geocode the pin into a readable address. Debounced 1000 ms because
   // Nominatim asks for no more than one request per second, and a failure is silent:
@@ -134,32 +143,18 @@ export function NewReportPage() {
   }
 
   function next() {
-    setTouched(true);
-    if (Object.keys(validateStep(step, values)).length > 0) return;
-    setTouched(false);
+    if (stepInvalid) return;
     const nextStep = Math.min(step + 1, STEPS.length - 1);
     setMaxStep((prev) => Math.max(prev, nextStep));
     setStep(nextStep);
   }
 
   function back() {
-    setTouched(false);
     setStep((current) => Math.max(current - 1, 0));
   }
 
   async function submit() {
-    setTouched(true);
-
-    // Re-check every step, not just the last — someone can reach step 3 and then
-    // clear a field by going back.
-    for (let index = 0; index < STEPS.length; index += 1) {
-      const stepErrors = validateStep(index, values);
-      if (Object.keys(stepErrors).length > 0) {
-        setStep(index);
-        return;
-      }
-    }
-    if (!values.point) return;
+    if (firstInvalid !== -1 || !values.point) return;
 
     // Multipart, because the photo rides along with the fields.
     const formData = new FormData();
@@ -176,7 +171,7 @@ export function NewReportPage() {
   }
 
   return (
-    <div className="max-w-3xl mx-auto flex flex-col gap-6">
+    <div className="max-w-3xl mx-auto flex flex-col gap-6" onBlur={fields.onBlur}>
       <header className="flex flex-col gap-2">
         <span className="font-mono text-[11px] uppercase tracking-wider text-muted">
           Step {step + 1} of {STEPS.length}
@@ -187,17 +182,17 @@ export function NewReportPage() {
         <nav aria-label="Wizard steps" className="flex items-center gap-2">
           {STEPS.map((label, index) => {
             const isCurrent = index === step;
-            const isUnlocked = index <= maxStep;
+            const isUnlocked = index <= maxStep && (firstInvalid === -1 || index <= firstInvalid);
             return (
               <button
                 key={label}
                 type="button"
-                disabled={!isUnlocked || isCurrent}
+                // The current step stays focusable and is announced; only steps not
+                // reached yet, or past a step that is not complete, are disabled.
+                disabled={!isUnlocked}
+                aria-current={isCurrent ? "step" : undefined}
                 onClick={() => {
-                  if (isUnlocked && !isCurrent) {
-                    setTouched(false);
-                    setStep(index);
-                  }
+                  if (isUnlocked && !isCurrent) setStep(index);
                 }}
                 className={`flex-1 text-left py-1.5 px-2 border-t-4 transition-colors ${
                   isCurrent
@@ -225,6 +220,7 @@ export function NewReportPage() {
                 >
                   {label}
                 </span>
+                {!isUnlocked && <span className="sr-only">(not available yet)</span>}
               </button>
             );
           })}
@@ -267,12 +263,6 @@ export function NewReportPage() {
             <Alert title="Location access disabled">
               {geoError}
             </Alert>
-          )}
-
-          {shown.point && (
-            <span role="alert" className="text-[11px] text-accent-700">
-              {shown.point}
-            </span>
           )}
 
           <Field
@@ -323,7 +313,7 @@ export function NewReportPage() {
           <Field
             label="Title"
             htmlFor="title"
-            hint="A short summary, like a headline."
+            hint="A short headline, at least 3 characters."
             error={shown.title}
             count={values.title.length}
             max={150}
@@ -339,7 +329,7 @@ export function NewReportPage() {
           <Field
             label="Description"
             htmlFor="description"
-            hint="What is wrong, how bad is it, and is anyone at risk?"
+            hint="What is wrong, how bad is it, and is anyone at risk? At least 10 characters."
             error={shown.description}
             count={values.description.length}
             max={1000}
@@ -414,11 +404,11 @@ export function NewReportPage() {
           </Button>
         )}
         {step < STEPS.length - 1 ? (
-          <Button type="button" variant="primary" onClick={next}>
+          <Button type="button" variant="primary" onClick={next} disabled={stepInvalid}>
             Continue
           </Button>
         ) : (
-          <Button type="button" variant="primary" onClick={submit} disabled={pending}>
+          <Button type="button" variant="primary" onClick={submit} disabled={pending || firstInvalid !== -1}>
             {pending ? "Submitting…" : "Submit report"}
           </Button>
         )}

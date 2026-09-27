@@ -3,8 +3,8 @@
 Start with [README.md](README.md). Use [docs/INDEX.md](docs/INDEX.md) to find
 only the documents relevant to the task.
 
-- The [course guide](docs/Guide.md) and [Phase 3](docs/Phase3_Instructions.md)
-  and [Phase 4](docs/Phase4_Instructions.md) instructions own requirements,
+- The [course guide](docs/Guide.md) and the
+  [Phase 3 and Phase 4 instructions](docs/Phase_Instructions.md) own requirements,
   deliverables, and evidence. A later instructor clarification lets the team
   choose its technology stack; PHP, MySQL, and other stack examples in those
   handouts are not mandatory.

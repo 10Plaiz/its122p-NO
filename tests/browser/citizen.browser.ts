@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { captureEvidence, FIXTURE_PASSWORD, signIn, USERS } from "./helpers.js";
+import { captureEvidence, FIXTURE_PASSWORD, signIn, TEST_TITLE_PREFIX, USERS } from "./helpers.js";
 
 test.describe("Citizen functional workflows (FUNC-01, FUNC-04, FUNC-05)", () => {
   test.beforeEach(async ({ page }) => {
@@ -11,9 +11,11 @@ test.describe("Citizen functional workflows (FUNC-01, FUNC-04, FUNC-05)", () => 
     await page.goto("/report/new");
     await page.waitForLoadState("networkidle");
 
-    // Attempting to proceed without dropping a pin
-    await page.click('button:has-text("Continue")');
-    await expect(page.locator('[role="alert"]')).toContainText("Tap the map to drop a pin");
+    // Without a pin, Continue is disabled rather than erroring after a click (KR-07),
+    // and the step's instruction says what is missing. Later steps are locked too.
+    await expect(page.locator('button:has-text("Continue")')).toBeDisabled();
+    await expect(page.locator("body")).toContainText("Tap the map where the problem is");
+    await expect(page.locator("nav[aria-label='Wizard steps'] button").nth(1)).toBeDisabled();
 
     await captureEvidence(page, "FUNC-01b-coordinate-error.png");
   });
@@ -36,7 +38,7 @@ test.describe("Citizen functional workflows (FUNC-01, FUNC-04, FUNC-05)", () => 
     const categorySelect = page.locator("#category");
     await categorySelect.selectOption({ index: 1 });
 
-    await page.fill("#title", "[TEST] Phase 4 automated verification report");
+    await page.fill("#title", `${TEST_TITLE_PREFIX} Phase 4 automated verification report`);
     await page.fill(
       "#description",
       "Automated functional testing verifying report submission, editing, and cancellation lifecycle.",
@@ -58,12 +60,12 @@ test.describe("Citizen functional workflows (FUNC-01, FUNC-04, FUNC-05)", () => 
     await editBtn.click();
 
     await expect(page.locator("h3")).toContainText("Edit pending report");
-    await page.fill("#edit-title", "[TEST] Phase 4 automated verification report (Updated)");
+    await page.fill("#edit-title", `${TEST_TITLE_PREFIX} Phase 4 automated verification report (Updated)`);
     await captureEvidence(page, "FUNC-04-edit-pending.png");
 
     await page.click('button:has-text("Save changes")');
     await page.waitForLoadState("networkidle");
-    await expect(page.locator("h2")).toContainText("[TEST] Phase 4 automated verification report (Updated)", { timeout: 15000 });
+    await expect(page.locator("h2")).toContainText(`${TEST_TITLE_PREFIX} Phase 4 automated verification report (Updated)`, { timeout: 15000 });
 
     // 3. Cancel Report (FUNC-05)
     await page.goto("/my-reports");
@@ -126,6 +128,17 @@ test.describe("Citizen functional workflows (FUNC-01, FUNC-04, FUNC-05)", () => 
     await step2Btn.click();
     await expect(page.locator("h2")).toContainText("What is wrong?");
     await expect(page.locator("#title")).toHaveValue("[UIUX-02] Road damage pre-flight verification");
+
+    // The current step is announced and stays focusable (KR-20).
+    const current = page.locator("nav[aria-label='Wizard steps'] [aria-current='step']");
+    await expect(current).toContainText("Step 2");
+    await expect(current).toBeEnabled();
+
+    // Clearing a required field disables Continue and locks the step after it, so
+    // Submit cannot be reached with an invalid report (KR-07).
+    await page.fill("#title", "");
+    await expect(page.locator('button:has-text("Continue")')).toBeDisabled();
+    await expect(page.locator("nav[aria-label='Wizard steps'] button:has-text('Step 3')")).toBeDisabled();
   });
 
   test("UIUX-05: Mobile my-reports renders responsive cards, zero overflow, and modal cancellation dialog", async ({ page }) => {

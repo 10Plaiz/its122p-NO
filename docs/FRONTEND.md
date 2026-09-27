@@ -63,6 +63,12 @@ When a user directly accesses a protected report-detail URL for a report they ar
   confirmation banner.
 - Client validation mirrors server validation where immediate field feedback is
   useful. Server validation remains authoritative.
+- An action button is disabled while its form is invalid or sending, and an
+  edit form's Save is also disabled while nothing has changed. Each field states its requirement as a hint and shows its error once the user
+  leaves it, marked with `aria-invalid` and linked by `aria-describedby`. Sign-in
+  is the one exception: its submit stays enabled, because only the server can
+  check a password and browser autofill can leave a disabled button stuck.
+  `useLeftFields` in `src/web/components/ui.tsx` implements the rule.
 - API field errors appear beside the corresponding form controls. Page-level
   failures use an alert and preserve a usable route back when one exists.
 - The public board stores filters and paging in the URL so filtered views are

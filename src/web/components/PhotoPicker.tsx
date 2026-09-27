@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { DragEvent } from "react";
-import { Button, Field, PhotoFrame } from "./ui.js";
+import { Button, Field, PhotoFrame, fieldNoteId } from "./ui.js";
 
 // The one photo control, shared by the citizen's report wizard and the staff
 // proof-of-repair panel. Both limits mirror photoUpload in src/server/lib/photos.ts —
@@ -114,6 +114,7 @@ export function PhotoPicker({ id, label, purpose, error, value, onChange }: Phot
           type="file"
           accept={ALLOWED_TYPES.join(",")}
           aria-invalid={error ? true : undefined}
+          aria-describedby={error ? fieldNoteId(id) : undefined}
           className="sr-only peer"
           onChange={(event) => choose(event.target.files?.[0] ?? null)}
         />

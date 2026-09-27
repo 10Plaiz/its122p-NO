@@ -103,12 +103,16 @@ function CategoryRow({
           <span className="flex flex-col gap-1">
             <Input
               aria-label="Category name"
+              aria-invalid={tooShort || undefined}
+              aria-describedby={tooShort ? `category-${category.id}-name-note` : undefined}
               maxLength={60}
               value={name}
               onChange={(event) => setName(event.target.value)}
             />
             {tooShort && (
-              <span className="text-muted text-[11px]">At least 2 characters.</span>
+              <span id={`category-${category.id}-name-note`} className="text-muted text-[11px]">
+                At least 2 characters.
+              </span>
             )}
           </span>
         ) : (
@@ -212,7 +216,7 @@ function CategoryRow({
           )}
         </div>
         {(update.error ?? retire.error) && (
-          <span className="text-[11px] text-accent-700">
+          <span role="alert" className="text-[11px] text-accent-700">
             {(update.error ?? retire.error)?.message}
           </span>
         )}

@@ -10,6 +10,11 @@ export const USERS = {
   staff2: "fixture-staff-2@kamoti.invalid",
 } as const;
 
+// What the tests write to the database. cleanup.ts deletes exactly these after every
+// run, so keep the tests and the cleanup on these two constants.
+export const TEST_TITLE_PREFIX = "[TEST]";
+export const TEST_REMARK = "Staff on-site assessment complete. Scheduled for follow-up review.";
+
 export async function signIn(page: Page, email: string, password = FIXTURE_PASSWORD) {
   await page.goto("/signin");
   await page.fill("#email", email);
