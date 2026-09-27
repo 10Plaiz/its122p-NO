@@ -10,6 +10,7 @@ export interface BoardReportCardProps {
 export function BoardReportCard({ report, isSelected, onToggle }: BoardReportCardProps) {
   const panelId = `report-panel-${report.id}`;
   const headerId = `report-header-${report.id}`;
+  const titleId = `report-title-${report.id}`;
 
   return (
     <article
@@ -21,7 +22,10 @@ export function BoardReportCard({ report, isSelected, onToggle }: BoardReportCar
     >
       {/* 1. Title + Location Unit: Tight vertical clustering */}
       <div className="flex flex-col">
-        <h3 className="card-title select-text cursor-text text-[16px] font-bold text-text leading-snug !m-0 !mb-0">
+        <h3
+          id={titleId}
+          className="card-title select-text cursor-text text-[16px] font-bold text-text leading-snug !m-0 !mb-0"
+        >
           {report.title}
         </h3>
         {report.address_text && (
@@ -43,15 +47,19 @@ export function BoardReportCard({ report, isSelected, onToggle }: BoardReportCar
 
         {/* Date on the left of Chevron button */}
         <div className="flex items-center gap-3 shrink-0">
-          <time className="text-[12px] font-medium text-neutral-700 select-text">
+          <time
+            dateTime={report.submitted_at}
+            className="text-[12px] font-medium text-neutral-700 select-text"
+          >
             {formatDate(report.submitted_at)}
           </time>
 
           <button
             id={headerId}
             type="button"
+            title={isSelected ? "Collapse details" : "Expand details"}
             aria-expanded={isSelected}
-            aria-controls={panelId}
+            aria-controls={isSelected ? panelId : undefined}
             onClick={() => onToggle(report.id)}
             className="size-8 shrink-0 flex items-center justify-center bg-surface hover:bg-neutral-300 border border-divider transition-colors focus-visible:outline-2 focus-visible:outline-accent cursor-pointer"
           >
@@ -79,7 +87,7 @@ export function BoardReportCard({ report, isSelected, onToggle }: BoardReportCar
         <div
           id={panelId}
           role="region"
-          aria-labelledby={headerId}
+          aria-labelledby={titleId}
           className="-mx-4 -mb-4 p-4 mt-1 bg-neutral-300/60 border-t border-divider flex flex-col gap-2.5"
         >
           {/* Reference ID in standard case (no caps lock / uppercase) */}
@@ -94,7 +102,7 @@ export function BoardReportCard({ report, isSelected, onToggle }: BoardReportCar
             {report.description}
           </p>
 
-          {report.photos[0] && (
+          {report.photos?.[0] && (
             <PhotoFrame
               src={report.photos[0].url}
               alt={`Photo of the issue reported as ${report.title}`}
