@@ -9,11 +9,9 @@ import {
   Field,
   Input,
   Pagination,
-  PhotoFrame,
   Select,
-  StatusBadge,
-  formatDate,
 } from "../components/ui.js";
+import { BoardReportCard } from "../components/BoardReportCard.js";
 import { useApi } from "../lib/useApi.js";
 import { PUBLIC_STATUSES, SORTS, STATUS_LABEL } from "../lib/types.js";
 import type { Category, Paged, PublicReport, PublicStats, Sort } from "../lib/types.js";
@@ -364,44 +362,14 @@ export function BoardPage() {
               loading && !firstLoad ? "pointer-events-none opacity-50" : ""
             }`}
           >
-            {visible.map((report) => {
-              const selected = report.id === selectedId;
-              return (
-                <button
-                  key={report.id}
-                  type="button"
-                  aria-expanded={selected}
-                  onClick={() => setSelectedId(selected ? null : report.id)}
-                  className={selected ? "card p-3 text-left flex flex-col gap-1 border-accent" : "card p-3 text-left flex flex-col gap-1"}
-                >
-                  <span className="flex items-center justify-between gap-2">
-                    <span className="font-mono text-[10px] text-muted">{report.reference_code}</span>
-                    <StatusBadge status={report.status} />
-                  </span>
-                  <span className="card-title">{report.title}</span>
-                  <span className="text-muted text-[11px]">
-                    {report.category} &middot; {formatDate(report.submitted_at)}
-                    {report.photos.length > 0 ? " · photo" : ""}
-                  </span>
-
-                  {selected && (
-                    <span className="flex flex-col gap-2 pt-2">
-                      <span className="text-[13px]">{report.description}</span>
-                      {report.address_text && (
-                        <span className="text-muted text-[11px]">{report.address_text}</span>
-                      )}
-                      {report.photos[0] && (
-                        <PhotoFrame
-                          src={report.photos[0].url}
-                          alt={`Photo of the issue reported as ${report.title}`}
-                          imageClassName="h-48"
-                        />
-                      )}
-                    </span>
-                  )}
-                </button>
-              );
-            })}
+            {visible.map((report) => (
+              <BoardReportCard
+                key={report.id}
+                report={report}
+                isSelected={report.id === selectedId}
+                onToggle={(id) => setSelectedId(selectedId === id ? null : id)}
+              />
+            ))}
           </div>
         </div>
       </div>
