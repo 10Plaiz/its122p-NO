@@ -5,7 +5,7 @@ task script, the questionnaire, the tester codes, and the privacy rules for
 evidence. Session results, ratings, observations, and findings are recorded in
 Section G of the [Phase 4 test report](Phase4_Test_Report.md), which owns them.
 
-Section G of the [Phase 4 instructions](Phase4_Instructions.md) owns the
+Section G of the [Phase 4 instructions](Phase_Instructions.md#g-usability-testing) owns the
 requirement. The [test environment](TEST_ENVIRONMENT.md) owns the test URL and
 the fixture sign-in details a facilitator hands to a tester.
 
