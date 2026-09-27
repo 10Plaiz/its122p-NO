@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   Alert,
@@ -11,6 +11,7 @@ import {
   Pagination,
   Select,
   StatusBadge,
+  Textarea,
   formatDate,
 } from "../components/ui.js";
 import { useToast } from "../components/Toast.js";
@@ -183,7 +184,7 @@ export function MyReportsPage() {
                 <div className="flex flex-col gap-1">
                   <Link
                     to={`/reports/${report.id}`}
-                    className="card-title text-[15px] font-semibold text-text hover:text-accent"
+                    className="card-title text-[15px] font-semibold text-text hover:text-accent break-words"
                   >
                     {report.title}
                   </Link>
@@ -243,9 +244,20 @@ function CancelDialog({
   onDone: () => void;
 }) {
   const toast = useToast();
-  const { run, pending, error } = useAction(() =>
-    api.post<{ report: Report }>(`/reports/${report.id}/cancel`),
+  const [details, setDetails] = useState("");
+  const { run, pending, error } = useAction((body?: { details?: string }) =>
+    api.post<{ report: Report }>(`/reports/${report.id}/cancel`, body),
   );
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && !pending) {
+        onClose();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onClose, pending]);
 
   return (
     <div className="dialog-backdrop z-[1100]" role="presentation" onClick={onClose}>
@@ -268,6 +280,24 @@ function CancelDialog({
             The report will be marked as cancelled. Its history will be preserved, but municipal staff will no longer act on it.
           </p>
 
+          <Field
+            label="Reason"
+            htmlFor="cancel-details"
+            hint="Optional. Municipal staff will see this note in the report history."
+            count={details.length}
+            max={500}
+          >
+            <Textarea
+              id="cancel-details"
+              rows={3}
+              maxLength={500}
+              placeholder="e.g. Issue was already resolved or submitted by mistake"
+              value={details}
+              onChange={(event) => setDetails(event.target.value)}
+              disabled={pending}
+            />
+          </Field>
+
           {error && <Alert title="Could not cancel report">{error.message}</Alert>}
         </div>
 
@@ -277,7 +307,7 @@ function CancelDialog({
             variant="primary"
             disabled={pending}
             onClick={async () => {
-              const cancelled = await run();
+              const cancelled = await run({ details: details.trim() || undefined });
               if (cancelled) {
                 toast("Report cancelled. Its history is kept.");
                 onDone();
