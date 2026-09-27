@@ -24,6 +24,7 @@ export function formatFileSize(bytes: number): string {
 
 // Map MIME types to friendly format badges (KR-19).
 export function formatMimeType(mime: string): string {
+  if (!mime) return "";
   switch (mime.toLowerCase()) {
     case "image/jpeg":
     case "image/jpg":
