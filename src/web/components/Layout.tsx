@@ -87,7 +87,7 @@ export function Layout() {
           {user ? (
             <>
               <NotificationLink />
-              <span className="text-muted font-mono text-[11px]">
+              <span data-testid="user-identity" className="text-muted font-mono text-[11px]">
                 {user.name} &middot; {ROLE_LABEL[user.role]}
               </span>
               <button type="button" className="btn btn-ghost" onClick={handleSignOut}>
