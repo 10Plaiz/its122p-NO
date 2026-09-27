@@ -141,8 +141,9 @@ Test case identifiers, results, evidence, and defects belong in the
 
 ## Safety boundaries
 
-- Never commit `.env`, credentials, access tokens, database passwords, or real
-  personal information.
+- Never commit `.env`, Supabase keys, access tokens, database passwords, or
+  real personal information. The disposable presentation-account password for
+  the shared test project is documented in [TEST_ENVIRONMENT.md](TEST_ENVIRONMENT.md#presentation-logins).
 - Never place `SUPABASE_SECRET_KEY` or another secret in a `VITE_*` variable.
 - Do not share the database password or Supabase CLI access token through the
   repository, issues, or pull requests.
@@ -254,6 +255,12 @@ not real incident photos. Staff 5 has an empty queue. Existing reports and
 fixture accounts are preserved, so total dashboard counts exceed the seed counts.
 This is demo data, not a concurrent traffic or performance test.
 
+For manual staff, admin, and citizen walkthroughs, use the
+[presentation login table](TEST_ENVIRONMENT.md#presentation-logins). In particular,
+`demo-makati-staff-1@kamoti.invalid` has 50 assigned reports in the initial
+seed; `fixture-staff-1@kamoti.invalid` has only one `[FIXTURE]` report. Sign in
+with the presentation password in that table.
+
 ### Generate, preview, apply, verify
 
 Run from the repository root with Bun. Generate does not connect to Supabase.
@@ -286,8 +293,10 @@ On the first apply, the runner creates a random demo password and stores it in
 The parent directory must enforce mode `0700`; the runner refuses filesystems
 that do not preserve these permissions. That file lists the account emails and
 roles, outside the repository. The `.seed/` directory is ignored by Git. Keep the
-file private, particularly the administrator login. The script never prints
-passwords or tokens. Optionally set `DEMO_PASSWORD` privately before first apply;
+file private for other projects. The shared test project's disposable
+presentation password is recorded in [TEST_ENVIRONMENT.md](TEST_ENVIRONMENT.md#presentation-logins).
+The script never prints passwords or tokens. Optionally set `DEMO_PASSWORD`
+privately before first apply;
 it must be 16–72 characters. Existing account passwords are never reset.
 
 Auth users are created through the admin API with confirmed synthetic emails.
