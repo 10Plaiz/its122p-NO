@@ -83,6 +83,13 @@ The first apply verified that all 269 pre-existing application rows remained
 unchanged. All six migrations were confirmed applied before seeding. The seed
 does not deploy frontend changes to Vercel or remove older `ZZ TEST` content.
 
+On 2026-09-28, the presentation copy was refreshed in this project. The
+`makati-demo-v1` reports, account display names, history, and notifications now
+use ordinary report wording. Three older cancelled reports also had their
+`[DEMO]` titles and synthetic descriptions replaced. A read-only check found
+zero remaining `[DEMO]` report titles and zero demo wording in the marked seed
+records. The illustration labels in the PNG assets were not changed.
+
 Use the [Makati demo seed instructions](LOCAL_DEV.md#makati-demo-seed) for
 generation, preview, application, verification, private credentials, and retry
 behavior. Demo passwords are separate from fixture passwords and are not
