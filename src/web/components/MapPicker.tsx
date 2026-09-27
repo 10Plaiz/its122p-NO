@@ -7,7 +7,7 @@ import { Button } from "./ui.js";
 // Pin drop for the report wizard. The caller owns the coordinates; this reports
 // where the pin was put by click, drag, or the keyboard-accessible map-center button.
 
-// A crosshair rather than the status square used on the board — this pin is being
+// A crosshair rather than the status square used on the board: this pin is being
 // placed, not reported on, and it should not read as an existing report.
 const PICKER_ICON = L.divIcon({
   className: "",
@@ -34,8 +34,8 @@ function ClickToPlace({ onPick }: { onPick: (point: Point) => void }) {
   return null;
 }
 
-// Recentres when the value changes from outside — using the device's location, for
-// instance — without fighting the user while they pan.
+// Recentres when the value changes from outside (using the device's location, for
+// instance) without fighting the user while they pan.
 function Recentre({ value }: { value: Point | null }) {
   const map = useMap();
   const [last, setLast] = useState<string | null>(null);
