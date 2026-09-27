@@ -160,8 +160,16 @@ flowchart LR
    - Clarify the action link text to indicate inspection rather than immediate transition execution.
 2. **Citizen Contact Direct Links:**
    - In [`StaffReport.tsx:L88`](../src/web/pages/StaffReport.tsx#L88), format citizen phone numbers with clickable `tel:` and `sms:` URI links.
-3. **Citizen My-Reports Mobile Cards:**
-   - Reflow [`MyReportsPage`](../src/web/pages/MyReports.tsx) from a wide table into responsive status cards on mobile devices.
+3. **[x] Citizen My-Reports Mobile Cards:**
+   - Reflow [`MyReportsPage`](../src/web/pages/MyReports.tsx) from a wide table into responsive status cards on viewports under 768px.
+   - Extract pending report cancellation into an isolated modal dialog with optional withdrawal reason.
+   - **Resolution:** Issue [#36](https://github.com/10Plaiz/its122p-NO/issues/36), PR [#40](https://github.com/10Plaiz/its122p-NO/pull/40). Verified by Playwright test `UIUX-05` in [`citizen.browser.ts`](../tests/browser/citizen.browser.ts).
+
+#### Verification Evidence Artifacts (Tier 2)
+
+| Feature Slice | Issue | Visual Evidence | Verification Test | Result |
+| :--- | :--- | :--- | :--- | :--- |
+| **Citizen My-Reports Mobile Cards & Cancellation Modal** | [#36](https://github.com/10Plaiz/its122p-NO/issues/36) | [`CITIZEN-mobile-my-reports.png`](../tests/evidence/CITIZEN-mobile-my-reports.png)<br>[`CITIZEN-cancel-dialog-modal.png`](../tests/evidence/CITIZEN-cancel-dialog-modal.png) | `tests/browser/citizen.browser.ts:UIUX-05` | Passed |
 
 ### Tier 3: Core Architectural Unification
 *Focus: Eliminates dual-route maintenance and unifies report inspection.*
