@@ -6,7 +6,7 @@ Persona: Administrator (`fixture-admin@kamoti.invalid`)
 ## Sub-features
 - **Executive Metrics Dashboard (`/admin`):** Total reports, resolved counts, average turnaround time, and status and category breakdown cards.
 - **Persistent Secondary Sub-Tabs:** Consolidated top header containing a single "Admin" link paired with persistent secondary sub-tabs across all admin modules (`Dashboard`, `Reports`, `Users`, `Categories`, `Activity`).
-- **Report Triage and Staff Assignment (`/admin/reports`):** Comprehensive report list with assignment dialog (`#staff`). The Assign button is disabled until a staff member is selected (`KR-10`). Retired categories remain selectable for historical audit, labeled with `(retired)` (`KR-11`).
+- **Report Triage and Staff Assignment (`/admin/reports`):** Comprehensive report list with assignment dialog (`#staff`). The Assign button is disabled until a staff member is selected (`KR-10`). The dialog traps keyboard focus within active controls, closes on Escape, and restores focus to the triggering Assign button upon dismissal. Retired categories remain selectable for historical audit, labeled with `(retired)` (`KR-11`).
 - **User Provisioning and Role Controls (`/admin/users`):** Account creation, password setup, role modifications, and deactivation.
 - **Admin Self-Action Invariant:** An administrator cannot change their own role or deactivate their own account. The row displays "This is your own account." and disables both actions (`KR-06`).
 - **Role Change Cancellation:** Cancelling a role modification discards the selection immediately. Reopening the dropdown reflects the saved role, and Save is disabled while unchanged (`KR-05`). Role values render as capitalized labels (`KR-09`).

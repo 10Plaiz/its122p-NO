@@ -4,7 +4,7 @@ Route: `/report/new`, `/my-reports`, `/reports/:id`
 Persona: Citizen (`fixture-citizen-1@kamoti.invalid`)
 
 ## Sub-features
-- **Step 1 (Location):** Leaflet interactive map picker with marker placement, coordinate extraction, and reverse geocoding via Nominatim.
+- **Step 1 (Location):** Leaflet interactive map picker with marker placement, coordinate extraction, and reverse geocoding via Nominatim. Supports pointer placement, keyboard map panning via arrow keys, and "Place pin at map center" button.
 - **Location Permission Denial Guidance:** Clicking "Use my location" with denied permission displays browser site settings instructions (`[role="alert"]`). Tapping the map dismisses the banner automatically (`KR-14`).
 - **Step 2 (Issue Details):** Category selection, title input (3 to 150 characters), and detailed description textarea (10 to 1000 characters).
 - **Disabled Until Valid Form Rule:** Continue button is disabled until current step fields are valid. Step 1 requires coordinates. Step 2 requires category, valid title, and valid description.
