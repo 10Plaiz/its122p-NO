@@ -122,6 +122,12 @@ bunx playwright install chromium
 bun run test:browser
 ```
 
+After every run, the suite deletes what the tests wrote: reports titled `[TEST] …`
+and the staff test's remark, both only when owned by fixture accounts. It runs only
+when `.env` has a working `SUPABASE_SECRET_KEY` for a project that has every fixture
+account; otherwise it prints why and deletes nothing. `[FIXTURE]` reports are kept.
+Run `bun run test:cleanup` to do the same cleanup without running the tests.
+
 Configuration and runtime parameters:
 - `PLAYWRIGHT_BASE_URL`: Base target deployment (defaults to `https://kamoti-chi.vercel.app`).
 - `FIXTURE_PASSWORD`: Fixture account password (defaults to `Password123!`).

@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { captureEvidence, FIXTURE_PASSWORD, signIn, signOut, USERS } from "./helpers.js";
+import { captureEvidence, FIXTURE_PASSWORD, signIn, signOut, TEST_REMARK, USERS } from "./helpers.js";
 
 test.describe("Staff functional workflows (FUNC-02, FUNC-03, FUNC-06, FUNC-07)", () => {
   test("FUNC-02, FUNC-07: Staff workflow inspection and remark creation", async ({ page }) => {
@@ -22,7 +22,7 @@ test.describe("Staff functional workflows (FUNC-02, FUNC-03, FUNC-06, FUNC-07)",
     // Add remark (FUNC-07)
     const remarkField = page.locator("#remark");
     if (await remarkField.isVisible()) {
-      await remarkField.fill("Staff on-site assessment complete. Scheduled for follow-up review.");
+      await remarkField.fill(TEST_REMARK);
       await captureEvidence(page, "FUNC-07-staff-remark.png");
       await page.click('button:has-text("Save remark")');
       await page.waitForTimeout(1000);
