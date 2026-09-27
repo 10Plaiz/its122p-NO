@@ -8,6 +8,7 @@ Use this page to find the document that owns the information you need.
 | [Contributing guide](../CONTRIBUTING.md) | Team ownership, branches, pull requests, and where work evidence belongs |
 | [Pull request template](../.github/pull_request_template.md) | Completion criteria, verification evidence, and reviewer handoff structure |
 | [Local development](LOCAL_DEV.md) | Prerequisites, environment setup, local commands, safety, and synthetic fixtures |
+| [Verification skill](../.agents/skills/verify-kamoti/SKILL.md) | Local application driving recipes, persona credentials, evidence capture, and feature map |
 | [Frontend guide](FRONTEND.md) | Browser routes, route-level role access, page purposes, and important UI behavior |
 | [Course guide](Guide.md) | Course-wide requirements, later stack clarification, and final deliverables |
 | [Phase 3 instructions](Phase3_Instructions.md) | Frontend and API submission requirements |

@@ -19,3 +19,4 @@ only the documents relevant to the task.
 - Before opening a PR, use the [PR template](.github/pull_request_template.md)
   to validate every completion criterion in its linked issue, when there is
   one. Run the relevant checks from [README.md](README.md) and report results.
+- For local browser testing, capturing visual evidence, or validating UI edge cases, use the project skill `/verify-kamoti` located in `.agents/skills/verify-kamoti/`.
