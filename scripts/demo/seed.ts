@@ -195,12 +195,12 @@ function summary(manifest: Manifest, state: State) {
 async function credentials(target: string, manifest: Manifest, hasAccounts: boolean) {
   await mkdir(privateDirectory, { recursive: true, mode: 0o700 });
   await chmod(privateDirectory, 0o700);
-  if (((await stat(privateDirectory)).mode & 0o077) !== 0) throw new Error("The credentials directory must enforce private filesystem permissions.");
+  if (process.platform !== "win32" && ((await stat(privateDirectory)).mode & 0o077) !== 0) throw new Error("The credentials directory must enforce private filesystem permissions.");
   const path = resolve(privateDirectory, `credentials-${target}.json`);
   try {
     const stored = z.object({ target: z.literal(target), dataset: z.literal(DATASET), password: z.string().min(16).max(72) }).parse(JSON.parse(await readFile(path, "utf8")));
     await chmod(path, 0o600);
-    if (((await stat(path)).mode & 0o077) !== 0) throw new Error("The credentials file must enforce private filesystem permissions.");
+    if (process.platform !== "win32" && ((await stat(path)).mode & 0o077) !== 0) throw new Error("The credentials file must enforce private filesystem permissions.");
     return stored.password;
   } catch (error) {
     if (!(error instanceof Error && "code" in error && error.code === "ENOENT")) throw error;
@@ -208,7 +208,7 @@ async function credentials(target: string, manifest: Manifest, hasAccounts: bool
     const password = process.env.DEMO_PASSWORD ?? `Km!${randomBytes(24).toString("base64url")}`;
     z.string().min(16).max(72).parse(password);
     await writeFile(path, JSON.stringify({ target, dataset: DATASET, password, accounts: manifest.accounts.map(({ email, role }) => ({ email, role })) }, null, 2) + "\n", { mode: 0o600, flag: "wx" });
-    if (((await stat(path)).mode & 0o077) !== 0) throw new Error("The credentials file must enforce private filesystem permissions.");
+    if (process.platform !== "win32" && ((await stat(path)).mode & 0o077) !== 0) throw new Error("The credentials file must enforce private filesystem permissions.");
     return password;
   }
 }
