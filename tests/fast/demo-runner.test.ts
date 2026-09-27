@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { checkTarget, validateManifest } from "../../scripts/demo/seed.js";
+import { checkTarget, digest, missingRows, validateManifest } from "../../scripts/demo/seed.js";
 import { generateSeed } from "../../scripts/demo/generate_seed.js";
 
 describe("demo seed application boundaries", () => {
@@ -21,4 +21,25 @@ describe("demo seed application boundaries", () => {
     expect(() => validateManifest(changed)).toThrow("Manifest differs");
     expect(() => validateManifest({ ...original, accounts: [...original.accounts, { key: "injected" }] })).toThrow("Manifest differs");
   });
+
+  it("filters out existing records by id while preserving missing rows", () => {
+    const planned = [{ id: "1", name: "one" }, { id: "2", name: "two" }, { id: 3, name: "three" }];
+    const existing = [{ id: "1", name: "existing one" }, { id: "3", name: "coerced three" }];
+
+    const missing = missingRows(planned, existing);
+    expect(missing).toEqual([{ id: "2", name: "two" }]);
+    expect(missingRows(planned, [])).toEqual(planned);
+    expect(missingRows([], existing)).toEqual([]);
+    expect(missingRows(planned, planned)).toEqual([]);
+  });
+
+  it("produces deterministic canonical digests regardless of object key order", () => {
+    const objA = { b: 2, a: 1, nested: { z: 10, y: 20 } };
+    const objB = { a: 1, nested: { y: 20, z: 10 }, b: 2 };
+    const objC = { a: 1, nested: { y: 21, z: 10 }, b: 2 };
+
+    expect(digest(objA)).toBe(digest(objB));
+    expect(digest(objA)).not.toBe(digest(objC));
+  });
 });
+
