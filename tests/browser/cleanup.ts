@@ -51,7 +51,11 @@ async function cleanup(): Promise<{ reports: number; remarks: number } | null> {
 
   if (reports.data.length > 0) {
     // Storage is not covered by the foreign keys, so the files go first.
-    const paths = reports.data.flatMap((report) => report.report_photos.map((photo) => photo.storage_path as string));
+    const paths = reports.data.flatMap((report) =>
+      (report.report_photos ?? [])
+        .map((photo: { storage_path?: string | null }) => photo.storage_path)
+        .filter(Boolean) as string[],
+    );
     if (paths.length > 0) {
       const storage = await db.storage.from(BUCKET).remove(paths);
       if (storage.error) throw new Error(storage.error.message);
@@ -71,7 +75,7 @@ async function cleanup(): Promise<{ reports: number; remarks: number } | null> {
     .select("id");
   if (remarks.error) throw new Error(remarks.error.message);
 
-  return { reports: reports.data.length, remarks: remarks.data.length };
+  return { reports: reports.data.length, remarks: remarks.data?.length ?? 0 };
 }
 
 function skip(reason: string): null {

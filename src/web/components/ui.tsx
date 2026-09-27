@@ -46,6 +46,19 @@ export function Field({
   const note = error ?? hint;
   const noteId = htmlFor && note ? fieldNoteId(htmlFor) : undefined;
 
+  const existingDescribedBy =
+    isValidElement<{ "aria-describedby"?: string }>(children) ? children.props["aria-describedby"] : undefined;
+  const describedBy = noteId
+    ? Array.from(
+        new Set(
+          [
+            ...(existingDescribedBy ? existingDescribedBy.split(/\s+/) : []),
+            noteId,
+          ].filter(Boolean),
+        ),
+      ).join(" ") || undefined
+    : existingDescribedBy || undefined;
+
   // Marks the control itself as invalid, so a screen reader says which field the
   // error belongs to. Only when the direct child is the labelled control; a
   // component that wraps its control sets the same attributes on it directly.
@@ -53,7 +66,7 @@ export function Field({
     isValidElement<{ id?: string; "aria-describedby"?: string }>(children) && children.props.id === htmlFor
       ? cloneElement(children, {
           "aria-invalid": error ? true : undefined,
-          "aria-describedby": [children.props["aria-describedby"], noteId].filter(Boolean).join(" ") || undefined,
+          "aria-describedby": describedBy,
         } as object)
       : children;
 
@@ -245,6 +258,15 @@ export function focusFirstError(errors: Record<string, string>, ids: Record<stri
   document.getElementById(ids[first] ?? first)?.focus();
 }
 
+/** Filters an error record down to the controls that have already been left/blurred. */
+export function filterLeftErrors(
+  errors: Record<string, string>,
+  left: ReadonlySet<string>,
+  ids: Record<string, string> = {},
+): Record<string, string> {
+  return Object.fromEntries(Object.entries(errors).filter(([key]) => left.has(ids[key] ?? key)));
+}
+
 // The one form rule (KR-07): an action button is disabled while its form is invalid,
 // so an error is never the result of a click. A field's error appears once the
 // person leaves it, which is what explains the disabled button. Sign-in is the one
@@ -261,7 +283,7 @@ export function useLeftFields() {
       if (id) setLeft((current) => (current.has(id) ? current : new Set(current).add(id)));
     },
     visible(errors: Record<string, string>, ids: Record<string, string> = {}) {
-      return Object.fromEntries(Object.entries(errors).filter(([key]) => left.has(ids[key] ?? key)));
+      return filterLeftErrors(errors, left, ids);
     },
     reset() {
       setLeft(new Set());
