@@ -254,7 +254,11 @@ export function NewReportPage() {
               {locating ? "Finding you…" : "Use my location"}
             </Button>
             {values.point && (
-              <span data-testid="selected-coordinates" className="text-muted font-mono text-[11px]">
+              <span
+                data-testid="selected-coordinates"
+                aria-live="polite"
+                className="text-muted font-mono text-[11px]"
+              >
                 {values.point.lat.toFixed(5)}, {values.point.lng.toFixed(5)}
               </span>
             )}
