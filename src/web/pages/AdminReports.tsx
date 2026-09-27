@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   Alert,
@@ -28,6 +28,7 @@ export function AdminReportsPage() {
   const [sort, setSort] = useState<Sort>("newest");
   const [page, setPage] = useState(1);
   const [assigning, setAssigning] = useState<Report | null>(null);
+  const closeAssign = useCallback(() => setAssigning(null), []);
 
   const query = useMemo(
     () => ({ q: search.trim(), status, category_id: categoryId, sort, page, per_page: PER_PAGE }),
@@ -175,7 +176,7 @@ export function AdminReportsPage() {
       {assigning && (
         <AssignDialog
           report={assigning}
-          onClose={() => setAssigning(null)}
+          onClose={closeAssign}
           onDone={() => {
             setAssigning(null);
             reload();
@@ -198,6 +199,45 @@ function AssignDialog({
   onDone: () => void;
 }) {
   const [staffId, setStaffId] = useState(report.assigned_staff?.id ?? "");
+  const dialogRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const dialog = dialogRef.current;
+    dialog?.querySelector<HTMLElement>("#staff, button:not([disabled])")?.focus();
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        onClose();
+        return;
+      }
+      if (event.key !== "Tab" || !dialog) return;
+
+      const controls = Array.from(
+        dialog.querySelectorAll<HTMLElement>("button:not([disabled]), select:not([disabled])"),
+      );
+      if (controls.length === 0) return;
+      const first = controls[0];
+      const last = controls[controls.length - 1];
+      if (!dialog.contains(document.activeElement)) {
+        event.preventDefault();
+        first.focus();
+      } else if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    }
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+      previousFocus?.focus();
+    };
+  }, [onClose]);
 
   const { data, loading } = useApi<{ users: Profile[] }>("/admin/users", { role: "staff" });
   const { run, pending, error } = useAction((body: { staff_id: string }) =>
@@ -212,6 +252,7 @@ function AssignDialog({
     // so the dialog has to clear them.
     <div className="dialog-backdrop z-[1100]" role="presentation" onClick={onClose}>
       <div
+        ref={dialogRef}
         className="dialog"
         role="dialog"
         aria-modal="true"

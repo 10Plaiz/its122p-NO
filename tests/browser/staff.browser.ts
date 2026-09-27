@@ -142,11 +142,8 @@ test.describe("Staff functional workflows (FUNC-02, FUNC-03, FUNC-06, FUNC-07)",
     const telHref = await telLink.getAttribute("href");
     expect(telHref).toBe("tel:09171234567");
 
-    const smsLink = page.locator('a[href^="sms:"]').first();
-    await expect(smsLink).toBeVisible();
-    const smsHref = await smsLink.getAttribute("href");
-    expect(smsHref).toBe("sms:09171234567");
+    await expect(page.locator('a[href^="sms:"]')).toHaveCount(0);
 
-    await captureEvidence(page, "KR-23-staff-contact-links.png");
+    await captureEvidence(page, "KR-23-call-only-mobile.png");
   });
 });

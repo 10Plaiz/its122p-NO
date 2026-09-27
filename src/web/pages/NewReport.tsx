@@ -20,7 +20,7 @@ function validateStep(step: number, values: Values): Record<string, string> {
   const errors: Record<string, string> = {};
 
   if (step === 0 && !values.point) {
-    errors.point = "Tap the map to drop a pin where the problem is.";
+    errors.point = "Tap the map or use Place pin at map center.";
   }
 
   if (step === 1) {
@@ -119,7 +119,7 @@ export function NewReportPage() {
 
   function useMyLocation() {
     if (!navigator.geolocation) {
-      setGeoError("Location access disabled. Please tap the map to place your report pin.");
+      setGeoError("Location access disabled. Tap the map or use Place pin at map center.");
       return;
     }
     setLocating(true);
@@ -136,7 +136,7 @@ export function NewReportPage() {
       },
       () => {
         setLocating(false);
-        setGeoError("Location access disabled. Please tap the map to place your report pin.");
+        setGeoError("Location access disabled. Tap the map or use Place pin at map center.");
       },
       { enableHighAccuracy: true, timeout: 10_000 },
     );
@@ -176,7 +176,7 @@ export function NewReportPage() {
         <span className="font-mono text-[11px] uppercase tracking-wider text-muted">
           Step {step + 1} of {STEPS.length}
         </span>
-        <h2>{STEPS[step]}</h2>
+        <h2 aria-live="polite">{STEPS[step]}</h2>
 
         {/* Clickable step indicators allowing quick return to previous steps */}
         <nav aria-label="Wizard steps" className="flex items-center gap-2">
@@ -230,7 +230,8 @@ export function NewReportPage() {
       {step === 0 && (
         <div className="flex flex-col gap-3">
           <p className="text-muted text-[13px]">
-            Tap the map where the problem is, or drag the pin to adjust it.
+            Tap the map where the problem is, or drag the pin to adjust it. With a keyboard,
+            use arrow keys to move the map, then choose Place pin at map center.
           </p>
 
           <div className="h-[300px] md:h-[420px] border-2 border-divider">
@@ -253,7 +254,7 @@ export function NewReportPage() {
               {locating ? "Finding you…" : "Use my location"}
             </Button>
             {values.point && (
-              <span className="text-muted font-mono text-[11px]">
+              <span data-testid="selected-coordinates" className="text-muted font-mono text-[11px]">
                 {values.point.lat.toFixed(5)}, {values.point.lng.toFixed(5)}
               </span>
             )}
@@ -447,4 +448,3 @@ function PhotoThumbnail({ file }: { file: File }) {
     />
   );
 }
-
