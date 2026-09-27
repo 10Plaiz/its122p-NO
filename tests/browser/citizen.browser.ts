@@ -136,40 +136,46 @@ test.describe("Citizen functional workflows (FUNC-01, FUNC-04, FUNC-05)", () => 
     // Table should be hidden on mobile viewport
     await expect(page.locator("table")).toBeHidden();
 
-    // Check if citizen has reports
+    // Verify stacked responsive cards render on mobile
     const cards = page.locator(".md\\:hidden .card");
-    if ((await cards.count()) > 0) {
-      const firstCard = cards.first();
-      await expect(firstCard).toBeVisible();
+    await expect(cards.first()).toBeVisible();
 
-      // Card elements: Reference Code, Category badge, Status badge, View details button
-      await expect(firstCard.locator(".tag").first()).toBeVisible();
-      await expect(firstCard.locator('a:has-text("View details")')).toBeVisible();
+    const firstCard = cards.first();
+    // Card elements: Reference Code, Category badge, Status badge, View details button
+    await expect(firstCard.locator(".tag").first()).toBeVisible();
+    await expect(firstCard.locator('a:has-text("View details")')).toBeVisible();
 
-      // Verify zero horizontal overflow on mobile
-      const scrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
-      const clientWidth = await page.evaluate(() => document.documentElement.clientWidth);
-      expect(scrollWidth).toBeLessThanOrEqual(clientWidth + 1);
+    // Verify zero horizontal overflow on mobile
+    const scrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
+    const clientWidth = await page.evaluate(() => document.documentElement.clientWidth);
+    expect(scrollWidth).toBeLessThanOrEqual(clientWidth + 1);
 
-      await captureEvidence(page, "CITIZEN-mobile-my-reports.png");
+    await captureEvidence(page, "CITIZEN-mobile-my-reports.png");
 
-      // Verify dedicated modal cancellation dialog if a pending report exists
-      const cancelBtn = page.locator('.md\\:hidden button:has-text("Cancel report")').first();
-      if (await cancelBtn.isVisible()) {
-        await cancelBtn.click();
+    // Verify dedicated modal cancellation dialog with optional reason input
+    const cancelBtn = page.locator('.md\\:hidden button:has-text("Cancel report")').first();
+    await expect(cancelBtn).toBeVisible();
+    await cancelBtn.click();
 
-        const dialog = page.locator('.dialog[role="dialog"]');
-        await expect(dialog).toBeVisible();
-        await expect(dialog.locator(".dialog-title")).toContainText("Withdraw this report?");
-        await expect(dialog.locator('button:has-text("Yes, cancel")')).toBeVisible();
+    const dialog = page.locator('.dialog[role="dialog"]');
+    await expect(dialog).toBeVisible();
+    await expect(dialog.locator(".dialog-title")).toContainText("Withdraw this report?");
+    await expect(dialog.locator("#cancel-details")).toBeVisible();
+    await expect(dialog.locator('button:has-text("Yes, cancel")')).toBeVisible();
 
-        await captureEvidence(page, "CITIZEN-cancel-dialog-modal.png");
+    await dialog.locator("#cancel-details").fill("Withdrawing duplicate report entry.");
 
-        // Dismiss dialog via Keep it
-        await dialog.locator('button:has-text("Keep it")').click();
-        await expect(dialog).toBeHidden();
-      }
-    }
+    await captureEvidence(page, "CITIZEN-cancel-dialog-modal.png");
+
+    // Test dismiss dialog via Keep it
+    await dialog.locator('button:has-text("Keep it")').click();
+    await expect(dialog).toBeHidden();
+
+    // Test dismiss dialog via Escape key
+    await cancelBtn.click();
+    await expect(dialog).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(dialog).toBeHidden();
   });
 });
 
