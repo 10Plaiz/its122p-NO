@@ -145,9 +145,8 @@ Test case identifiers, results, evidence, and defects belong in the
 
 The `bun run fixture` command creates or reuses a small, clearly marked set of
 synthetic accounts and reports for local development and verification work. It
-is the only bundled fixture, it is limited to local development, and it is safe
-to rerun. Until you run it, create test records manually and follow the safety
-boundaries above.
+is limited to local development and is safe to rerun. The separate
+[Makati demo seed](#makati-demo-seed) populates the shared presentation site.
 
 ### Command and required runtime inputs
 
@@ -220,3 +219,94 @@ fixture from a development project, do it manually and narrowly:
 
 Reports must be deleted first, because the schema prevents deleting a profile
 that still owns reports.
+
+## Makati demo seed
+
+The presentation dataset is separate from the five fixture accounts above.
+It creates 30 demo citizens, five staff, one administrator, and 150 reports
+across the six standard categories. The reports cover six months up to a fixed
+reference date. Their titles start with `[DEMO]`, addresses identify synthetic
+locations in Makati, and accounts use `demo-makati-*@kamoti.invalid` addresses.
+Locations are illustrative and do not identify verified incidents.
+
+| Status | Seed reports | Public |
+| :--- | ---: | :--- |
+| Pending | 30 | No |
+| Under review | 30 | Yes |
+| In progress | 30 | Yes |
+| Resolved | 50 | Yes |
+| Cancelled | 10 | No |
+
+Reports include assignment and status history, remarks, notifications, and a
+selection of initial and resolution images. Images are labelled illustrations,
+not real incident photos. Staff 5 has an empty queue. Existing reports and
+fixture accounts are preserved, so total dashboard counts exceed the seed counts.
+This is demo data, not a concurrent traffic or performance test.
+
+### Generate, preview, apply, verify
+
+Run from the repository root with Bun. Generate does not connect to Supabase.
+The other commands use the private `SUPABASE_URL` and `SUPABASE_SECRET_KEY`.
+
+```bash
+bun run seed:generate --seed 42 --as-of 2026-09-27
+bun run seed:plan --target chqyxlyrmudmkanqmpil
+# After reviewing the target and planned counts:
+bun run seed:apply --target chqyxlyrmudmkanqmpil
+bun run seed:verify --target chqyxlyrmudmkanqmpil
+```
+
+Generation writes `.seed/makati-demo-v1.json`. The runner validates it against
+the deterministic generator before any remote writes. Changing its rows by hand
+is rejected. A fingerprint covers the manifest and image bytes. Auth account
+metadata records the fingerprint so an existing dataset cannot be reused with
+different generation settings or assets by accident. To reproduce a run, retain
+the generator version, image files, random seed, and reference date.
+
+The plan checks active categories, the photo bucket, the migrated public view,
+account ownership, and existing records. It reports missing records without
+writing to Supabase. Apply requires an explicit target matching the configured
+HTTPS project URL. Seeding is never part of Vercel builds or schema migrations.
+
+### Passwords and reruns
+
+On the first apply, the runner creates a random demo password and stores it in
+`~/.local/share/kamoti/demo-seeds/credentials-<PROJECT_REF>.json` with mode `0600`.
+The parent directory must enforce mode `0700`; the runner refuses filesystems
+that do not preserve these permissions. That file lists the account emails and
+roles, outside the repository. The `.seed/` directory is ignored by Git. Keep the
+file private, particularly the administrator login. The script never prints
+passwords or tokens. Optionally set `DEMO_PASSWORD` privately before first apply;
+it must be 16–72 characters. Existing account passwords are never reset.
+
+Auth users are created through the admin API with confirmed synthetic emails.
+Profiles, reports, history, notifications, and image links are inserted in
+dependency order. Existing rows are skipped. Activity records use the explicit
+`demo.report_seeded` action rather than claiming real staff work occurred.
+Database reference codes are allocated by the existing trigger.
+
+Auth, Storage, and database writes do not share one transaction. If a run fails,
+keep the same manifest, assets, credentials, and code version, then rerun plan
+and apply. Stable record IDs let the command insert missing records without
+reverting report status, read notifications, or edited text. The script does not
+delete records or provide a reset command. A partial run can be visible until
+the retry finishes.
+
+Use one operator at a time. A `.seed/<PROJECT_REF>.lock` file prevents concurrent
+apply runs from this checkout; it does not coordinate separate computers. After
+a killed process, confirm it has stopped before manually removing its stale
+lock. Apply hashes existing application rows before and after the run and fails
+if any changed. Avoid simultaneous demo interactions during this check because
+they can change the same rows legitimately.
+
+### Verification and images
+
+`seed:verify` checks record completeness, public visibility, resolution dates,
+and stored image bytes. It allows later report edits and does not restore initial
+states. Also run `bun run test:smoke` and inspect the board filters, report
+timelines, staff queues, and citizen notifications on the deployed site.
+
+The PNG assets are checked in under `scripts/demo/assets/`. To regenerate the
+illustrations, use `bun run seed:assets` with Playwright Chromium installed.
+Regenerated bytes can change the fingerprint; retain the original assets when
+resuming an existing dataset. The normal seed commands do not need Chromium.
