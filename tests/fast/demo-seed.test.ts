@@ -72,7 +72,7 @@ describe("demo seed generator", () => {
     for (const report of reports) {
       expect(accountByKey.get(report.ownerKey)?.role).toBe("citizen");
       if (report.staffKey) expect(accountByKey.get(report.staffKey)?.role).toBe("staff");
-      expect(report.title).not.toMatch(/\[demo\]|synthetic/i);
+      expect(report.title).not.toMatch(/demo|synthetic/i);
       expect(report.description).not.toMatch(/demo|synthetic|illustrative/i);
       expect(report.address_text).not.toMatch(/demo|synthetic/i);
       expect(report.title).not.toBe(`${report.category} concern near ${report.address_text.split(",")[0]}`);
