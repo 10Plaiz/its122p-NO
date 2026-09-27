@@ -17,7 +17,7 @@ test.describe("Citizen functional workflows (FUNC-01, FUNC-04, FUNC-05)", () => 
     await expect(page.locator("body")).toContainText("Tap the map where the problem is");
     await expect(page.locator("nav[aria-label='Wizard steps'] button").nth(1)).toBeDisabled();
 
-    await captureEvidence(page, "FUNC-01b-coordinate-error.png");
+    await captureEvidence(page, "FUNC-01b-no-pin-continue-disabled.png");
   });
 
   test("FUNC-01a, FUNC-04, FUNC-05: Complete citizen report lifecycle", async ({ page }) => {
@@ -30,7 +30,7 @@ test.describe("Citizen functional workflows (FUNC-01, FUNC-04, FUNC-05)", () => 
     await map.click({ position: { x: 150, y: 150 } });
     await page.waitForTimeout(500);
 
-    // Proceed to Step 1
+    // Proceed to Step 2
     await page.click('button:has-text("Continue")');
     await expect(page.locator("h2")).toContainText("What is wrong?");
 
@@ -38,21 +38,24 @@ test.describe("Citizen functional workflows (FUNC-01, FUNC-04, FUNC-05)", () => 
     const categorySelect = page.locator("#category");
     await categorySelect.selectOption({ index: 1 });
 
-    await page.fill("#title", `${TEST_TITLE_PREFIX} Phase 4 automated verification report`);
+    const title = `${TEST_TITLE_PREFIX} Phase 4 automated verification report`;
+    const updatedTitle = `${title} (Updated)`;
+    await page.fill("#title", title);
     await page.fill(
       "#description",
       "Automated functional testing verifying report submission, editing, and cancellation lifecycle.",
     );
 
-    // Proceed to Step 2
+    // Proceed to Step 3
     await page.click('button:has-text("Continue")');
     await expect(page.locator("h2")).toContainText("Show us");
 
-    await captureEvidence(page, "FUNC-01a-report-create.png");
-
-    // Submit report
+    // Submit report. The evidence is the filed report, not the form before it.
     await page.click('button:has-text("Submit report")');
     await expect(page).toHaveURL(/.*reports\/[a-f0-9-]+/);
+    await expect(page.locator("h2")).toContainText(title);
+    await expect(page.locator("body")).toContainText("Pending");
+    await captureEvidence(page, "FUNC-01a-report-create.png");
 
     // 2. Edit Pending Report (FUNC-04)
     const editBtn = page.locator('button:has-text("Edit report")');
@@ -60,26 +63,33 @@ test.describe("Citizen functional workflows (FUNC-01, FUNC-04, FUNC-05)", () => 
     await editBtn.click();
 
     await expect(page.locator("h3")).toContainText("Edit pending report");
-    await page.fill("#edit-title", `${TEST_TITLE_PREFIX} Phase 4 automated verification report (Updated)`);
-    await captureEvidence(page, "FUNC-04-edit-pending.png");
+    // The category list loads separately; until it does the select shows its placeholder.
+    await expect(page.locator("#edit-category")).not.toHaveValue("");
+    await expect(page.locator("#edit-category option:checked")).not.toHaveText("Choose a category");
+    await page.fill("#edit-title", updatedTitle);
+    await captureEvidence(page, "FUNC-04a-edit-pending-form.png");
 
     await page.click('button:has-text("Save changes")');
     await page.waitForLoadState("networkidle");
-    await expect(page.locator("h2")).toContainText(`${TEST_TITLE_PREFIX} Phase 4 automated verification report (Updated)`, { timeout: 15000 });
+    await expect(page.locator("h2")).toContainText(updatedTitle, { timeout: 15000 });
+    await captureEvidence(page, "FUNC-04b-edit-pending-saved.png");
 
-    // 3. Cancel Report (FUNC-05)
+    // 3. Cancel Report (FUNC-05). Scope to this run's report so a fixture report
+    // that is also pending can never be the one withdrawn.
     await page.goto("/my-reports");
     await page.waitForLoadState("networkidle");
 
-    const firstCancelBtn = page.locator('button:has-text("Cancel report")').first();
-    await expect(firstCancelBtn).toBeVisible();
-    await firstCancelBtn.click();
+    const row = page.locator("tr", { hasText: updatedTitle }).first();
+    const cancelBtn = row.locator('button:has-text("Cancel report")');
+    await expect(cancelBtn).toBeVisible();
+    await cancelBtn.click();
 
     await expect(page.locator("body")).toContainText("Withdraw this report?");
-    await captureEvidence(page, "FUNC-05-cancelled-report.png");
+    await captureEvidence(page, "FUNC-05a-cancel-confirm.png");
 
     await page.click('button:has-text("Yes, cancel")');
-    await page.waitForTimeout(1000);
+    await expect(row).toContainText("Cancelled", { timeout: 15000 });
+    await captureEvidence(page, "FUNC-05b-cancelled-report.png");
   });
 
   test("UIUX-02: Wizard step 3 pre-flight review displays description, photo state, and allows step navigation", async ({ page }) => {

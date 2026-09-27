@@ -31,9 +31,13 @@ export async function signOut(page: Page) {
   }
 }
 
+// Screenshots land in tests/evidence/ unless EVIDENCE_DIR names another folder, so a
+// run against a different target can keep its set apart from the committed one.
+const EVIDENCE_DIR = process.env.EVIDENCE_DIR ?? "tests/evidence";
+
 export async function captureEvidence(page: Page, filename: string) {
   await page.screenshot({
-    path: `tests/evidence/${filename}`,
+    path: `${EVIDENCE_DIR}/${filename}`,
     fullPage: true,
   });
 }
