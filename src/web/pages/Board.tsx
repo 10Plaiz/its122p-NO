@@ -305,9 +305,12 @@ export function BoardPage() {
           />
         </div>
 
+        {/* `relative` makes this scroll box the containing block for the cards'
+            absolutely positioned `sr-only` text. Without it those spans resolve against
+            the page, escape the overflow clip, and stretch the page far below the footer. */}
         <div
           data-testid="board-list-container"
-          className={`flex flex-col gap-3 lg:max-h-[560px] lg:overflow-y-auto ${
+          className={`relative flex flex-col gap-3 lg:max-h-[560px] lg:overflow-y-auto ${
             pane === "map" ? "hidden lg:flex" : "flex"
           }`}
         >
