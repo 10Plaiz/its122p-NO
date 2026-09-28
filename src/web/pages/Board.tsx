@@ -330,24 +330,23 @@ export function BoardPage() {
           </div>
         </div>
 
-        {/* Paging sits under the list it pages, flush right: the second column from lg,
-            full width below it, where it follows whichever pane is on screen. */}
-        {data && (
-          <div className="flex justify-end lg:col-start-2">
+        {/* Paging and the map credit sit under the list, flush right: the second column
+            from lg, full width below it, where they follow whichever pane is on screen. */}
+        <div className="flex flex-col items-end gap-2 text-right lg:col-start-2">
+          {data && (
             <Pagination
               page={data.page}
               perPage={data.per_page}
               total={data.total}
               onPage={(next) => update({ page: next === 1 ? null : next }, { push: true })}
             />
-          </div>
-        )}
+          )}
+          <p className="text-muted font-mono text-[10px]">
+            Map data &copy; OpenStreetMap contributors, rendered with Leaflet. &middot;{" "}
+            <Link to="/">Back to start</Link>
+          </p>
+        </div>
       </div>
-
-      <p className="text-muted font-mono text-[10px]">
-        Map data &copy; OpenStreetMap contributors, rendered with Leaflet. &middot;{" "}
-        <Link to="/">Back to start</Link>
-      </p>
     </div>
   );
 }
