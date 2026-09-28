@@ -81,51 +81,46 @@ test.describe("Responsive Viewport Validation (FUNC-12)", () => {
     await expect(listContainer).toBeVisible();
   });
 
-  test("KR-02: Returning to List View with the map-view filter on still lists reports", async ({ page }) => {
-    // Regression for the empty-list bug. Hiding the map drops its container to 0x0, and
-    // Leaflet's invalidateSize() fires `moveend` for that size change. Publishing bounds
-    // from a collapsed map handed the board a box where north equalled south, which
-    // filtered out every report in the list the visitor had just switched to.
-    await page.setViewportSize({ width: 375, height: 812 });
+  test("UIUX-06: Board pagination sits flush right under the list, and the page ends at the footer", async ({ page }) => {
+    for (const viewport of [
+      { width: 1280, height: 800 },
+      { width: 375, height: 812 },
+    ]) {
+      await page.setViewportSize(viewport);
+      await page.goto("/board");
+      await page.waitForLoadState("networkidle");
 
-    // `view=map` is the bounds filter (the checkbox), not the pane toggle.
-    await page.goto("/board?view=map");
-    await page.waitForLoadState("networkidle");
+      // The map-view bounds filter was removed; nothing should offer it.
+      await expect(page.getByText("Only show reports in this map view")).toHaveCount(0);
 
-    const listContainer = page.locator('[data-testid="board-list-container"]');
-    const cards = listContainer.locator("button[aria-expanded]");
+      const next = page.getByRole("button", { name: "Next" });
+      test.skip((await next.count()) === 0, "No public reports on this environment to page.");
 
-    // Nothing to prove if the environment has no public reports.
-    const initialCount = await cards.count();
-    test.skip(initialCount === 0, "No public reports on this environment to filter.");
+      const list = await page.locator('[data-testid="board-list-container"]').boundingBox();
+      const pager = await next.locator("xpath=..").boundingBox();
+      expect(list && pager).toBeTruthy();
+      // Below the list, and its right edge lined up with the list's.
+      expect(pager!.y).toBeGreaterThanOrEqual(list!.y + list!.height);
+      expect(Math.abs(pager!.x + pager!.width - (list!.x + list!.width))).toBeLessThanOrEqual(1);
 
-    await expect(page.locator('[data-testid="mobile-view-toggle"] input[value="map"]')).toBeChecked({
-      checked: false,
-    });
-
-    // Out to the map and back again.
-    await page.locator('[data-testid="mobile-view-map"]').click();
-    await expect(page.locator('[data-testid="board-map-container"]')).toBeVisible();
-
-    await page.locator('[data-testid="mobile-view-list"]').click();
-    await expect(listContainer).toBeVisible();
-
-    // The map auto-fits to the reports it was given, so its last real viewport contains
-    // them: the list must still have rows, and must not be showing its empty state.
-    await expect(cards.first()).toBeVisible();
-    expect(await cards.count()).toBeGreaterThan(0);
-    await expect(page.locator("body")).not.toContainText("Nothing matches those filters");
+      // Regression: the cards' absolutely positioned sr-only text once escaped the
+      // list's scroll box and stretched the page thousands of pixels past the footer.
+      const overshoot = await page.evaluate(() => {
+        const footer = document.querySelector("footer")!.getBoundingClientRect();
+        return document.documentElement.scrollHeight - (footer.bottom + window.scrollY);
+      });
+      expect(overshoot).toBeLessThanOrEqual(1);
+    }
   });
 
-  test("KR-21: The mobile pane survives a reload, and is not the same thing as view=map", async ({ page }) => {
+  test("KR-21: The mobile pane survives a reload", async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 812 });
     await page.goto("/board");
     await page.waitForLoadState("networkidle");
 
-    // Choosing Map writes `pane`, leaving the `view` bounds filter untouched.
+    // Choosing Map writes `pane` to the URL.
     await page.locator('[data-testid="mobile-view-map"]').click();
     await expect(page).toHaveURL(/[?&]pane=map/);
-    await expect(page).not.toHaveURL(/[?&]view=map/);
 
     // A shared or reloaded link opens on the pane it was left on.
     await page.reload();

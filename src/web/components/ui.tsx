@@ -113,6 +113,25 @@ export function Input({ className = "", ...props }: InputHTMLAttributes<HTMLInpu
   return <input className={`input ${className}`.trim()} {...props} />;
 }
 
+// A password input with a Show/Hide toggle. Props, including the aria wiring Field
+// adds, go straight to the input.
+export function PasswordInput({ className = "", ...props }: Omit<InputHTMLAttributes<HTMLInputElement>, "type">) {
+  const [shown, setShown] = useState(false);
+  return (
+    <div className="relative">
+      <Input {...props} type={shown ? "text" : "password"} className={`pr-16 ${className}`.trim()} />
+      <button
+        type="button"
+        className="absolute inset-y-0 right-0 px-3 text-[12px] font-semibold text-muted hover:text-text cursor-pointer bg-transparent border-0"
+        aria-label={shown ? "Hide password" : "Show password"}
+        onClick={() => setShown((value) => !value)}
+      >
+        {shown ? "Hide" : "Show"}
+      </button>
+    </div>
+  );
+}
+
 export function Textarea({ className = "", ...props }: TextareaHTMLAttributes<HTMLTextAreaElement>) {
   return <textarea className={`input ${className}`.trim()} {...props} />;
 }

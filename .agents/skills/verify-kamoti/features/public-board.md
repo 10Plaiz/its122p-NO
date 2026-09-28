@@ -50,7 +50,7 @@ test("Public Board: Browsing, filtering, and responsive toggle", async ({ page }
 ```
 
 ## Gotchas
-- **Mobile Pane versus Map Filter:** The query parameter `pane=map` controls the mobile segmented toggle between map and list views. The parameter `view=map` controls geographic bounding-box filtering. These two parameters are distinct.
-- **Leaflet Container Invalidation:** Hiding the map drops its container to zero dimensions. Switching back to list view requires bounds guards to avoid filtering out all reports (`KR-02`).
+- **Mobile Pane:** The query parameter `pane=map` controls the mobile segmented toggle between map and list views. The board has no map-bounds filter; `view=map` is ignored.
+- **Leaflet Container Invalidation:** Hiding the map drops its container to zero dimensions, so the map re-measures and refits when its pane is shown again.
 - **Category Dropdown Selector:** The category filter input renders with `id="category"`. Do not use `name="category"` in automation scripts.
 - **Inline Card Expansion:** Clicking a card toggles inline expansion with `aria-expanded` state. It does not navigate to a new route.

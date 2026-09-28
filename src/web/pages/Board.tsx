@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { ReportMap } from "../components/ReportMap.js";
-import type { Bounds } from "../components/ReportMap.js";
 import {
   Alert,
   Button,
@@ -43,14 +42,6 @@ function readParams(params: URLSearchParams) {
     categoryId: params.get("category") ?? "",
     sort: ((SORTS as readonly string[]).includes(sort) ? sort : "newest") as Sort,
     page: Number.isInteger(page) && page > 0 ? page : 1,
-    // Off unless asked for. Narrowing by map view is useful, but as a default it let a
-    // filter change be swallowed by wherever the map happened to be pointing.
-    //
-    // `view` and `pane` are different questions and are deliberately separate params:
-    // `view=map` asks "narrow the list to the map's current viewport", while `pane`
-    // below asks "which of the two does this narrow screen show". One filters data,
-    // the other only chooses what is on screen.
-    inView: params.get("view") === "map",
     // Which pane a narrow viewport shows. The list leads, because burying the cards
     // under a map was the problem the toggle was added to solve. Ignored from `lg` up,
     // where both panes render side by side.
@@ -60,10 +51,9 @@ function readParams(params: URLSearchParams) {
 
 export function BoardPage() {
   const [params, setParams] = useSearchParams();
-  const { q, status, categoryId, sort, page, inView, pane } = readParams(params);
+  const { q, status, categoryId, sort, page, pane } = readParams(params);
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [bounds, setBounds] = useState<Bounds | null>(null);
 
   // Typing stays local; only the settled term reaches the URL and the API.
   const [search, setSearch] = useState(q);
@@ -117,23 +107,8 @@ export function BoardPage() {
   // whatever they had panned to.
   const fitKey = useMemo(() => reports.map((report) => report.id).join(","), [reports]);
 
-  // Opt-in: panning narrows the list only while the toggle is on.
-  const visible = useMemo(() => {
-    if (!inView || !bounds) return reports;
-    return reports.filter(
-      (report) =>
-        report.latitude <= bounds.north &&
-        report.latitude >= bounds.south &&
-        report.longitude <= bounds.east &&
-        report.longitude >= bounds.west,
-    );
-  }, [reports, bounds, inView]);
-
-  const handleMove = useCallback((next: Bounds) => setBounds(next), []);
-
   function resetFilters() {
     setSearch("");
-    setBounds(null);
     // Which pane is on screen is not a filter, so clearing the filters leaves it
     // alone: a visitor on the map should not be thrown back to the list for asking
     // to see everything.
@@ -147,7 +122,6 @@ export function BoardPage() {
   )?.name;
 
   const filtered = q !== "" || status !== "" || categoryId !== "";
-  const narrowed = inView && bounds !== null && visible.length !== reports.length;
   const total = data?.total ?? 0;
   const firstLoad = loading && !data;
 
@@ -156,13 +130,12 @@ export function BoardPage() {
     categoryName,
     status ? STATUS_LABEL[status] : null,
     q ? `“${q}”` : null,
-    narrowed ? "in this map view" : null,
   ].filter((part): part is string => Boolean(part));
 
   const shown =
-    visible.length === total
+    reports.length === total
       ? `${total} report${total === 1 ? "" : "s"}`
-      : `${visible.length} of ${total}`;
+      : `${reports.length} of ${total}`;
 
   const summary = firstLoad
     ? "Loading the board…"
@@ -300,7 +273,6 @@ export function BoardPage() {
             fitKey={fitKey}
             selectedId={selectedId}
             onSelect={setSelectedId}
-            onMove={handleMove}
             invalidateTrigger={pane}
           />
         </div>
@@ -314,35 +286,17 @@ export function BoardPage() {
             pane === "map" ? "hidden lg:flex" : "flex"
           }`}
         >
-          <div className="flex flex-col gap-2 border-b-2 border-divider pb-2">
-            <label className="flex cursor-pointer touch-manipulation select-none items-center gap-2 text-[12px]">
-              <input
-                type="checkbox"
-                checked={inView}
-                onChange={(event) => update({ view: event.target.checked ? "map" : null })}
-                className="size-4 accent-accent"
-              />
-              Only show reports in this map view
-            </label>
+          {/* One live region for the list. The single thing a visitor needs told when
+              a filter changes is how much it matched. */}
+          <p aria-live="polite" className="text-muted font-mono text-[11px] border-b-2 border-divider pb-2">
+            {summary}
+          </p>
 
-            {/* One live region for the list. The single thing a visitor needs told when
-                a filter changes is how much it matched. */}
-            <p aria-live="polite" className="text-muted font-mono text-[11px]">
-              {summary}
-            </p>
-          </div>
-
-          {!loading && visible.length === 0 && (
-            <EmptyState
-              title={filtered || narrowed ? "Nothing matches this view" : "No reports on the board yet"}
-            >
-              {filtered || narrowed ? (
+          {!loading && reports.length === 0 && (
+            <EmptyState title={filtered ? "Nothing matches this view" : "No reports on the board yet"}>
+              {filtered ? (
                 <div className="flex flex-col items-start gap-3">
-                  <p>
-                    {narrowed
-                      ? "Nothing in this part of the map matches. Pan the map, untick the map-view filter, or clear the filters."
-                      : "Try a different word, or clear the filters."}
-                  </p>
+                  <p>Try a different word, or clear the filters.</p>
                   <Button type="button" onClick={resetFilters}>
                     Clear filters
                   </Button>
@@ -365,7 +319,7 @@ export function BoardPage() {
               loading && !firstLoad ? "pointer-events-none opacity-50" : ""
             }`}
           >
-            {visible.map((report) => (
+            {reports.map((report) => (
               <BoardReportCard
                 key={report.id}
                 report={report}
@@ -375,16 +329,20 @@ export function BoardPage() {
             ))}
           </div>
         </div>
-      </div>
 
-      {data && (
-        <Pagination
-          page={data.page}
-          perPage={data.per_page}
-          total={data.total}
-          onPage={(next) => update({ page: next === 1 ? null : next }, { push: true })}
-        />
-      )}
+        {/* Paging sits under the list it pages, flush right: the second column from lg,
+            full width below it, where it follows whichever pane is on screen. */}
+        {data && (
+          <div className="flex justify-end lg:col-start-2">
+            <Pagination
+              page={data.page}
+              perPage={data.per_page}
+              total={data.total}
+              onPage={(next) => update({ page: next === 1 ? null : next }, { push: true })}
+            />
+          </div>
+        )}
+      </div>
 
       <p className="text-muted font-mono text-[10px]">
         Map data &copy; OpenStreetMap contributors, rendered with Leaflet. &middot;{" "}

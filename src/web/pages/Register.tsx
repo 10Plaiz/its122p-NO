@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import type { ChangeEvent, FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { ContactNumberField, validateContactNumber } from "../components/ContactNumberField.js";
-import { Alert, Button, Field, Input, useLeftFields } from "../components/ui.js";
+import { Alert, Button, Field, Input, useLeftFields, PasswordInput } from "../components/ui.js";
 import { homePathFor, useAuth } from "../lib/auth.js";
 import { useAction } from "../lib/useApi.js";
 
@@ -92,10 +92,9 @@ export function RegisterPage() {
 
         {/* Capped but not counted: a length readout on a secret is not worth showing. */}
         <Field label="Password" htmlFor="password" hint="At least 8 characters." error={shown.password}>
-          <Input
+          <PasswordInput
             id="password"
             name="password"
-            type="password"
             autoComplete="new-password"
             maxLength={72}
             value={values.password}

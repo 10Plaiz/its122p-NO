@@ -3,42 +3,8 @@ import { MapContainer, Marker, TileLayer, useMap } from "react-leaflet";
 import { DEFAULT_CENTER, DEFAULT_ZOOM, TILE_ATTRIBUTION, TILE_URL, pinFor } from "../lib/leaflet.js";
 import type { PublicReport } from "../lib/types.js";
 
-// Read-only map of reports. The board owns the data; this renders pins and reports
-// back which ones are inside the current view, so panning narrows the list beside it.
-
-type Bounds = { north: number; south: number; east: number; west: number };
-
-function ViewportWatcher({ onMove }: { onMove: (bounds: Bounds) => void }) {
-  const map = useMap();
-
-  useEffect(() => {
-    function publish() {
-      // A collapsed container reports no bounds worth having. Hiding the map (which
-      // the board's mobile pane toggle does with `display: none`) drives
-      // `clientWidth`/`clientHeight` to 0, and Leaflet's own `invalidateSize()` then
-      // fires `moveend` for the size change. Publishing at that moment hands the board
-      // a degenerate box where north equals south, which filters every report out of a
-      // list the visitor just asked to see.
-      const size = map.getSize();
-      if (size.x === 0 || size.y === 0) return;
-
-      const bounds = map.getBounds();
-      onMove({
-        north: bounds.getNorth(),
-        south: bounds.getSouth(),
-        east: bounds.getEast(),
-        west: bounds.getWest(),
-      });
-    }
-
-    map.on("moveend", publish);
-    return () => {
-      map.off("moveend", publish);
-    };
-  }, [map, onMove]);
-
-  return null;
-}
+// Read-only map of reports. The board owns the data; this renders its pins and
+// reports back which one a visitor clicked.
 
 // Refits the view when the result set changes, so a filter that returns pins
 // elsewhere in the city does not leave the map looking empty.
@@ -84,8 +50,7 @@ function FitToReports({
         .map((report) => [report.latitude, report.longitude] as [number, number]);
 
       if (points.length === 0) return;
-      // Unanimated on purpose: it respects a reduced-motion preference without asking,
-      // and `moveend` fires at once rather than a flight later.
+      // Unanimated on purpose: it respects a reduced-motion preference without asking.
       map.fitBounds(points, { padding: [32, 32], maxZoom: 16, animate: false });
       fitted.current = fitKey;
     }
@@ -129,7 +94,6 @@ export function ReportMap({
   fitKey,
   selectedId,
   onSelect,
-  onMove,
   invalidateTrigger,
 }: {
   reports: PublicReport[];
@@ -137,7 +101,6 @@ export function ReportMap({
   fitKey: string;
   selectedId: string | null;
   onSelect: (id: string) => void;
-  onMove?: (bounds: Bounds) => void;
   invalidateTrigger?: unknown;
 }) {
   return (
@@ -154,7 +117,6 @@ export function ReportMap({
       <AutoInvalidate trigger={invalidateTrigger} />
       <TileLayer url={TILE_URL} attribution={TILE_ATTRIBUTION} />
       <FitToReports reports={reports} fitKey={fitKey} sizeKey={invalidateTrigger} />
-      {onMove && <ViewportWatcher onMove={onMove} />}
 
       {reports
         .filter((report) => report.latitude != null && report.longitude != null)
@@ -170,5 +132,3 @@ export function ReportMap({
     </MapContainer>
   );
 }
-
-export type { Bounds };

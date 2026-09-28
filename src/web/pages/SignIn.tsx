@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Alert, Button, Field, Input, focusFirstError } from "../components/ui.js";
+import { Alert, Button, Field, Input, focusFirstError, PasswordInput } from "../components/ui.js";
 import { homePathFor, useAuth } from "../lib/auth.js";
 import { useAction } from "../lib/useApi.js";
 
@@ -107,10 +107,9 @@ export function SignInPage() {
         </Field>
 
         <Field label="Password" htmlFor="password" error={shownPasswordError}>
-          <Input
+          <PasswordInput
             id="password"
             name="password"
-            type="password"
             autoComplete="current-password"
             value={password}
             onChange={(event) => setPassword(event.target.value)}
