@@ -61,35 +61,70 @@ export function StaffReportPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <header className="flex flex-col gap-2">
-        <div className="flex items-center justify-between gap-3 flex-wrap">
-          <span className="font-mono text-[11px] text-muted">{report.reference_code}</span>
-          <StatusBadge status={report.status} />
+      {/* Zone 1: Consolidated Hero Header */}
+      <header className="flex flex-col gap-2 pb-5 border-b border-divider">
+        <div className="flex items-center justify-between gap-4">
+          <Link
+            to={returnTarget.to}
+            className="inline-flex items-center gap-1.5 text-[12px] font-mono font-semibold text-neutral-700 hover:text-text transition-colors"
+          >
+            <span aria-hidden="true">&larr;</span> {returnTarget.label}
+          </Link>
         </div>
-        <h2>{report.title}</h2>
-        <p className="text-muted font-mono text-[11px]">
-          {report.category?.name ?? "Uncategorised"} &middot; filed {formatDateTime(report.submitted_at)}
-        </p>
+
+        <div className="flex flex-col">
+          <h2 className="text-[28px] sm:text-[32px] font-bold text-text leading-tight !m-0 !mb-0 text-balance">
+            {report.title}
+          </h2>
+          {report.address_text && (
+            <p className="text-[13px] sm:text-[14px] font-medium text-neutral-700 !m-0 !mt-1">
+              {report.address_text}
+            </p>
+          )}
+        </div>
+
+        <div className="flex items-center justify-between gap-3 flex-wrap pt-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="tag tag-outline text-[12px] font-semibold tracking-wide">
+              {report.category?.name ?? "Uncategorised"}
+            </span>
+            <StatusBadge status={report.status} />
+            <span className="font-mono text-[11px] bg-neutral-200 px-2 py-0.5 border border-divider text-neutral-800">
+              {report.reference_code}
+            </span>
+          </div>
+
+          <time className="text-[12px] font-medium text-neutral-700 font-mono">
+            Filed {formatDateTime(report.submitted_at)}
+          </time>
+        </div>
       </header>
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        <div className="flex flex-col gap-4">
-          <section className="flex flex-col gap-2">
-            <h6>What was reported</h6>
-            <p className="text-[14px] whitespace-pre-line">{report.description}</p>
-            {report.address_text && <p className="text-muted text-[13px]">{report.address_text}</p>}
-          </section>
+      {/* Zone 2: Two-Tone Split Canvas */}
+      <div className="grid gap-6 lg:grid-cols-12 items-start">
+        {/* Left Column: Read Dossier (7 of 12 columns) */}
+        <section className="lg:col-span-7 flex flex-col gap-6">
+          <div className="flex flex-col gap-2">
+            <h3 className="text-[15px] font-bold text-text !m-0 !normal-case tracking-normal">
+              Report details
+            </h3>
+            <p className="text-[14px] leading-relaxed text-text select-text cursor-text whitespace-pre-line !m-0">
+              {report.description}
+            </p>
+          </div>
 
-          {/* Staff need a way to reach the reporter; the public board never shows this. */}
+          {/* Reporter information */}
           {report.citizen && (
-            <section className="flex flex-col gap-2 border-t border-divider pt-3">
-              <h6>Reported by</h6>
-              <div>
-                <p className="text-[13px] font-medium">{report.citizen.name}</p>
-                <p className="text-muted font-mono text-[11px]">{report.citizen.email}</p>
-              </div>
-              {report.citizen.contact_number && (
-                <div className="flex flex-wrap items-center gap-2 pt-1">
+            <div className="flex flex-col gap-2.5 pt-4 border-t border-divider">
+              <h3 className="text-[14px] font-bold text-text !m-0 !normal-case tracking-normal">
+                Reporter information
+              </h3>
+              <div className="flex items-center justify-between gap-4 flex-wrap">
+                <div>
+                  <p className="text-[13px] font-semibold text-text !m-0">{report.citizen.name}</p>
+                  <p className="text-[12px] text-neutral-600 font-mono !m-0">{report.citizen.email}</p>
+                </div>
+                {report.citizen.contact_number && (
                   <a
                     href={`tel:${report.citizen.contact_number.replace(/[^\d+]/g, "")}`}
                     className="btn btn-secondary text-[12px] py-1.5 px-3 min-h-[36px]"
@@ -97,17 +132,19 @@ export function StaffReportPage() {
                   >
                     Call {report.citizen.contact_number}
                   </a>
-                </div>
-              )}
-            </section>
+                )}
+              </div>
+            </div>
           )}
 
+          {/* Photo evidence */}
           {report.photos.length > 0 && (
-            <section className="flex flex-col gap-2 border-t border-divider pt-3">
-              <h6>Photos</h6>
-              <div className="grid grid-cols-2 gap-2">
+            <div className="flex flex-col gap-3 pt-4 border-t border-divider">
+              <h3 className="text-[14px] font-bold text-text !m-0 !normal-case tracking-normal">
+                Photo evidence
+              </h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {report.photos.map((photo) => {
-                  // `kind` is the API's word for it; the screen says what it means.
                   const kindLabel = photo.kind === "resolution" ? "Proof of repair" : "Evidence";
                   return (
                     <button
@@ -117,71 +154,94 @@ export function StaffReportPage() {
                         setActivePhoto({
                           src: photo.url,
                           alt: `${kindLabel} photo for report ${report.reference_code}`,
-                          title: `${kindLabel} · ${report.reference_code}`,
+                          title: `${kindLabel} (${report.reference_code})`,
                         })
                       }
-                      className="block text-left cursor-pointer p-0 bg-transparent border-0"
+                      className="flex flex-col gap-1 text-left cursor-pointer p-0 bg-transparent border-0 group"
                       aria-label={`View ${kindLabel.toLowerCase()} photo in full resolution`}
                     >
                       <PhotoFrame
                         src={photo.url}
                         alt={`${kindLabel} photo for report ${report.reference_code}`}
+                        imageClassName="h-44 w-full object-cover group-hover:opacity-90 transition-opacity"
                       />
-                      <span className="font-mono text-[9px] uppercase text-muted">{kindLabel}</span>
+                      <span className="font-mono text-[10px] font-medium text-neutral-600">
+                        {kindLabel}
+                      </span>
                     </button>
                   );
                 })}
               </div>
-            </section>
+            </div>
           )}
 
-          <div className="h-[220px] border-2 border-divider">
-            <MapContainer
-              center={[report.latitude, report.longitude]}
-              zoom={16}
-              scrollWheelZoom={false}
-              className="h-full w-full"
-            >
-              <TileLayer url={TILE_URL} attribution={TILE_ATTRIBUTION} />
-              <Marker position={[report.latitude, report.longitude]} icon={pinFor(report.status)} />
-            </MapContainer>
+          {/* Location map */}
+          <div className="flex flex-col gap-2.5 pt-4 border-t border-divider">
+            <h3 className="text-[14px] font-bold text-text !m-0 !normal-case tracking-normal">
+              Location map
+            </h3>
+            <div className="h-[260px] border border-divider">
+              <MapContainer
+                center={[report.latitude, report.longitude]}
+                zoom={16}
+                scrollWheelZoom={false}
+                className="h-full w-full"
+              >
+                <TileLayer url={TILE_URL} attribution={TILE_ATTRIBUTION} />
+                <Marker position={[report.latitude, report.longitude]} icon={pinFor(report.status)} />
+              </MapContainer>
+            </div>
           </div>
-        </div>
+        </section>
 
-        <div className="flex flex-col gap-5">
-          <AdvanceStatus report={report} onDone={refresh} />
-          <AddRemark reportId={id} onDone={refresh} />
-          <UploadResolution reportId={id} status={report.status} onDone={refresh} />
+        {/* Right Column: Operational Tray (5 of 12 columns) */}
+        <aside className="lg:col-span-5 bg-neutral-200/60 border border-divider p-4 sm:p-5 flex flex-col gap-5">
+          <div className="flex flex-col gap-4">
+            <h3 className="text-[14px] font-bold text-text !m-0 !normal-case tracking-normal">
+              Action workbench
+            </h3>
+            <AdvanceStatus report={report} onDone={refresh} />
+            <AddRemark reportId={id} onDone={refresh} />
+            <UploadResolution reportId={id} status={report.status} onDone={refresh} />
+          </div>
 
-          <section className="flex flex-col gap-3 border-t-2 border-divider pt-4">
-            <h6>History</h6>
+          <section className="flex flex-col gap-3 pt-4 border-t border-divider">
+            <h6 className="text-[14px] font-bold text-text !m-0 !normal-case tracking-normal">History</h6>
             {(history?.updates ?? []).length === 0 ? (
-              <p className="text-muted text-[13px]">Nothing recorded yet.</p>
+              <p className="text-neutral-600 text-[13px] !m-0">Nothing recorded yet.</p>
             ) : (
-              <ol className="flex flex-col gap-3">
+              <ol className="flex flex-col gap-3 relative before:absolute before:top-2 before:bottom-2 before:left-[7px] before:w-[2px] before:bg-divider list-none !p-0 !m-0">
                 {(history?.updates ?? []).map((update) => (
-                  <li key={update.id} className="flex flex-col gap-0.5">
-                    <p className="text-[13px]">
-                      {update.new_status
-                        ? `${update.previous_status ? `${STATUS_LABEL[update.previous_status]} → ` : ""}${STATUS_LABEL[update.new_status]}`
-                        : update.update_type.replace(/[._]/g, " ")}
-                    </p>
-                    {update.details && <p className="text-muted text-[13px]">{update.details}</p>}
-                    <p className="font-mono text-[10px] text-muted">
-                      {formatDateTime(update.created_at)}
-                      {update.author ? ` · ${update.author.name}` : ""}
-                    </p>
+                  <li key={update.id} className="relative pl-6 flex flex-col gap-1">
+                    <span
+                      className="absolute left-0 top-1.5 size-3.5 border-2 border-surface bg-neutral-600 shrink-0"
+                      aria-hidden="true"
+                    />
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-[13px] font-bold text-text leading-snug">
+                        {update.new_status
+                          ? `${update.previous_status ? `${STATUS_LABEL[update.previous_status]} → ` : ""}${STATUS_LABEL[update.new_status]}`
+                          : update.update_type.replace(/[._]/g, " ")}
+                      </span>
+                    </div>
+                    {update.details && (
+                      <p className="text-[13px] text-neutral-800 bg-surface/80 border border-divider/60 p-2 leading-relaxed !m-0">
+                        {update.details}
+                      </p>
+                    )}
+                    <div className="flex items-center gap-2 text-neutral-600 font-mono text-[11px] flex-wrap">
+                      <time>{formatDateTime(update.created_at)}</time>
+                      {update.author && (
+                        <span className="text-neutral-700 font-medium">({update.author.name})</span>
+                      )}
+                    </div>
                   </li>
                 ))}
               </ol>
             )}
           </section>
-        </div>
+        </aside>
       </div>
-
-      <Link to={returnTarget.to} className="btn btn-secondary self-start">
-        {returnTarget.label}
-      </Link>
 
       {activePhoto && (
         <PhotoLightbox
@@ -209,9 +269,9 @@ function AdvanceStatus({ report, onDone }: { report: Report; onDone: () => void 
 
   if (!next || !label) {
     return (
-      <section className="border-2 border-divider p-4 flex flex-col gap-2">
-        <h6>Status</h6>
-        <p className="text-[13px] text-muted">
+      <section className="bg-surface border border-divider p-4 flex flex-col gap-2">
+        <h6 className="text-[13px] font-bold text-text !m-0 !normal-case tracking-normal">Status</h6>
+        <p className="text-[13px] text-neutral-700 !m-0">
           This report is {STATUS_LABEL[report.status].toLowerCase()}. There is no further step.
         </p>
       </section>
@@ -219,9 +279,9 @@ function AdvanceStatus({ report, onDone }: { report: Report; onDone: () => void 
   }
 
   return (
-    <section className="border-2 border-divider p-4 flex flex-col gap-3">
-      <h6>Next step</h6>
-      <p className="text-[13px]">
+    <section className="bg-surface border border-divider p-4 flex flex-col gap-3">
+      <h6 className="text-[13px] font-bold text-text !m-0 !normal-case tracking-normal">Next step</h6>
+      <p className="text-[13px] text-neutral-800 !m-0">
         {STATUS_LABEL[report.status]} &rarr; <strong>{STATUS_LABEL[next]}</strong>
       </p>
 
@@ -276,8 +336,8 @@ function AddRemark({ reportId, onDone }: { reportId: string; onDone: () => void 
   const shown = fields.visible(invalid ? { remark: "Write the remark before saving it." } : {});
 
   return (
-    <section className="border-2 border-divider p-4 flex flex-col gap-3" onBlur={fields.onBlur}>
-      <h6>Add a remark</h6>
+    <section className="bg-surface border border-divider p-4 flex flex-col gap-3" onBlur={fields.onBlur}>
+      <h6 className="text-[13px] font-bold text-text !m-0 !normal-case tracking-normal">Add a remark</h6>
 
       <Field
         label="Remark"
@@ -346,8 +406,8 @@ function UploadResolution({
   }
 
   return (
-    <section className="border-2 border-divider p-4 flex flex-col gap-3">
-      <h6>Upload proof of repair</h6>
+    <section className="bg-surface border border-divider p-4 flex flex-col gap-3">
+      <h6 className="text-[13px] font-bold text-text !m-0 !normal-case tracking-normal">Upload proof of repair</h6>
 
       <PhotoPicker
         id="resolution-photo"
