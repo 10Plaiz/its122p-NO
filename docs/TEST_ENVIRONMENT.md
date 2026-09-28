@@ -83,10 +83,46 @@ The first apply verified that all 269 pre-existing application rows remained
 unchanged. All six migrations were confirmed applied before seeding. The seed
 does not deploy frontend changes to Vercel or remove older `ZZ TEST` content.
 
+On 2026-09-28, the presentation copy was refreshed in this project. The
+`makati-demo-v1` reports, account display names, history, and notifications now
+use ordinary report wording. Three older cancelled reports also had their
+`[DEMO]` titles and synthetic descriptions replaced. A read-only check found
+zero remaining `[DEMO]` report titles and zero demo wording in the marked seed
+records. The illustration labels in the PNG assets were not changed.
+
+### Presentation logins
+
+For a presentation, sign in at the [deployed site](https://kamoti-chi.vercel.app)
+or a local app connected to project `chqyxlyrmudmkanqmpil` using one of these
+accounts. The fixture logins above are for automated tests; `fixture-staff-1`
+has only one assigned `[FIXTURE]` report.
+
+**Presentation password for every account below:** `Km!_HzdrZj-p6ciRmy-VyTrLwImMa9KZFe8`
+
+The fixture password `Password123!` does not work for these accounts. This
+password belongs only to the disposable `chqyxlyrmudmkanqmpil` test project;
+do not reuse it elsewhere.
+
+| Screen to show | Email | Display name | Seeded reports |
+| :--- | :--- | :--- | :--- |
+| Admin dashboard, reports, users | `demo-makati-admin@kamoti.invalid` | Nina Valdez | All 150 presentation reports, plus existing test records |
+| Staff queue | `demo-makati-staff-1@kamoti.invalid` | Mariel Dela Cruz | 50 assigned |
+| Staff queue | `demo-makati-staff-2@kamoti.invalid` | Paolo Bautista | 34 assigned |
+| Staff queue | `demo-makati-staff-3@kamoti.invalid` | Liza Mercado | 17 assigned |
+| Staff queue | `demo-makati-staff-4@kamoti.invalid` | Ramon Flores | 17 assigned |
+| Empty staff queue | `demo-makati-staff-5@kamoti.invalid` | Celia Aquino | None, intentionally |
+| Citizen reports | `demo-makati-citizen-1@kamoti.invalid` | Ana Santos | 14 owned |
+| Citizen reports | `demo-makati-citizen-2@kamoti.invalid` | Ben Santos | 7 owned |
+
+Other presentation citizens follow `demo-makati-citizen-3@kamoti.invalid`
+through `demo-makati-citizen-30@kamoti.invalid`; the seed credentials file
+lists every account. The counts above describe the initial seed. Subsequent
+test activity can change report assignments and states. Admin pages include
+both presentation and fixture records because they show the whole project.
+
 Use the [Makati demo seed instructions](LOCAL_DEV.md#makati-demo-seed) for
 generation, preview, application, verification, private credentials, and retry
-behavior. Demo passwords are separate from fixture passwords and are not
-recorded in this document.
+behavior.
 
 ## Smoke verification procedure
 

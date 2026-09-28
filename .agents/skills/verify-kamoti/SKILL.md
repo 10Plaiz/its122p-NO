@@ -27,8 +27,8 @@ curl -s http://localhost:4000/api/public/stats && curl -s http://localhost:5173
 
 Optional realistic demonstration seed:
 ```bash
-# Generate and apply realistic Makati demonstration reports and photos
-bun run seed:demo:makati
+# Generate realistic Makati demonstration manifest
+bun run seed:generate --seed 42 --as-of 2026-09-27
 ```
 
 ## 2. Doctor

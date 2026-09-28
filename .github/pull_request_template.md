@@ -1,40 +1,37 @@
-## Linked issue
+## Context
 
-<!-- Use "Closes #123" when this PR completes an issue. If there is no issue, say so. -->
+Closes #<!-- issue number, or state "No issue" -->
 
-## What changed
+> **Release note:** <!-- One or two plain-language sentences stating the concrete outcome of this change. -->
 
-<!-- Summarize the working behavior and any API or database contract changes. -->
+## Review order
 
-## Completion criteria and evidence
+<!-- List key files in the order the reviewer should read them, with a brief note on why. -->
+1. `path/to/schema`: <!-- Data model or contract change -->
+2. `path/to/logic`: <!-- Core behavior -->
+3. `path/to/ui`: <!-- Interface wiring -->
 
-<!-- Before creating this PR, check and validate every completion criterion in
-the linked issue. List each criterion with its result and evidence. If there is
-no linked issue, state what counts as complete and validate that instead. Do not
-mark an unverified criterion complete. -->
+## Visual changes
 
-| Criterion | Result and how it was validated |
+<!-- Delete this table if the change has no user interface. -->
+| Before | After |
 | :--- | :--- |
-|  |  |
+| <!-- image or text --> | <!-- image or text --> |
 
-## Database and Supabase changes
+## Verification
 
-<!-- Select the applicable option. Migration changes require the migration
-owner to apply them after this PR is merged. Never include keys or passwords. -->
+### Automated checks
+- [ ] Typecheck passes
+- [ ] Tests pass
+- [ ] Production build succeeds
 
-- [ ] This PR does not change migrations, RLS, storage, or Supabase setup.
-- [ ] This PR changes migrations or Supabase access; the migration files and
-      expected dry-run result are described above or in the linked issue.
-- [ ] No Supabase key, database password, or CLI token is included in this PR.
+### Manual proof
+<!-- Describe what you clicked or ran. Paste the command output or test log. -->
+1. Step to reproduce or test.
+2. Observed result.
 
-## Checks
+## Deploy and rollback notes
 
-| Check | Result |
-| :--- | :--- |
-| `bun run typecheck` |  |
-| `bun run test` |  |
-| `bun run build` |  |
-| Relevant feature or manual checks |  |
-
-<!-- Include desktop/mobile screenshots for visible UI changes. Explain any
-check that could not run and any remaining limitation. -->
+- [ ] Schema migrations applied: <!-- State "None" or name the migration file -->
+- [ ] Safe to roll back: <!-- Yes, or describe why data migration makes rollback difficult -->
+- [ ] No secrets or environment credentials in this diff

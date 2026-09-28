@@ -141,8 +141,9 @@ Test case identifiers, results, evidence, and defects belong in the
 
 ## Safety boundaries
 
-- Never commit `.env`, credentials, access tokens, database passwords, or real
-  personal information.
+- Never commit `.env`, Supabase keys, access tokens, database passwords, or
+  real personal information. The disposable presentation-account password for
+  the shared test project is documented in [TEST_ENVIRONMENT.md](TEST_ENVIRONMENT.md#presentation-logins).
 - Never place `SUPABASE_SECRET_KEY` or another secret in a `VITE_*` variable.
 - Do not share the database password or Supabase CLI access token through the
   repository, issues, or pull requests.
@@ -235,9 +236,10 @@ that still owns reports.
 The presentation dataset is separate from the five fixture accounts above.
 It creates 30 demo citizens, five staff, one administrator, and 150 reports
 across the six standard categories. The reports cover six months up to a fixed
-reference date. Their titles start with `[DEMO]`, addresses identify synthetic
-locations in Makati, and accounts use `demo-makati-*@kamoti.invalid` addresses.
-Locations are illustrative and do not identify verified incidents.
+reference date. Report titles, descriptions, addresses, account display names,
+history, and notifications read like ordinary reports. The accounts retain
+`demo-makati-*@kamoti.invalid` addresses, and activity logs retain the dataset
+marker. Locations and incidents are illustrative, not verified public reports.
 
 | Status | Seed reports | Public |
 | :--- | ---: | :--- |
@@ -252,6 +254,12 @@ selection of initial and resolution images. Images are labelled illustrations,
 not real incident photos. Staff 5 has an empty queue. Existing reports and
 fixture accounts are preserved, so total dashboard counts exceed the seed counts.
 This is demo data, not a concurrent traffic or performance test.
+
+For manual staff, admin, and citizen walkthroughs, use the
+[presentation login table](TEST_ENVIRONMENT.md#presentation-logins). In particular,
+`demo-makati-staff-1@kamoti.invalid` has 50 assigned reports in the initial
+seed; `fixture-staff-1@kamoti.invalid` has only one `[FIXTURE]` report. Sign in
+with the presentation password in that table.
 
 ### Generate, preview, apply, verify
 
@@ -285,8 +293,10 @@ On the first apply, the runner creates a random demo password and stores it in
 The parent directory must enforce mode `0700`; the runner refuses filesystems
 that do not preserve these permissions. That file lists the account emails and
 roles, outside the repository. The `.seed/` directory is ignored by Git. Keep the
-file private, particularly the administrator login. The script never prints
-passwords or tokens. Optionally set `DEMO_PASSWORD` privately before first apply;
+file private for other projects. The shared test project's disposable
+presentation password is recorded in [TEST_ENVIRONMENT.md](TEST_ENVIRONMENT.md#presentation-logins).
+The script never prints passwords or tokens. Optionally set `DEMO_PASSWORD`
+privately before first apply;
 it must be 16–72 characters. Existing account passwords are never reset.
 
 Auth users are created through the admin API with confirmed synthetic emails.
@@ -308,6 +318,36 @@ a killed process, confirm it has stopped before manually removing its stale
 lock. Apply hashes existing application rows before and after the run and fails
 if any changed. Avoid simultaneous demo interactions during this check because
 they can change the same rows legitimately.
+
+### Refresh copy in the existing presentation seed
+
+PR 43 already inserted the original wording into the linked project. Editing
+`generate_seed.ts` and regenerating the manifest does not update those rows.
+The runner preserves existing rows and rejects a changed manifest fingerprint.
+Do not rerun `seed:apply` or `seed:verify` with the revised generator against
+the PR 43 dataset.
+
+The one-time [copy refresh SQL](../scripts/demo/refresh_seed_copy.sql) selects
+only accounts with the `makati-demo-v1` Auth marker and reports with the
+`demo.report_seeded` audit marker. It checks for 36 accounts and 150 reports
+before changing text. It updates original demo wording in names, reports,
+history, and notifications. It also updates the exact original title and
+description of three older cancelled demo reports found outside the seed.
+Edited values and other records are left alone. Review the target
+and confirm marker counts with these read-only queries in the linked Supabase
+project's SQL editor:
+
+```sql
+select count(distinct entity_id) from activity_logs
+where action = 'demo.report_seeded' and metadata->>'dataset' = 'makati-demo-v1';
+select count(*) from auth.users
+where raw_app_meta_data->>'demo_dataset' = 'makati-demo-v1';
+```
+
+After taking a database backup, run the refresh SQL once in that SQL editor.
+Its transaction rolls back on an error. Check a sample of public board cards,
+timelines, and notifications afterward. The PNG illustrations still carry their
+visible illustration labels.
 
 ### Verification and images
 
