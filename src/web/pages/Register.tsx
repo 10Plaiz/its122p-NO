@@ -4,6 +4,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { ContactNumberField, validateContactNumber } from "../components/ContactNumberField.js";
 import { Alert, Button, Field, Input, useLeftFields, PasswordInput } from "../components/ui.js";
 import { homePathFor, useAuth } from "../lib/auth.js";
+import { validateName } from "../lib/names.js";
 import { useAction } from "../lib/useApi.js";
 
 // Rules mirror registerSchema in src/server/routes/auth.routes.ts, message for
@@ -11,7 +12,8 @@ import { useAction } from "../lib/useApi.js";
 function validate(values: { name: string; email: string; password: string; contact: string }) {
   const errors: Record<string, string> = {};
 
-  if (values.name.trim().length < 2) errors.name = "Enter your full name.";
+  const nameError = validateName(values.name, "Enter your full name.");
+  if (nameError) errors.name = nameError;
   if (!/^\S+@\S+\.\S+$/.test(values.email.trim())) errors.email = "Enter a valid email address.";
   if (values.password.length < 8) errors.password = "Use at least 8 characters.";
   else if (values.password.length > 72) errors.password = "Keep the password under 72 characters.";
@@ -74,7 +76,7 @@ export function RegisterPage() {
       <p className="text-muted text-[13px]">Public sign-up always creates a citizen account.</p>
 
       <form className="flex flex-col gap-4" onSubmit={handleSubmit} onBlur={fields.onBlur} noValidate>
-        <Field label="Full name" htmlFor="name" hint="At least 2 characters." error={shown.name} count={values.name.length} max={80}>
+        <Field label="Full name" htmlFor="name" hint="Letters, spaces, and . ' - only." error={shown.name} count={values.name.length} max={80}>
           <Input id="name" name="name" autoComplete="name" maxLength={80} value={values.name} onChange={set("name")} />
         </Field>
 

@@ -27,6 +27,13 @@ export const contactNumber = z
   .trim()
   .regex(/^09\d{9}$/, "Enter an 11-digit mobile number starting with 09.");
 
+// A person's name: letters in any language (so ñ and é pass), plus the spaces,
+// periods, apostrophes, and hyphens real names use ("Ma. Dela Cruz-Santos",
+// "O'Brien"), with at least two letters. Mirrored by NAME_PATTERN in
+// src/web/lib/names.ts, message for message. Length is left to each schema.
+export const NAME_PATTERN = /^(?=(?:.*\p{L}){2})[\p{L}\p{M} .'’-]+$/u;
+export const NAME_ERROR = "Use letters, spaces, periods, apostrophes, or hyphens only.";
+
 export const PASSWORD_MIN_ERROR = "Use at least 8 characters.";
 export const PASSWORD_MAX_ERROR = "Keep the password under 72 characters.";
 

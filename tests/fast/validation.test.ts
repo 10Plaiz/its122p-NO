@@ -207,6 +207,22 @@ describe("VAL-07 user registration validation schema", () => {
     expect(result.error?.issues[0]?.message).toBe("Enter your full name.");
   });
 
+  test("rejects names made of symbols or digits", () => {
+    for (const name of ["!@#$%^&*()_+", "J@ne!!", "Agent 007", ".."]) {
+      const result = registerSchema.safeParse({ ...validRegistration, name });
+      expect(result.success).toBe(false);
+      expect(result.error?.issues[0]?.message).toBe(
+        "Use letters, spaces, periods, apostrophes, or hyphens only.",
+      );
+    }
+  });
+
+  test("accepts real names with accents, periods, apostrophes, and hyphens", () => {
+    for (const name of ["Ma. Dela Cruz-Santos", "O'Brien", "José Niño"]) {
+      expect(registerSchema.safeParse({ ...validRegistration, name }).success).toBe(true);
+    }
+  });
+
   test("rejects invalid email formats", () => {
     for (const invalidEmail of ["notanemail", "user@", "@domain.com", "user@domain"]) {
       const result = registerSchema.safeParse({ ...validRegistration, email: invalidEmail });

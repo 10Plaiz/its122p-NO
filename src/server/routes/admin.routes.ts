@@ -2,7 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { db } from "../config/supabase.js";
 import { badRequest, notFound, orThrow } from "../lib/errors.js";
-import { contactNumber, parse, passwordRule } from "../lib/validate.js";
+import { NAME_ERROR, NAME_PATTERN, contactNumber, parse, passwordRule } from "../lib/validate.js";
 import { requireAuth, requireRole } from "../middleware/auth.js";
 import { logActivity } from "../lib/activity.js";
 import { currentUser } from "../middleware/auth.js";
@@ -13,7 +13,7 @@ const router = Router();
 router.use(requireAuth, requireRole("admin"));
 
 export const createUserSchema = z.object({
-  name: z.string().trim().min(2).max(80, "Keep the name under 80 characters."),
+  name: z.string().trim().min(2).max(80, "Keep the name under 80 characters.").regex(NAME_PATTERN, NAME_ERROR),
   email: z.email().max(254, "That email address is too long."),
   password: passwordRule,
   role: z.enum(ROLES),
@@ -21,7 +21,7 @@ export const createUserSchema = z.object({
 });
 
 const updateUserSchema = z.object({
-  name: z.string().trim().min(2).max(80, "Keep the name under 80 characters.").optional(),
+  name: z.string().trim().min(2).max(80, "Keep the name under 80 characters.").regex(NAME_PATTERN, NAME_ERROR).optional(),
   role: z.enum(ROLES).optional(),
   contact_number: contactNumber.optional(),
   is_active: z.boolean().optional(),

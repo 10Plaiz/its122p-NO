@@ -6,6 +6,7 @@ import { api } from "../lib/api.js";
 import { useAuth } from "../lib/auth.js";
 import { useAction, useApi } from "../lib/useApi.js";
 import { ROLES, ROLE_LABEL } from "../lib/types.js";
+import { validateName } from "../lib/names.js";
 import type { Profile, Role } from "../lib/types.js";
 
 // Wireframe 1q. Public registration always creates a citizen, so staff and admin
@@ -200,7 +201,8 @@ function CreateUser({ onDone }: { onDone: () => void }) {
 
   // Same rules the server applies in createUserSchema.
   const errors: Record<string, string> = {};
-  if (values.name.trim().length < 2) errors.name = "Enter a full name.";
+  const nameError = validateName(values.name, "Enter a full name.");
+  if (nameError) errors.name = nameError;
   if (!/^\S+@\S+\.\S+$/.test(values.email.trim())) errors.email = "Enter a valid email address.";
   if (values.password.length < 8) errors.password = "Use at least 8 characters.";
   else if (values.password.length > 72) errors.password = "Keep the password under 72 characters.";
@@ -228,7 +230,7 @@ function CreateUser({ onDone }: { onDone: () => void }) {
           admin's own address here would quietly create the wrong account, and
           `new-password` stops it treating the field as a login to fill or to save. */}
       <div className="grid gap-3 md:grid-cols-2">
-        <Field label="Full name" htmlFor="new-name" hint="At least 2 characters." error={shown.name} count={values.name.length} max={80}>
+        <Field label="Full name" htmlFor="new-name" hint="Letters, spaces, and . ' - only." error={shown.name} count={values.name.length} max={80}>
           <Input
             id="new-name"
             name="new-name"

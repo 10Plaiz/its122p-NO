@@ -2,14 +2,14 @@ import { Router } from "express";
 import { z } from "zod";
 import { auth, db } from "../config/supabase.js";
 import { badRequest, forbidden, orThrow, unauthorized } from "../lib/errors.js";
-import { contactNumber, parse, passwordRule } from "../lib/validate.js";
+import { NAME_ERROR, NAME_PATTERN, contactNumber, parse, passwordRule } from "../lib/validate.js";
 import { requireAuth } from "../middleware/auth.js";
 import { logActivity } from "../lib/activity.js";
 
 const router = Router();
 
 export const registerSchema = z.object({
-  name: z.string().trim().min(2, "Enter your full name.").max(80, "Keep the name under 80 characters."),
+  name: z.string().trim().min(2, "Enter your full name.").max(80, "Keep the name under 80 characters.").regex(NAME_PATTERN, NAME_ERROR),
   email: z.email("Enter a valid email address.").max(254, "That email address is too long."),
   password: passwordRule,
   contact_number: contactNumber.optional(),
