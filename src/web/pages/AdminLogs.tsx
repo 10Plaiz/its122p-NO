@@ -8,7 +8,7 @@ import {
   ToolbarItem,
   useColumnVisibility,
 } from "../components/data-table/index.js";
-import { Alert, EmptyState, Field, Input, Loading, Select, formatDateTime } from "../components/ui.js";
+import { Alert, Button, EmptyState, Field, Input, Loading, Select, formatDateTime } from "../components/ui.js";
 import { api } from "../lib/api.js";
 import { capNotice, describeFilters, exportTable } from "../lib/export.js";
 import type { Column, ExportFormat, ExportResult } from "../lib/table-types.js";
@@ -120,6 +120,15 @@ export function AdminLogsPage() {
   const { visible, setShown, reset } = useColumnVisibility(TABLE_ID, COLUMNS);
   const logs = data?.logs ?? [];
 
+  function clearFilters() {
+    setAction("");
+    setRole("");
+    setReference("");
+    setFrom("");
+    setTo("");
+    setPage(1);
+  }
+
   // Any filter change starts again from the first page.
   function change(set: (value: string) => void) {
     return (value: string) => {
@@ -226,7 +235,10 @@ export function AdminLogsPage() {
 
       {!loading && logs.length === 0 && filtered && (
         <EmptyState title="No entries match those filters">
-          Widen the dates, choose another action, or clear the report reference.
+          <p className="!m-0">Widen the dates, choose another action, or clear the report reference.</p>
+          <Button type="button" className="mt-3" onClick={clearFilters}>
+            Clear filters
+          </Button>
         </EmptyState>
       )}
 
@@ -237,7 +249,7 @@ export function AdminLogsPage() {
           visible={visible}
           rows={logs}
           rowKey={(log) => log.id}
-          caption={`Activity log, newest first, ${data?.total ?? 0} ${filtered ? "matching" : ""} entries in total.`.replace("  ", " ")}
+          caption={`Activity log, newest first, ${data?.total ?? 0} ${filtered ? "matching entries" : "entries in total"}.`}
         />
       )}
 
