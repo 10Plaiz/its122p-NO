@@ -10,6 +10,7 @@ import { NAME_PART_MAX, SUFFIXES, validateNameParts } from "../lib/names.js";
 import { PASSWORD_MAX, validatePassword } from "../lib/passwords.js";
 import { PasswordRules } from "../components/PasswordRules.js";
 import { ResidencyReview } from "../components/ResidencyReview.js";
+import { SpecializationEditor } from "../components/SpecializationEditor.js";
 import { RESIDENCY_LABEL, residencyStep } from "../lib/residency.js";
 import type { Profile, Role } from "../lib/types.js";
 
@@ -108,6 +109,9 @@ function UserRow({ user, onDone }: { user: Profile; onDone: () => void }) {
   const { user: currentUser } = useAuth();
   const [editing, setEditing] = useState(false);
   const [reviewing, setReviewing] = useState(false);
+  // SW-1: a staff member's categories open in a row of their own under theirs.
+  const [specializing, setSpecializing] = useState(false);
+  const specializationsId = `specializations-row-${user.id}`;
   const [role, setRole] = useState<Role>(user.role);
   const active = user.is_active !== false;
 
@@ -144,119 +148,139 @@ function UserRow({ user, onDone }: { user: Profile; onDone: () => void }) {
   }
 
   return (
-    <tr>
-      <td className="text-[13px]">{user.name}</td>
-      <td className="font-mono text-[11px]">{user.email}</td>
-      <td className="font-mono text-[11px]">
-        {user.contact_number ? (
-          <div className="flex flex-col items-start gap-1">
-            <span>{user.contact_number}</span>
-            <span className={user.phone_verified_at ? "tag tag-outline" : "text-muted"}>
-              {user.phone_verified_at ? "Verified" : "Not verified"}
-            </span>
-            <Button
-              type="button"
-              variant="ghost"
-              className="!px-0 text-[11px]"
-              disabled={phone.pending}
-              onClick={() => setPhoneVerified(!user.phone_verified_at)}
-            >
-              {user.phone_verified_at ? "Mark not verified" : "Mark verified"}
-              <span className="sr-only"> (mobile number of {user.name})</span>
-            </Button>
-            {phone.error && <span role="alert" className="text-accent-700">{phone.error.message}</span>}
-          </div>
-        ) : (
-          "—"
-        )}
-      </td>
-      <td>
-        {editing ? (
-          <Select
-            aria-label={`Role for ${user.name}`}
-            value={role}
-            onChange={(event) => setRole(event.target.value as Role)}
-          >
-            {ROLES.map((option) => (
-              <option key={option} value={option}>
-                {ROLE_LABEL[option]}
-              </option>
-            ))}
-          </Select>
-        ) : (
-          <span className="tag tag-outline">{ROLE_LABEL[user.role]}</span>
-        )}
-      </td>
-      <td className="text-[13px]">
-        {user.role === "citizen" ? (
-          <div className="flex flex-col items-start gap-1">
-            <span>{RESIDENCY_LABEL[residencyStep(user)]}</span>
-            <Button type="button" variant="ghost" className="!px-0 text-[12px]" onClick={() => setReviewing(true)}>
-              Review<span className="sr-only"> residency of {user.name}</span>
-            </Button>
-          </div>
-        ) : (
-          <span className="text-muted">—</span>
-        )}
-        {reviewing && (
-          <ResidencyReview
-            user={user}
-            onClose={() => setReviewing(false)}
-            onDone={() => {
-              setReviewing(false);
-              onDone();
-            }}
-          />
-        )}
-      </td>
-      <td className="text-[13px]">{active ? "Active" : "Deactivated"}</td>
-      <td className="font-mono text-[11px]">{formatDate(user.created_at ?? null)}</td>
-      <td>
-        <div className="flex gap-2 flex-wrap">
-          {editing ? (
-            <>
+    <>
+      <tr>
+        <td className="text-[13px]">{user.name}</td>
+        <td className="font-mono text-[11px]">{user.email}</td>
+        <td className="font-mono text-[11px]">
+          {user.contact_number ? (
+            <div className="flex flex-col items-start gap-1">
+              <span>{user.contact_number}</span>
+              <span className={user.phone_verified_at ? "tag tag-outline" : "text-muted"}>
+                {user.phone_verified_at ? "Verified" : "Not verified"}
+              </span>
               <Button
                 type="button"
-                variant="primary"
-                disabled={pending || role === user.role}
-                onClick={() => save({ role }, "Role updated.")}
+                variant="ghost"
+                className="!px-0 text-[11px]"
+                disabled={phone.pending}
+                onClick={() => setPhoneVerified(!user.phone_verified_at)}
               >
-                Save
+                {user.phone_verified_at ? "Mark not verified" : "Mark verified"}
+                <span className="sr-only"> (mobile number of {user.name})</span>
               </Button>
-              {/* Restores the dropdown as well as closing it. Leaving the picked role in
-                  state meant reopening the row showed a change nobody had saved, and the
-                  next Save applied it. */}
-              <Button
-                type="button"
-                onClick={() => {
-                  setRole(user.role);
-                  setEditing(false);
-                }}
-              >
-                Cancel
-              </Button>
-            </>
+              {phone.error && <span role="alert" className="text-accent-700">{phone.error.message}</span>}
+            </div>
           ) : (
-            <>
-              <Button type="button" disabled={isSelf} onClick={() => setEditing(true)}>
-                Change role
-              </Button>
-              {/* Accounts are deactivated, never deleted, so their reports and
-                  activity history survive. */}
-              <Button
-                type="button"
-                disabled={pending || isSelf}
-                onClick={() => save({ is_active: !active })}
-              >
-                {active ? "Deactivate" : "Reactivate"}
-              </Button>
-            </>
+            "—"
           )}
-        </div>
-        {isSelf && <span className="text-muted text-[11px]">This is your own account.</span>}
-        {error && <span role="alert" className="text-[11px] text-accent-700">{error.message}</span>}
-      </td>
-    </tr>
+        </td>
+        <td>
+          {editing ? (
+            <Select
+              aria-label={`Role for ${user.name}`}
+              value={role}
+              onChange={(event) => setRole(event.target.value as Role)}
+            >
+              {ROLES.map((option) => (
+                <option key={option} value={option}>
+                  {ROLE_LABEL[option]}
+                </option>
+              ))}
+            </Select>
+          ) : (
+            <span className="tag tag-outline">{ROLE_LABEL[user.role]}</span>
+          )}
+        </td>
+        <td className="text-[13px]">
+          {user.role === "citizen" ? (
+            <div className="flex flex-col items-start gap-1">
+              <span>{RESIDENCY_LABEL[residencyStep(user)]}</span>
+              <Button type="button" variant="ghost" className="!px-0 text-[12px]" onClick={() => setReviewing(true)}>
+                Review<span className="sr-only"> residency of {user.name}</span>
+              </Button>
+            </div>
+          ) : (
+            <span className="text-muted">—</span>
+          )}
+          {reviewing && (
+            <ResidencyReview
+              user={user}
+              onClose={() => setReviewing(false)}
+              onDone={() => {
+                setReviewing(false);
+                onDone();
+              }}
+            />
+          )}
+        </td>
+        <td className="text-[13px]">{active ? "Active" : "Deactivated"}</td>
+        <td className="font-mono text-[11px]">{formatDate(user.created_at ?? null)}</td>
+        <td>
+          <div className="flex gap-2 flex-wrap">
+            {editing ? (
+              <>
+                <Button
+                  type="button"
+                  variant="primary"
+                  disabled={pending || role === user.role}
+                  onClick={() => save({ role }, "Role updated.")}
+                >
+                  Save
+                </Button>
+                {/* Restores the dropdown as well as closing it. Leaving the picked role in
+                    state meant reopening the row showed a change nobody had saved, and the
+                    next Save applied it. */}
+                <Button
+                  type="button"
+                  onClick={() => {
+                    setRole(user.role);
+                    setEditing(false);
+                  }}
+                >
+                  Cancel
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button type="button" disabled={isSelf} onClick={() => setEditing(true)}>
+                  Change role
+                </Button>
+                {user.role === "staff" && (
+                  <Button
+                    type="button"
+                    aria-expanded={specializing}
+                    aria-controls={specializing ? specializationsId : undefined}
+                    onClick={() => setSpecializing((open) => !open)}
+                  >
+                    {specializing ? "Close specializations" : "Specializations"}
+                    <span className="sr-only"> for {user.name}</span>
+                  </Button>
+                )}
+                {/* Accounts are deactivated, never deleted, so their reports and
+                    activity history survive. */}
+                <Button
+                  type="button"
+                  disabled={pending || isSelf}
+                  onClick={() => save({ is_active: !active })}
+                >
+                  {active ? "Deactivate" : "Reactivate"}
+                </Button>
+              </>
+            )}
+          </div>
+          {isSelf && <span className="text-muted text-[11px]">This is your own account.</span>}
+          {error && <span role="alert" className="text-[11px] text-accent-700">{error.message}</span>}
+        </td>
+      </tr>
+      {specializing && (
+        <tr id={specializationsId}>
+          <td colSpan={8} className="bg-neutral-200/60">
+            <SpecializationEditor staffId={user.id} staffName={user.name} onSaved={() => setSpecializing(false)} />
+          </td>
+        </tr>
+      )}
+    </>
   );
 }
 

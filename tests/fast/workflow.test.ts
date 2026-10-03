@@ -108,11 +108,13 @@ describe("WF-02 every workflow decision needs a comment (SW-2)", () => {
     expect(assignSchema.safeParse({ staff_id: STAFF_ID, details: "Nearest crew." }).success).toBe(true);
   });
 
-  it("requires a comment to request resolution and accepts only the resolved outcome for now", () => {
+  it("requires a comment to request closure, as resolved by default or as rejected", () => {
     expect(closureRequestSchema.safeParse({}).success).toBe(false);
     const parsed = closureRequestSchema.parse({ details: "Replaced the lamp." });
     expect(parsed.outcome).toBe("resolved");
-    expect(closureRequestSchema.safeParse({ outcome: "rejected", details: "Cannot fix." }).success).toBe(false);
+    expect(closureRequestSchema.safeParse({ outcome: "rejected", details: "Private property." }).success).toBe(true);
+    expect(closureRequestSchema.safeParse({ outcome: "rejected", details: "  " }).success).toBe(false);
+    expect(closureRequestSchema.safeParse({ outcome: "deleted", details: "Gone." }).success).toBe(false);
   });
 
   it("requires a decision and a comment to verify", () => {
@@ -168,7 +170,7 @@ describe("WF-04 who may request and verify resolution (SW-4)", () => {
   it("lets only the assigned staff member request it", () => {
     expect(() => server.assertCanRequestClosure(report(), user("staff", STAFF_ID), NO_REQUEST)).not.toThrow();
     expect(() => server.assertCanRequestClosure(report(), user("staff", OTHER_STAFF_ID), NO_REQUEST)).toThrow(
-      "Only the staff member assigned to this report can request its resolution.",
+      "Only the staff member assigned to this report can ask for it to be closed.",
     );
     expect(() => server.assertCanRequestClosure(report(), user("admin", ADMIN_ID), NO_REQUEST)).toThrow();
   });
@@ -189,7 +191,7 @@ describe("WF-04 who may request and verify resolution (SW-4)", () => {
   it("verifies only a request that is still waiting", () => {
     expect(() => server.assertCanReviewClosure(report(), PENDING_REQUEST)).not.toThrow();
     expect(() => server.assertCanReviewClosure(report(), NO_REQUEST)).toThrow(
-      "This report has no resolution request waiting for verification.",
+      "This report has no request waiting for verification.",
     );
     expect(() =>
       server.assertCanReviewClosure(report(), { ...PENDING_REQUEST, verified_at: "2026-09-11T00:00:00.000Z" }),
@@ -320,12 +322,148 @@ describe("WF-05 the closure flow writes what it should (SW-4)", () => {
     ).rejects.toMatchObject({ status: 409 });
   });
 
-  it("refuses to approve an outcome this version cannot apply", async () => {
-    useFake((call) => (call.table === "reports" && call.op === "select" ? ok({ ...PENDING_REQUEST, closure_outcome: "rejected" }) : ok()));
+  it("refuses to approve a request with no outcome", async () => {
+    useFake((call) => (call.table === "reports" && call.op === "select" ? ok({ ...PENDING_REQUEST, closure_outcome: null }) : ok()));
 
     await expect(
       server.reviewClosure({ report: report(), user: user("admin", ADMIN_ID), decision: "approve", details: "Fine." }),
     ).rejects.toMatchObject({ status: 400 });
+  });
+});
+
+// SW-7: a report that cannot be fixed is closed as rejected, through the same
+// request and verification as a resolution.
+const REJECTION_REQUEST: WorkflowRow = {
+  ...PENDING_REQUEST,
+  closure_outcome: "rejected",
+  closure_reason: "The drain is on private property.",
+};
+
+describe("WF-08 who may request a rejection (SW-7)", () => {
+  const staff = user("staff", STAFF_ID);
+  const noProof = { photos: [] };
+
+  it("lets the assigned staff member ask from under review or in progress, without proof of repair", () => {
+    for (const status of ["under_review", "in_progress"] as const) {
+      expect(() => server.assertCanRequestClosure(report({ status, ...noProof }), staff, NO_REQUEST, "rejected")).not.toThrow();
+    }
+  });
+
+  it("refuses pending, closed, and cancelled reports", () => {
+    for (const status of ["pending", "resolved", "cancelled", "rejected"] as const) {
+      expect(() => server.assertCanRequestClosure(report({ status }), staff, NO_REQUEST, "rejected")).toThrow(
+        "Only a report under review or in progress can be rejected.",
+      );
+    }
+  });
+
+  it("refuses anyone but the assigned staff member, and a second request", () => {
+    expect(() =>
+      server.assertCanRequestClosure(report({ status: "under_review" }), user("staff", OTHER_STAFF_ID), NO_REQUEST, "rejected"),
+    ).toThrow("Only the staff member assigned to this report can ask for it to be closed.");
+    expect(() => server.assertCanRequestClosure(report({ status: "under_review" }), user("admin", ADMIN_ID), NO_REQUEST, "rejected")).toThrow();
+    expect(() => server.assertCanRequestClosure(report({ status: "under_review" }), staff, REJECTION_REQUEST, "rejected")).toThrow(
+      "This report is already waiting for an administrator to verify it.",
+    );
+  });
+
+  it("still keeps resolution to in-progress reports with proof", () => {
+    expect(() => server.assertCanRequestClosure(report({ status: "under_review" }), staff, NO_REQUEST, "resolved")).toThrow(
+      "Only a report in progress can be sent for verification.",
+    );
+  });
+
+  it("does not start work while a rejection request waits", async () => {
+    const waiting = report({
+      status: "under_review",
+      closure_requested_at: "2026-09-10T00:00:00.000Z",
+      verified_at: null,
+    });
+    await expect(
+      server.changeStatus({ report: waiting, user: user("admin", ADMIN_ID), newStatus: "in_progress", details: "Go." }),
+    ).rejects.toThrow("This report is waiting for an administrator to verify a request.");
+  });
+
+  it("lets an administrator verify a request waiting under review", () => {
+    expect(() => server.assertCanReviewClosure(report({ status: "under_review" }), REJECTION_REQUEST)).not.toThrow();
+    expect(() => server.assertCanReviewClosure(report({ status: "pending" }), REJECTION_REQUEST)).toThrow();
+  });
+});
+
+describe("WF-09 the rejection flow writes what it should (SW-7)", () => {
+  it("records the request with its reason and guards on the statuses it may start from", async () => {
+    const calls = useFake((call) => {
+      if (call.table === "reports" && call.op === "select") return ok(NO_REQUEST);
+      if (call.table === "reports" && call.op === "update") return ok([{ id: "report-wf-1" }]);
+      if (call.table === "profiles") return ok([{ id: ADMIN_ID }]);
+      return ok();
+    });
+
+    await server.requestClosure({
+      report: report({ status: "under_review", photos: [] }),
+      user: user("staff", STAFF_ID),
+      details: "The drain is on private property.",
+      outcome: "rejected",
+    });
+
+    const update = calls.find((call) => call.table === "reports" && call.op === "update");
+    expect(update?.payload).toMatchObject({ closure_outcome: "rejected", closure_reason: "The drain is on private property." });
+    expect(update?.filters).toContainEqual(["in", "status", ["under_review", "in_progress"]]);
+
+    const history = calls.find((call) => call.table === "report_updates");
+    expect(history?.payload).toMatchObject({
+      update_type: "closure_request",
+      details: "Rejection requested: The drain is on private property.",
+    });
+    const notices = calls.find((call) => call.table === "notifications")?.payload as { user_id: string; message: string }[];
+    expect(notices.find((n) => n.user_id === CITIZEN_ID)?.message).toContain("cannot be fixed");
+  });
+
+  it("approves: closes as rejected without a resolved date and tells the citizen why", async () => {
+    const calls = useFake((call) => {
+      if (call.table === "reports" && call.op === "select") return ok(REJECTION_REQUEST);
+      if (call.table === "reports" && call.op === "update") return ok({ ...report({ status: "under_review" }), status: "rejected" });
+      return ok();
+    });
+
+    const result = await server.reviewClosure({
+      report: report({ status: "under_review" }),
+      user: user("admin", ADMIN_ID),
+      decision: "approve",
+      details: "Confirmed with the barangay.",
+    });
+
+    expect(result.report.status).toBe("rejected");
+    const update = calls.find((call) => call.table === "reports" && call.op === "update");
+    expect(update?.payload).toMatchObject({ status: "rejected", resolved_at: null, verified_by: ADMIN_ID, is_public: true });
+    expect(update?.filters).toContainEqual(["in", "status", ["under_review", "in_progress"]]);
+
+    const history = calls.find((call) => call.table === "report_updates");
+    expect(history?.payload).toMatchObject({ update_type: "verification", previous_status: "under_review", new_status: "rejected" });
+
+    const notices = calls.find((call) => call.table === "notifications")?.payload as { user_id: string; message: string }[];
+    expect(notices.find((n) => n.user_id === CITIZEN_ID)?.message).toBe(
+      "Report KMT-2026-000200 was rejected: The drain is on private property.",
+    );
+  });
+
+  it("returns a rejection request waiting under review", async () => {
+    const calls = useFake((call) => {
+      if (call.table === "reports" && call.op === "select") return ok(REJECTION_REQUEST);
+      if (call.table === "reports" && call.op === "update") return ok(report({ status: "under_review" }));
+      return ok();
+    });
+
+    await server.reviewClosure({
+      report: report({ status: "under_review" }),
+      user: user("admin", ADMIN_ID),
+      decision: "return",
+      details: "The barangay says it is public. Please fix it.",
+    });
+
+    const update = calls.find((call) => call.table === "reports" && call.op === "update");
+    expect(update?.payload).toMatchObject({ closure_outcome: null, closure_reason: null });
+    expect(update?.filters).toContainEqual(["in", "status", ["under_review", "in_progress"]]);
   });
 });
 

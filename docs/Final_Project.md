@@ -59,29 +59,34 @@ Afonso (2017) notes that centralized web apps drastically lower the transaction 
 ### Citizen-Facing Features
 * Account registration and login
 * Submit infrastructure reports (category, description, photo, map location inside Makati City)
-* Track status of submitted reports (Pending -> Under Review -> In Progress -> Resolved)
+* Track status of submitted reports (Pending -> Under Review -> In Progress -> Resolved), or Rejected with the reason when a report cannot be fixed
 * View public transparency board of all community reports
+* Comment on their own reports at any status; the assigned staff member and the administrators are notified (up to 10 comments an hour)
+* Rate a resolved report from 1 to 5 with an optional comment, which reaches the staff member who did the work
 * Receive notifications on status updates
 
 ### Staff-Facing Features
 * View assigned or available reports/requests
 * Update the status of reports as work progresses
 * Add remarks, resolution notes, or completion photos
+* Request that a report be closed as resolved (with proof of repair) or rejected (with a reason, from Under Review or In Progress); an administrator verifies the request
 * Manage transactions related to processing a report (e.g., inspection logs, work orders)
+* See the reporter's rating on resolved reports and their own average rating
 
 ### Administrator-Facing Features
 * Manage user accounts (citizens and staff)
 * Manage infrastructure categories (roads, streetlights, drainage, signs, etc.)
 * Manage and oversee all submitted records/reports
 * Assign staff to reports
-* Generate analytics and summary reports (volume by category, resolution time, status distribution)
+* Verify staff requests to close a report as resolved or rejected, approving or returning each with a comment
+* Generate analytics and summary reports (volume by category, resolution time, status distribution, average citizen rating)
 * View system-wide activity logs
 
 ### Shared Features
 * Map-based geotagging of reports, limited to Makati City's boundary: a pin outside the city is refused in the browser, by the API, and by a database check
 * Photo upload/attachment support
 * Notification system for status changes
-* Public transparency board (view-only, no login required)
+* Public transparency board (view-only, no login required); rejected reports stay on it with their reason
 
 ---
 

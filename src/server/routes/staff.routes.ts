@@ -126,9 +126,7 @@ router.get("/:id/specializations", async (req, res) => {
 
 // PUT /api/staff/:id/specializations { category_ids } — replaces the set. Nothing is
 // deleted: a dropped category is switched off and comes back if chosen again.
-// PATCH is accepted as the same request because the web client has no put()
-// helper yet (src/web/lib/api.ts belongs to another work stream this phase).
-router.route("/:id/specializations").put(saveSpecializations).patch(saveSpecializations);
+router.put("/:id/specializations", saveSpecializations);
 
 async function saveSpecializations(req: Request, res: Response) {
   const { id } = parse(idSchema, req.params);

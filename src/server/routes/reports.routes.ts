@@ -6,7 +6,8 @@ import { parse } from "../lib/validate.js";
 import { photoUpload, photoUrl, savePhoto } from "../lib/photos.js";
 import { endOfDay, pageFields, searchFields, searchFilter, sortColumn } from "../lib/query.js";
 import { currentUser, requireAuth, requireResidency } from "../middleware/auth.js";
-import { REPORT_FIELDS, findReport, present, type Report } from "../services/reports.common.js";
+import { findReport, present, type Report } from "../services/reports.common.js";
+import { REPORT_ROW_FIELDS } from "../services/reports.rows.js";
 import { assertCanUpdate, assertCanView, scopeReportQuery } from "../services/reports.access.js";
 import { STATUSES } from "../services/reports.workflow.js";
 import submissionRoutes from "./reports.submission.routes.js";
@@ -36,7 +37,7 @@ router.get("/", async (req, res) => {
 
   let query = db
     .from("reports")
-    .select(REPORT_FIELDS, { count: "exact" })
+    .select(REPORT_ROW_FIELDS, { count: "exact" })
     .order(order.column, { ascending: order.ascending })
     .range((page - 1) * per_page, page * per_page - 1);
 

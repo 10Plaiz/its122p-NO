@@ -10,10 +10,11 @@ const COMMENT_MAX = 500;
 
 type Decision = "approve" | "return";
 
-// The administrator's half of SW-4. Staff asked for this report to be closed; the
-// administrator checks the proof and either approves, which closes it, or returns
-// it with a reason, which puts it back in the staff member's hands. Both need a
-// comment (SW-2).
+// The administrator's half of SW-4 and SW-7. Staff asked for this report to be
+// closed, as resolved (with proof of repair) or as rejected (with a reason that
+// becomes public). The administrator approves, which closes it, or returns it with
+// a reason, which puts it back in the staff member's hands. Both need a comment
+// (SW-2).
 export function VerificationPanel({
   report,
   closure,
@@ -33,7 +34,8 @@ export function VerificationPanel({
   );
 
   const proofCount = report.photos.filter((photo) => photo.kind === "resolution").length;
-  const outcomeLabel = closure.outcome === "rejected" ? "Rejected" : STATUS_LABEL.resolved;
+  const rejecting = closure.outcome === "rejected";
+  const outcomeLabel = rejecting ? STATUS_LABEL.rejected : STATUS_LABEL.resolved;
   const invalid = details.trim().length === 0;
   const shown = fields.visible(invalid ? { "verify-comment": "Write the reason for your decision." } : {});
 
@@ -45,7 +47,7 @@ export function VerificationPanel({
     if (done) {
       setDetails("");
       fields.reset();
-      toast(decision === "approve" ? `Report closed as ${outcomeLabel.toLowerCase()}.` : "Report returned to staff.");
+      toast(decision === "approve" ? `Report closed as ${outcomeLabel.toLowerCase()}.` : "Request returned to staff.");
       onDone();
     }
   }
@@ -57,7 +59,7 @@ export function VerificationPanel({
       onBlur={fields.onBlur}
     >
       <h6 id="verify-title" className="text-[13px] font-bold text-text !m-0 !normal-case tracking-normal">
-        Verify resolution
+        {rejecting ? "Verify rejection" : "Verify resolution"}
       </h6>
 
       <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-[13px] !m-0">
@@ -67,12 +69,21 @@ export function VerificationPanel({
         <dd className="!m-0 font-mono text-[12px]">{formatDateTime(closure.requested_at)}</dd>
         <dt className="text-neutral-700">Outcome asked</dt>
         <dd className="!m-0">{outcomeLabel}</dd>
-        <dt className="text-neutral-700">Proof of repair</dt>
-        <dd className="!m-0">
-          {proofCount === 1 ? "1 photo" : `${proofCount} photos`}, shown under Photo evidence
-        </dd>
+        {!rejecting && (
+          <>
+            <dt className="text-neutral-700">Proof of repair</dt>
+            <dd className="!m-0">
+              {proofCount === 1 ? "1 photo" : `${proofCount} photos`}, shown under Photo evidence
+            </dd>
+          </>
+        )}
       </dl>
 
+      {closure.reason && (
+        <p className="text-[12px] text-neutral-700 !m-0">
+          {rejecting ? "Reason given. If you approve, it is shown on the public board." : "What was done"}
+        </p>
+      )}
       {closure.reason && (
         <blockquote className="text-[13px] text-neutral-800 bg-bg border border-divider/60 p-2 leading-relaxed whitespace-pre-line break-words !m-0">
           {closure.reason}
@@ -104,7 +115,7 @@ export function VerificationPanel({
           {pending && deciding === "approve" ? "Closing…" : `Approve and close as ${outcomeLabel.toLowerCase()}`}
         </Button>
         <Button type="button" disabled={pending || invalid} onClick={() => decide("return")}>
-          {pending && deciding === "return" ? "Returning…" : "Return for more work"}
+          {pending && deciding === "return" ? "Returning…" : rejecting ? "Return to staff" : "Return for more work"}
         </Button>
       </div>
     </section>

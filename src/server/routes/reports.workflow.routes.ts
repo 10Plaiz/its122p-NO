@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { z } from "zod";
 import { logReportActivity } from "../lib/activity.js";
+import { limits } from "../lib/rate-limit.js";
 import { parse } from "../lib/validate.js";
 import { currentUser, requireRole } from "../middleware/auth.js";
 import { findReport, present } from "../services/reports.common.js";
@@ -48,9 +49,11 @@ export const assignSchema = z.object({
   details: comment("Enter a comment for the assignment."),
 });
 
+// "resolved" says the work is done (SW-4); "rejected" says the report cannot be
+// fixed (SW-7), and its reason is shown on the public board once approved.
 export const closureRequestSchema = z.object({
-  outcome: z.enum(CLOSURE_OUTCOMES, { error: "A report can only be sent for verification as resolved." }).default("resolved"),
-  details: comment("Describe the work done before requesting resolution."),
+  outcome: z.enum(CLOSURE_OUTCOMES, { error: "Ask for the report to be closed as resolved or rejected." }).default("resolved"),
+  details: comment("Explain the work done, or why the report cannot be fixed."),
 });
 
 export const closureReviewSchema = z.object({
@@ -99,19 +102,24 @@ router.patch("/:id/assign", requireRole("admin"), async (req, res) => {
 });
 
 // POST /api/reports/:id/remarks — a note on the report without changing status.
-router.post("/:id/remarks", requireRole("admin", "staff"), async (req, res) => {
+// Staff and admins act on reports they may update. The reporting citizen may
+// comment on their own report at any status (RS-6), ten times an hour.
+router.post("/:id/remarks", requireRole("admin", "staff", "citizen"), limits.citizenComment, async (req, res) => {
   const { details } = parse(remarkSchema, req.body);
   const report = await findReport(req.params.id);
-  assertCanUpdate(report, currentUser(req));
+  const user = currentUser(req);
+  if (user.role === "citizen") assertCanView(report, user);
+  else assertCanUpdate(report, user);
 
-  await addRemark({ report, user: currentUser(req), details });
+  await addRemark({ report, user, details });
 
-  await logReportActivity(req, "report.remark_added", report);
+  await logReportActivity(req, user.role === "citizen" ? "report.comment_added" : "report.remark_added", report);
   res.status(201).json({ ok: true });
 });
 
 // POST /api/reports/:id/closure-request — the assigned staff member says the work
-// is done. The report stays in progress until an administrator verifies it.
+// is done, or that the report cannot be fixed. Nothing changes status until an
+// administrator verifies it.
 router.post("/:id/closure-request", requireRole("staff"), async (req, res) => {
   const { outcome, details } = parse(closureRequestSchema, req.body);
   const report = await findReport(req.params.id);

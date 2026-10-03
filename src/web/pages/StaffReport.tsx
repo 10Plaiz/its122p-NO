@@ -22,9 +22,10 @@ import { authorResidencyLabel } from "../lib/residency.js";
 import { api } from "../lib/api.js";
 import { useAuth } from "../lib/auth.js";
 import { LocationMap } from "../components/LocationMap.js";
+import { FeedbackSummary } from "../components/FeedbackSummary.js";
 import { getReportReturnTarget } from "../lib/navigation.js";
 import { useAction, useApi } from "../lib/useApi.js";
-import { NEXT_STATUS, NEXT_STATUS_LABEL, STATUS_LABEL, updateTypeLabel } from "../lib/types.js";
+import { NEXT_STATUS, NEXT_STATUS_LABEL, REJECTABLE_STATUSES, STATUS_LABEL, historyLabel } from "../lib/types.js";
 import type { Report, ReportUpdate, ReportWorkflow } from "../lib/types.js";
 import { PhotoLightbox } from "../components/PhotoLightbox.js";
 
@@ -75,7 +76,8 @@ export function StaffReportPage() {
 
   const report = data.report;
   const workflow = workflowData?.workflow ?? null;
-  const closurePending = report.status === "in_progress" && Boolean(workflow?.closure?.pending);
+  // A request can wait under review (rejection) or in progress (either outcome).
+  const closurePending = REJECTABLE_STATUSES.includes(report.status) && Boolean(workflow?.closure?.pending);
   const isAssignee = user?.role === "staff" && report.assigned_staff?.id === user.id;
 
   return (
@@ -233,20 +235,21 @@ export function StaffReportPage() {
             <h3 className="text-[14px] font-bold text-text !m-0 !normal-case tracking-normal">
               Action workbench
             </h3>
-            {report.status === "in_progress" ? (
-              closurePending && workflow?.closure ? (
-                user?.role === "admin" ? (
-                  <VerificationPanel report={report} closure={workflow.closure} onDone={refresh} />
-                ) : (
-                  <StatusNote title="Waiting for verification">
-                    {workflow.closure.requested_by?.id === user?.id
-                      ? "You"
-                      : (workflow.closure.requested_by?.name ?? "Staff")}{" "}
-                    requested resolution on {formatDateTime(workflow.closure.requested_at)}. An administrator will
-                    approve it or return it with a comment.
-                  </StatusNote>
-                )
-              ) : isAssignee ? (
+            {closurePending && workflow?.closure ? (
+              user?.role === "admin" ? (
+                <VerificationPanel report={report} closure={workflow.closure} onDone={refresh} />
+              ) : (
+                <StatusNote title="Waiting for verification">
+                  {workflow.closure.requested_by?.id === user?.id
+                    ? "You"
+                    : (workflow.closure.requested_by?.name ?? "Staff")}{" "}
+                  requested {workflow.closure.outcome === "rejected" ? "rejection" : "resolution"} on{" "}
+                  {formatDateTime(workflow.closure.requested_at)}. An administrator will approve it or return it
+                  with a comment.
+                </StatusNote>
+              )
+            ) : report.status === "in_progress" ? (
+              isAssignee ? (
                 <RequestResolution report={report} ready={workflow !== null} onDone={refresh} />
               ) : (
                 <StatusNote title="Next step">
@@ -258,9 +261,19 @@ export function StaffReportPage() {
             ) : (
               <AdvanceStatus report={report} onDone={refresh} />
             )}
+            {isAssignee && !closurePending && REJECTABLE_STATUSES.includes(report.status) && (
+              <RequestRejection report={report} ready={workflow !== null} onDone={refresh} />
+            )}
             <AddRemark reportId={id} onDone={refresh} />
             <UploadResolution reportId={id} status={report.status} onDone={refresh} />
           </div>
+
+          {/* FB-1: the reporter's rating reaches the staff member (and admins). */}
+          {report.status === "resolved" && (
+            <div className="pt-4 border-t border-divider">
+              <FeedbackSummary report={report} />
+            </div>
+          )}
 
           <section className="flex flex-col gap-3 pt-4 border-t border-divider">
             <h6 className="text-[14px] font-bold text-text !m-0 !normal-case tracking-normal">History</h6>
@@ -278,7 +291,7 @@ export function StaffReportPage() {
                       <span className="text-[13px] font-bold text-text leading-snug">
                         {update.new_status
                           ? `${update.previous_status ? `${STATUS_LABEL[update.previous_status]} → ` : ""}${STATUS_LABEL[update.new_status]}`
-                          : updateTypeLabel(update.update_type)}
+                          : historyLabel(update)}
                       </span>
                     </div>
                     {update.details && (
@@ -516,6 +529,69 @@ function RequestResolution({ report, ready, onDone }: { report: Report; ready: b
   );
 }
 
+// SW-7: the staff member on the report says it cannot be fixed. Only the reason is
+// needed, no proof photo; an administrator approves or returns the request. Once
+// approved, the reason is shown on the public board, and the form says so.
+function RequestRejection({ report, ready, onDone }: { report: Report; ready: boolean; onDone: () => void }) {
+  const toast = useToast();
+  const [details, setDetails] = useState("");
+  const fields = useLeftFields();
+
+  const { run, pending, error } = useAction((body: { outcome: "rejected"; details: string }) =>
+    api.post<{ workflow: ReportWorkflow }>(`/reports/${report.id}/closure-request`, body),
+  );
+
+  const invalid = details.trim().length === 0;
+  const shown = fields.visible(invalid ? { "rejection-details": "Explain why the report cannot be fixed." } : {});
+
+  return (
+    <section className="bg-surface border border-divider p-4 flex flex-col gap-3" onBlur={fields.onBlur}>
+      <h6 className="text-[13px] font-bold text-text !m-0 !normal-case tracking-normal">Request rejection</h6>
+      <p className="text-[13px] text-neutral-800 !m-0">
+        If this report cannot be fixed, for example because it is on private property or outside the city&rsquo;s
+        responsibility, ask an administrator to close it as rejected.
+      </p>
+
+      <Field
+        label="Reason"
+        htmlFor="rejection-details"
+        hint="Required. The citizen, administrators, and the public board see this."
+        error={shown["rejection-details"] ?? error?.fieldErrors.details}
+        count={details.length}
+        max={COMMENT_MAX}
+      >
+        <Textarea
+          id="rejection-details"
+          rows={3}
+          maxLength={COMMENT_MAX}
+          required
+          value={details}
+          onChange={(event) => setDetails(event.target.value)}
+        />
+      </Field>
+
+      {error && <Alert title="Could not request rejection">{error.message}</Alert>}
+
+      <Button
+        type="button"
+        disabled={pending || invalid || !ready}
+        onClick={async () => {
+          if (invalid) return;
+          const done = await run({ outcome: "rejected", details: details.trim() });
+          if (done) {
+            setDetails("");
+            fields.reset();
+            toast("Rejection requested. An administrator will verify it.");
+            onDone();
+          }
+        }}
+      >
+        {pending ? "Sending…" : "Request rejection"}
+      </Button>
+    </section>
+  );
+}
+
 // A note that does not move the report. Required, or there is nothing to record.
 function AddRemark({ reportId, onDone }: { reportId: string; onDone: () => void }) {
   const toast = useToast();
@@ -590,7 +666,7 @@ function UploadResolution({
     api.upload<{ photo: unknown }>(`/reports/${reportId}/photos`, formData),
   );
 
-  if (status === "resolved" || status === "cancelled") return null;
+  if (status === "resolved" || status === "cancelled" || status === "rejected") return null;
 
   function check(candidate: File | null): string | undefined {
     if (!candidate) return "Choose a photo first.";

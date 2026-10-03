@@ -78,6 +78,7 @@ export const STATUS_COLOR: Record<ReportStatus, string> = {
   in_progress: "var(--color-accent)",
   resolved: "var(--color-success-700)",
   cancelled: "var(--color-neutral-300)",
+  rejected: "var(--color-neutral-800)",
 };
 
 // Google draws polygons on a canvas, which cannot read CSS variables, so the token is

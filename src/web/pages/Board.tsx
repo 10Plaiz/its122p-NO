@@ -157,8 +157,8 @@ export function BoardPage() {
           board on purpose: the headline a transparency board exists to publish should
           not move because a visitor picked a category. What the filter matched is
           reported over the list instead. */}
-      <div className="grid grid-cols-2 md:grid-cols-4 border-2 border-divider">
-        <Stat label="All" value={stats?.total} />
+      <div className="grid grid-cols-2 md:grid-cols-5 border-2 border-divider">
+        <Stat label="All" value={stats?.total} className="col-span-2 md:col-span-1" />
         {PUBLIC_STATUSES.map((key) => (
           <Stat key={key} label={STATUS_LABEL[key]} value={stats?.by_status?.[key]} />
         ))}
@@ -351,9 +351,9 @@ export function BoardPage() {
   );
 }
 
-function Stat({ label, value }: { label: string; value?: number }) {
+function Stat({ label, value, className = "" }: { label: string; value?: number; className?: string }) {
   return (
-    <div className="p-3 flex flex-col gap-0.5 border-r border-b border-divider last:border-r-0">
+    <div className={`p-3 flex flex-col gap-0.5 border-r border-b border-divider last:border-r-0 ${className}`.trim()}>
       <span className="font-mono text-[10px] uppercase tracking-wider text-muted">{label}</span>
       <span className="text-2xl font-extrabold tabular-nums">{value ?? "—"}</span>
     </div>

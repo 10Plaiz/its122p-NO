@@ -34,8 +34,8 @@ Written 2026-10-03 after reviewing commits `d27fd46..888e112`, [HANDOFF.md](HAND
 | C1 ✅ | Report data foundation | REPORT_FIELDS, `cancelReport` | KI-09 | S |
 | C2 ✅ | Server Makati check and pins | MP-2, B2 | KI-04 | S |
 | C3 ✅ | Google Maps on report pages; remove Leaflet | MP-1, SW-5, B3 | KI-09 | M |
-| C4 ⚑ | `rejected` status | SW-7, B1 | KI-09 | L |
-| C5 | Report page wiring and citizen comments | FB-1, RS-6, SW-3/6, B4 | KI-09 | M |
+| C4 ✅ | `rejected` status | SW-7, B1 | KI-09 | L |
+| C5 ✅ | Report page wiring and citizen comments | FB-1, RS-6, SW-3/6, B4 | KI-09 | M |
 | C6 | Tables, admin users, logs | TB, SW-1, B5, B6, B9 | KI-09 | L |
 | C7 | Area routing by barangay | SW-1, B7 | KI-09 | L |
 | C7b | Leftovers | DM-2 purge UI, B10 | KI-09 | S |
@@ -68,44 +68,20 @@ Why this order: C1 adds the fields that C4–C6 read. C2 must land before C8, be
 - Local run with the user's key: 8/8 browser checks, no console errors. Dialogs clear the map (`.gm-style` is z-index 0). The main chunk is about 492 kB, so the build warning is gone.
 - Left for C8: `tests/browser/citizen.browser.ts` and the verify-kamoti feature notes still target `.leaflet-container`.
 
-### C4 `rejected` status (SW-7)
-- New migration `supabase/migrations/20261003000700_rejected_status.sql`:
-  - `alter type report_status add value 'rejected'`. This must run outside a transaction that also uses the new value.
-  - Re-check the closure CHECKs from `…000400`, and the `public_reports` view and filters from `…000006`.
-- Server:
-  - `reports.workflow.ts`: `CLOSURE_OUTCOMES`, `OUTCOME_STATUS.rejected`, and a required reason.
-  - Notify the citizen with the reason.
-  - Update `retention.ts` and `analytics.ts` status lists, plus export and list filters (grep for `"cancelled"`).
-- Web:
-  - `types.ts` status union and labels.
-  - StatusBadge for `rejected`: its own tone, icon, and word.
-  - StaffReport "Request rejection" dialog with a required reason.
-  - Admin approve and return work the same as for resolution.
-  - Board/public view, filters, and the citizen's ReportDetail show the reason.
-- Rules:
-  - `resolved_at` stays null for a rejected report.
-  - The completion column shows `verified_at` as "Closed".
-  - Rejected reports cannot be rated (decision D2).
-- Tests: closure-review with outcome `rejected`, the required reason, a 409 race, and the label in `activity-labels.ts`.
+### C4 `rejected` status ✅ (2026-10-03)
+- Migrations `…000700` (enum value) and `…000710` (`public_reports.rejection_reason`, filled only for rejected reports). Both applied locally.
+- Server: `CLOSURE_OUTCOMES` gains `rejected`. `CLOSURE_FROM` allows rejection from under review or in progress with no proof photo. Guarded updates use `.in(status)`. The citizen's notice carries the reason.
+- Web: neutral Rejected badge and pin (cross). StaffReport "Request rejection" and the waiting note. VerificationPanel adapts. The citizen sees "Why it was rejected" and a closed date. The board card, filter, and stats include it. Dashboard "Open" counts open statuses.
+- Local run: 22/22 end-to-end checks (API guards, staff request, admin approve, citizen, board, public API, stats).
+- Decisions: shown publicly with the reason; requestable from under review or in progress.
 
-```mermaid
-sequenceDiagram
-  Staff->>API: POST /reports/:id/closure-request {outcome:"rejected", comment}
-  API->>DB: closure_requested_at, closure_outcome=rejected; log + update row
-  Admin->>API: POST /reports/:id/closure-review {decision:"approve", comment}
-  API->>DB: status=rejected, verified_at (guarded; 409 on race)
-  API-->>Citizen: notification with the reason
-```
-
-### C5 Report page wiring and citizen comments
-- RS-6: `POST /:id/remarks` also accepts the citizen who owns the report, at any status (no new route). It notifies the assigned staff member, and both timelines show it.
-- ReportDetail:
-  - Show `<FeedbackForm report />` to the owner (resolved only).
-  - Timeline uses `updateTypeLabel()`; show the "Awaiting verification" badge.
-  - Add a comment box for the owner.
-- StaffReport: add `<FeedbackSummary report />` between the workbench and History.
-- Optional: `RatingAverage` on StaffQueue and AdminDashboard.
-- Scope: Final_Project.md citizen features (comments, rating).
+### C5 Report page wiring and citizen comments ✅ (2026-10-03)
+- RS-6: `POST /:id/remarks` also takes the owning citizen at any status. It notifies the assigned staff member and every active admin, is limited to 10 an hour per citizen (`limits.citizenComment`, per account), and is logged as `report.comment_added`.
+- ReportDetail: `FeedbackForm` (owner, resolved), "Add a comment", readable history (`historyLabel`), and the "Awaiting verification" badge (`closurePendingOf`).
+- StaffReport: `FeedbackSummary` on resolved reports and `historyLabel`. StaffQueue "Your rating"; AdminDashboard "Citizen rating".
+- Tests: `tests/fast/comments.test.ts` runs the real route in an app with a stand-in database (18 tests).
+- Local run: 21/21 checks, covering the rating, comment, notifications, 403 for another citizen, the staff summary and averages, and the waiting badge.
+- Main chunk is back to about 503 kB (KI-21, planned for C9).
 
 ### C6 Tables, admin users, logs
 - B6: optional columns in `report-columns.tsx` and the export select:

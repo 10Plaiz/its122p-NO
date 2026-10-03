@@ -1,7 +1,8 @@
 import { Link } from "react-router-dom";
+import { RatingAverage } from "../components/FeedbackSummary.js";
 import { Alert, Loading } from "../components/ui.js";
 import { useApi } from "../lib/useApi.js";
-import { STATUSES, STATUS_LABEL } from "../lib/types.js";
+import { OPEN_STATUSES, STATUSES, STATUS_LABEL } from "../lib/types.js";
 import type { Analytics } from "../lib/types.js";
 
 // Wireframe 1o. Every number here comes from GET /api/admin/analytics, which
@@ -33,9 +34,17 @@ export function AdminDashboardPage() {
         />
         <Metric
           label="Open"
-          value={data.total_reports - data.resolved_count - (data.by_status.cancelled ?? 0)}
+          // Counted from the open statuses, so a new closed status (rejected) can
+          // never be mistaken for open work.
+          value={OPEN_STATUSES.reduce((sum, status) => sum + (data.by_status[status] ?? 0), 0)}
         />
       </div>
+
+      {/* FB-1: every reporter rating, across all staff. */}
+      <section className="flex flex-col gap-3">
+        <h6>Citizen rating</h6>
+        <RatingAverage />
+      </section>
 
       <section className="flex flex-col gap-3">
         <h6>By status</h6>

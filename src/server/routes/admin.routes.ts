@@ -11,6 +11,7 @@ import { logActivity } from "../lib/activity.js";
 import { currentUser } from "../middleware/auth.js";
 import { ROLES } from "../types/auth.js";
 import { calculateAnalytics, type AnalyticsReportRow } from "../lib/analytics.js";
+import { applyLogFilters, logFilterFields, logSelect } from "../lib/log-filters.js";
 
 const router = Router();
 router.use(requireAuth, requireRole("admin"));
@@ -249,22 +250,25 @@ router.get("/analytics", async (_req, res) => {
 
 // ----------------------------------------------------------------------- logs
 
-router.get("/logs", async (req, res) => {
-  const { page, per_page } = parse(
-    z.object({
-      page: z.coerce.number().int().min(1).default(1),
-      per_page: z.coerce.number().int().min(1).max(100).default(50),
-    }),
-    req.query,
-  );
+// GET /api/admin/logs — filtered on the server (B9) by action, actor role, report
+// reference, and date, so every page and the export see the same rows.
+export const logQuerySchema = z.object({
+  ...logFilterFields,
+  page: z.coerce.number().int().min(1).default(1),
+  per_page: z.coerce.number().int().min(1).max(100).default(50),
+});
 
-  const result = await db
-    .from("activity_logs")
-    .select("id, action, entity_type, entity_id, metadata, created_at, actor:profiles ( id, name, role )", {
-      count: "exact",
-    })
-    .order("created_at", { ascending: false })
-    .range((page - 1) * per_page, page * per_page - 1);
+router.get("/logs", async (req, res) => {
+  const { page, per_page, ...filters } = parse(logQuerySchema, req.query);
+
+  const result = await applyLogFilters(
+    db
+      .from("activity_logs")
+      .select(logSelect(filters), { count: "exact" })
+      .order("created_at", { ascending: false })
+      .order("id", { ascending: false }),
+    filters,
+  ).range((page - 1) * per_page, page * per_page - 1);
 
   res.json({
     logs: orThrow(result, "Activity logs could not be loaded."),

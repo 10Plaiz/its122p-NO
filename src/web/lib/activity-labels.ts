@@ -22,6 +22,7 @@ export const ACTIVITY_LABEL: Record<string, string> = {
   "report.status_changed": "Changed a report's status",
   "report.assigned": "Assigned a report",
   "report.remark_added": "Added a remark to a report",
+  "report.comment_added": "Reporter commented on their report",
   "report.closure_requested": "Requested resolution of a report",
   "report.closure_approved": "Approved a report's resolution",
   "report.closure_returned": "Returned a report for more work",

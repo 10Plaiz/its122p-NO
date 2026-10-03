@@ -54,7 +54,7 @@ Work plan and file ownership: [PARALLEL_PLAN.md](PARALLEL_PLAN.md).
 | RS-3 | Allow editing a submitted report, with the change recorded in its history. | Medium | Existing for the citizen while pending; history records field names only. |
 | RS-4 | Record a primary (required) and a secondary (optional) problem type for each report. | Medium | Gap. |
 | RS-5 | Keep a draft of the report form (text and pin) and warn before unsaved input is lost. | Medium | Gap. |
-| RS-6 | Let a citizen add a comment to their own report at any status; it appears in the report history and reaches the assigned staff member. | High | Gap: added by the team on 2026-10-03 (see Decisions). Only staff and admins can add remarks today. |
+| RS-6 | Let a citizen add a comment to their own report at any status; it appears in the report history and reaches the assigned staff member. | High | Done locally (2026-10-03): `POST /api/reports/:id/remarks` accepts the owner at any status; history reads \"Comment from the reporter\"; notifies the assigned staff member and every administrator; 10 an hour per citizen. |
 
 ## 4. Staff Workflow
 
@@ -66,7 +66,7 @@ Work plan and file ownership: [PARALLEL_PLAN.md](PARALLEL_PLAN.md).
 | SW-4 | Staff request resolution; an Administrator approves or returns it before the report is closed. | High | Gap: staff set `resolved` directly. |
 | SW-5 | Show resolved reports in green, with a text label or icon as well. | Low | Done locally: badges (green, check, word) and map pins (green, check). |
 | SW-6 | Track status delays and show the relevant dates (submitted, assigned, completed). | Medium | Partial: submitted and resolved dates exist. |
-| SW-7 | Staff can reject a report that cannot be fixed, with a required reason, through admin verification (new `rejected` status). | High | Gap. Built in the integration phase. |
+| SW-7 | Staff can reject a report that cannot be fixed, with a required reason, through admin verification (new `rejected` status). | High | Done locally (2026-10-03): migrations `…000700` and `…000710`; request from under review or in progress; admin approves or returns; the citizen and the public board see the reason. |
 
 ## 5. Data Management
 
@@ -88,7 +88,7 @@ Work plan and file ownership: [PARALLEL_PLAN.md](PARALLEL_PLAN.md).
 
 | ID | Requirement | Priority | Status |
 | :--- | :--- | :--- | :--- |
-| FB-1 | Let the citizen rate and comment on a resolved report, and route that feedback to the assigned staff member. | Medium | Gap. |
+| FB-1 | Let the citizen rate and comment on a resolved report, and route that feedback to the assigned staff member. | Medium | Done locally (2026-10-03): rating form on the citizen's resolved report, the reporter's rating on the staff page, averages on the staff queue and admin dashboard. |
 
 ## Implementation Notes
 
@@ -121,3 +121,5 @@ Work plan and file ownership: [PARALLEL_PLAN.md](PARALLEL_PLAN.md).
 | RS-6 | "Comments required" (2026-10-03) | Citizens can comment on their own reports at any status, including resolved, rejected, and cancelled. Not on other people's reports. |
 | FB-1, SW-7 | Rating a rejected report (2026-10-03) | Ratings stay for resolved reports only; comments (RS-6) cover every other status. A rejected report shows a "Closed" date (`verified_at`); `resolved_at` stays empty. |
 | UA-13 | Citizen self-edit (2026-10-03) | In scope. The rules for a changed number or address are settled when it is built. |
+| SW-7 | Rejected reports on the board; when staff can reject (2026-10-03) | Rejected reports stay on the public board with the approved reason; other closure reasons stay private. Staff can request rejection from under review or in progress, without a proof photo. |
+| RS-6 | Who hears about a comment; spam (2026-10-03) | A citizen's comment notifies the assigned staff member and every active administrator. Ten comments an hour per citizen (per account, not per network); staff and admin remarks are not limited. |

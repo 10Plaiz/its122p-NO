@@ -21,6 +21,7 @@ import { useToast } from "../components/Toast.js";
 import { VoiceInput } from "../components/VoiceInput.js";
 import { reverseGeocode } from "../lib/maps.js";
 import { LocationMap } from "../components/LocationMap.js";
+import { FeedbackForm } from "../components/FeedbackForm.js";
 import { api } from "../lib/api.js";
 import { useAuth } from "../lib/auth.js";
 import {
@@ -36,7 +37,7 @@ import {
 import type { ProblemTypesResponse, ReportProblems } from "../lib/submission-types.js";
 import { useUnsavedChangesWarning } from "../lib/useDraft.js";
 import { useAction, useApi } from "../lib/useApi.js";
-import { ROLE_LABEL, STATUS_LABEL } from "../lib/types.js";
+import { ROLE_LABEL, STATUS_LABEL, closurePendingOf, historyLabel } from "../lib/types.js";
 import type { Category, Report, ReportUpdate } from "../lib/types.js";
 import { getReportReturnTarget } from "../lib/navigation.js";
 import { PhotoLightbox } from "../components/PhotoLightbox.js";
@@ -75,8 +76,8 @@ export function ReportDetailPage() {
   if (!data) return null;
 
   const report = data.report;
-  const canEdit =
-    user?.role === "citizen" && report.citizen?.id === user.id && report.status === "pending";
+  const isOwner = user?.role === "citizen" && report.citizen?.id === user.id;
+  const canEdit = isOwner && report.status === "pending";
   const problems: ReportProblems = { primary: report.primary_problem, secondary: report.secondary_problem };
 
   if (isEditing && canEdit) {
@@ -102,7 +103,7 @@ export function ReportDetailPage() {
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <span className="font-mono text-[11px] text-muted">{report.reference_code}</span>
           <div className="flex items-center gap-2">
-            <StatusBadge status={report.status} />
+            <StatusBadge status={report.status} awaitingVerification={closurePendingOf(report)} />
             {canEdit && (
               <Button type="button" variant="secondary" onClick={() => setIsEditing(true)}>
                 Edit report
@@ -114,6 +115,7 @@ export function ReportDetailPage() {
         <p className="text-muted font-mono text-[11px]">
           {report.category?.name ?? "Uncategorised"} &middot; filed {formatDateTime(report.submitted_at)}
           {report.resolved_at ? ` · resolved ${formatDateTime(report.resolved_at)}` : ""}
+          {report.status === "rejected" && report.verified_at ? ` · closed ${formatDateTime(report.verified_at)}` : ""}
         </p>
       </header>
 
@@ -136,6 +138,14 @@ export function ReportDetailPage() {
             <p className="text-[14px] whitespace-pre-line">{report.description}</p>
             {report.address_text && <p className="text-muted text-[13px]">{report.address_text}</p>}
           </section>
+
+          {/* SW-7: the citizen reads why their report was closed without a repair. */}
+          {report.status === "rejected" && report.closure_reason && (
+            <section className="flex flex-col gap-1 border-t border-divider pt-3">
+              <h6>Why it was rejected</h6>
+              <p className="text-[14px] whitespace-pre-line break-words !m-0">{report.closure_reason}</p>
+            </section>
+          )}
 
           {report.assigned_staff && (
             <section className="flex flex-col gap-1 border-t border-divider pt-3">
@@ -207,6 +217,9 @@ export function ReportDetailPage() {
               </div>
             </section>
           )}
+
+          {/* FB-1: only the reporter rates, and only a resolved report. */}
+          {isOwner && <FeedbackForm report={report} />}
         </div>
 
         <div className="flex flex-col gap-4">
@@ -222,6 +235,7 @@ export function ReportDetailPage() {
           <section className="flex flex-col gap-3">
             <h6>History</h6>
             <Timeline updates={history?.updates ?? []} />
+            {isOwner && <ReportComment reportId={report.id} onDone={reloadHistory} />}
           </section>
         </div>
       </div>
@@ -270,7 +284,7 @@ function Timeline({ updates }: { updates: ReportUpdate[] }) {
                 )}
               </>
             ) : (
-              update.update_type.replace(/[._]/g, " ")
+              historyLabel(update)
             )}
           </p>
           {update.details && <p className="text-[13px] text-muted pt-0.5">{update.details}</p>}
@@ -281,6 +295,67 @@ function Timeline({ updates }: { updates: ReportUpdate[] }) {
         </li>
       ))}
     </ol>
+  );
+}
+
+// RS-6: the reporter can add a comment at any status, such as "the water is
+// rising again" after it was resolved. It goes into the history and reaches the
+// assigned staff member and the administrators. Ten an hour (the server says so).
+const COMMENT_MAX = 500;
+
+function ReportComment({ reportId, onDone }: { reportId: string; onDone: () => void }) {
+  const toast = useToast();
+  const [details, setDetails] = useState("");
+  const fields = useLeftFields();
+
+  const { run, pending, error } = useAction((body: { details: string }) =>
+    api.post<{ ok: true }>(`/reports/${reportId}/remarks`, body),
+  );
+
+  const invalid = details.trim().length === 0;
+  const shown = fields.visible(invalid ? { "report-comment": "Write your comment before sending it." } : {});
+
+  return (
+    <form
+      className="flex flex-col gap-3 border-t border-divider pt-3"
+      onBlur={fields.onBlur}
+      onSubmit={async (event) => {
+        event.preventDefault();
+        if (invalid) return;
+        const done = await run({ details: details.trim() });
+        if (done) {
+          setDetails("");
+          fields.reset();
+          toast("Comment sent. Staff and administrators will see it in the history.");
+          onDone();
+        }
+      }}
+    >
+      <Field
+        label="Add a comment"
+        htmlFor="report-comment"
+        hint="Staff and administrators read this. It is added to the history above."
+        error={shown["report-comment"] ?? error?.fieldErrors.details}
+        count={details.length}
+        max={COMMENT_MAX}
+      >
+        <Textarea
+          id="report-comment"
+          name="comment"
+          rows={3}
+          maxLength={COMMENT_MAX}
+          autoComplete="off"
+          value={details}
+          onChange={(event) => setDetails(event.target.value)}
+        />
+      </Field>
+
+      {error && !error.fieldErrors.details && <Alert title="Could not send the comment">{error.message}</Alert>}
+
+      <Button type="submit" className="self-start" disabled={pending || invalid}>
+        {pending ? "Sending…" : "Send comment"}
+      </Button>
+    </form>
   );
 }
 

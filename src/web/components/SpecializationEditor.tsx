@@ -32,8 +32,8 @@ export function SpecializationEditor({
   }, [current.data]);
 
   const { run, pending, error } = useAction((body: { category_ids: number[] }) =>
-    // PATCH, accepted by the server as the same request as PUT (see staff.routes.ts).
-    api.patch<{ specializations: Specialization[] }>(`/staff/${staffId}/specializations`, body),
+    // PUT: the request replaces the whole set (see staff.routes.ts).
+    api.put<{ specializations: Specialization[] }>(`/staff/${staffId}/specializations`, body),
   );
 
   if (categories.loading || current.loading || !chosen) {

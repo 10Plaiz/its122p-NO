@@ -7,37 +7,49 @@ import { REPORT_FIELDS, recordUpdate, reportLabel, type Notice, type Report, typ
 // "cancelled" is a dead end reached only by the citizen who filed the report.
 // "in_progress" has no manual next step: the assigned staff member requests
 // resolution and an administrator closes the report by verifying it (SW-4).
+// "rejected" is reached the same way, from under review or in progress, when the
+// report cannot be fixed (SW-7).
 export const NEXT_STATUS: Record<ReportStatus, ReportStatus[]> = {
   pending: ["under_review"],
   under_review: ["in_progress"],
   in_progress: [],
   resolved: [],
   cancelled: [],
+  rejected: [],
 };
 
 // Every status a report can hold — used for filtering.
-export const STATUSES = ["pending", "under_review", "in_progress", "resolved", "cancelled"] as const;
+export const STATUSES = ["pending", "under_review", "in_progress", "resolved", "cancelled", "rejected"] as const;
 
 // The subset staff and admins can set by hand. Only a citizen cancels their own
 // report, and only an administrator's verification resolves one.
 export const STAFF_STATUSES = ["under_review", "in_progress"] as const;
 
 // The only statuses the public board can show: a report appears once it leaves
-// `pending`, and a cancelled one never appears. These answer "what can be seen",
-// which is a different question from STAFF_STATUSES' "what can be set".
-export const PUBLIC_STATUSES = ["under_review", "in_progress", "resolved"] as const;
+// `pending`, and a cancelled one never appears. A rejected one stays, with its
+// reason (decision 2026-10-03). These answer "what can be seen", which is a
+// different question from STAFF_STATUSES' "what can be set".
+export const PUBLIC_STATUSES = ["under_review", "in_progress", "resolved", "rejected"] as const;
 
 // Statuses that still need work. Counts toward a staff member's open load.
 export const OPEN_STATUSES = ["pending", "under_review", "in_progress"] as const;
 
-// What a closure request asks for. The database also accepts "rejected" for the
-// later rejected status (SW-7); the API offers it once that status exists.
-export const CLOSURE_OUTCOMES = ["resolved"] as const;
-export type ClosureOutcome = "resolved" | "rejected";
+// What a closure request asks for: the work is done (SW-4), or the report cannot be
+// fixed (SW-7).
+export const CLOSURE_OUTCOMES = ["resolved", "rejected"] as const;
+export type ClosureOutcome = (typeof CLOSURE_OUTCOMES)[number];
 
-// The status an approved request moves the report to. A stored outcome missing
-// here cannot be approved by this version.
-const OUTCOME_STATUS: Partial<Record<ClosureOutcome, ReportStatus>> = { resolved: "resolved" };
+// The status an approved request moves the report to.
+const OUTCOME_STATUS: Record<ClosureOutcome, ReportStatus> = { resolved: "resolved", rejected: "rejected" };
+
+// Where each request can start. Resolution needs the work under way; a report can
+// be found unfixable as soon as it is reviewed, without starting work on it.
+export const CLOSURE_FROM: Record<ClosureOutcome, readonly ReportStatus[]> = {
+  resolved: ["in_progress"],
+  rejected: ["under_review", "in_progress"],
+};
+// Every status a request can be waiting in, for the guarded updates below.
+const REQUESTABLE: ReportStatus[] = ["under_review", "in_progress"];
 
 // How long a report may sit in a status before it shows as delayed, in days.
 // Mirrored in src/web/lib/types.ts. A closure request waiting for an administrator
@@ -153,6 +165,15 @@ export async function changeStatus({ report, user, newStatus, details }: { repor
   if (report.status === "in_progress") {
     throw badRequest("A report in progress is closed by requesting resolution, which an administrator then verifies.");
   }
+  // A rejection asked for under review waits for an administrator; work does not
+  // start around it. REPORT_FIELDS carries both columns.
+  const waiting = closurePending({
+    closure_requested_at: (report.closure_requested_at as string | null) ?? null,
+    verified_at: (report.verified_at as string | null) ?? null,
+  });
+  if (waiting) {
+    throw badRequest("This report is waiting for an administrator to verify a request. Decide on that first.");
+  }
   if (!NEXT_STATUS[report.status].includes(newStatus)) {
     const allowed = NEXT_STATUS[report.status];
     throw badRequest(
@@ -246,7 +267,36 @@ export async function assignStaff({ report, user, staffId, details }: { report: 
   return { report: updated as unknown as Report, staff: { id: staff.id as string, name: staff.name as string } };
 }
 
+// Every active administrator, for notices that are everyone's business.
+async function activeAdminIds(failure: string) {
+  const admins = orThrow(
+    await db.from("profiles").select("id").eq("role", "admin").eq("is_active", true),
+    failure,
+  ) as { id: string }[];
+  return admins.map((admin) => admin.id);
+}
+
 export async function addRemark({ report, user, details }: { report: Report; user: AuthUser; details: string }) {
+  // RS-6: the reporter's own comment, at any status. It reaches the assigned staff
+  // member and every administrator (decision 2026-10-03), so it is never missed on
+  // a report nobody has picked up yet.
+  if (user.role === "citizen") {
+    const admins = await activeAdminIds("The comment could not be saved because administrators could not be found.");
+    await recordUpdate({
+      report,
+      actorId: user.id,
+      updateType: "remark",
+      details,
+      notify: [
+        { userId: report.assigned_staff?.id, message: `The reporter commented on ${reportLabel(report)}.` },
+        ...admins
+          .filter((id) => id !== report.assigned_staff?.id)
+          .map((id): Notice => ({ userId: id, message: `The reporter commented on ${reportLabel(report)}.` })),
+      ],
+    });
+    return;
+  }
+
   await recordUpdate({
     report,
     actorId: user.id,
@@ -264,27 +314,37 @@ export async function addRemark({ report, user, details }: { report: Report; use
   });
 }
 
-// Only the staff member doing the work can say it is done, only while it is in
-// progress, once, and with proof of repair attached.
-export function assertCanRequestClosure(report: Report, user: AuthUser, workflow: Pick<WorkflowRow, "closure_requested_at" | "verified_at">) {
+// Only the staff member on the report can ask for it to be closed, once at a time.
+// Resolution needs the work in progress and proof of repair; rejection needs only
+// the reason, from under review or in progress (SW-7).
+export function assertCanRequestClosure(
+  report: Report,
+  user: AuthUser,
+  workflow: Pick<WorkflowRow, "closure_requested_at" | "verified_at">,
+  outcome: ClosureOutcome = "resolved",
+) {
   if (user.role !== "staff" || report.assigned_staff?.id !== user.id) {
-    throw forbidden("Only the staff member assigned to this report can request its resolution.");
+    throw forbidden("Only the staff member assigned to this report can ask for it to be closed.");
   }
-  if (report.status !== "in_progress") {
-    throw badRequest("Only a report in progress can be sent for verification.");
+  if (!CLOSURE_FROM[outcome].includes(report.status)) {
+    throw badRequest(
+      outcome === "resolved"
+        ? "Only a report in progress can be sent for verification."
+        : "Only a report under review or in progress can be rejected.",
+    );
   }
   if (closurePending(workflow)) {
     throw badRequest("This report is already waiting for an administrator to verify it.");
   }
-  if (!(report.photos ?? []).some((photo) => photo.kind === "resolution")) {
+  if (outcome === "resolved" && !(report.photos ?? []).some((photo) => photo.kind === "resolution")) {
     throw badRequest("Upload at least one proof-of-repair photo before requesting resolution.");
   }
 }
 
 // An administrator can only decide on a request that is still waiting.
 export function assertCanReviewClosure(report: Report, workflow: Pick<WorkflowRow, "closure_requested_at" | "verified_at">) {
-  if (report.status !== "in_progress" || !closurePending(workflow)) {
-    throw badRequest("This report has no resolution request waiting for verification.");
+  if (!REQUESTABLE.includes(report.status) || !closurePending(workflow)) {
+    throw badRequest("This report has no request waiting for verification.");
   }
 }
 
@@ -294,7 +354,7 @@ const alreadyDecided = () =>
   new ApiError(409, "This request was already handled. Reload the report to see its current state.");
 
 export async function requestClosure({ report, user, details, outcome }: { report: Report; user: AuthUser; details: string; outcome: ClosureOutcome }) {
-  assertCanRequestClosure(report, user, await findWorkflow(report.id));
+  assertCanRequestClosure(report, user, await findWorkflow(report.id), outcome);
 
   const { data, error } = await db
     .from("reports")
@@ -305,30 +365,32 @@ export async function requestClosure({ report, user, details, outcome }: { repor
       closure_reason: details,
     })
     .eq("id", report.id)
-    .eq("status", "in_progress")
+    .in("status", CLOSURE_FROM[outcome])
     .is("closure_requested_at", null)
     .select("id");
-  throwIfFailed({ error }, "The resolution request could not be saved.");
+  throwIfFailed({ error }, "The request could not be saved.");
   if (!data || data.length === 0) throw alreadyDecided();
 
-  const admins = orThrow(
-    await db.from("profiles").select("id").eq("role", "admin").eq("is_active", true),
-    "The resolution request was saved but administrators could not be found.",
-  ) as { id: string }[];
+  const admins = await activeAdminIds("The request was saved but administrators could not be found.");
 
+  const rejecting = outcome === "rejected";
   await recordUpdate({
     report,
     actorId: user.id,
     updateType: "closure_request",
-    details,
+    details: rejecting ? `Rejection requested: ${details}` : details,
     notify: [
       {
         userId: report.citizen.id,
-        message: `Work on report ${report.reference_code} is finished and waiting for verification.`,
+        message: rejecting
+          ? `Staff found that report ${report.reference_code} cannot be fixed. An administrator will review the reason.`
+          : `Work on report ${report.reference_code} is finished and waiting for verification.`,
       },
-      ...admins.map((admin): Notice => ({
-        userId: admin.id,
-        message: `${reportLabel(report)} is waiting for your verification.`,
+      ...admins.map((id): Notice => ({
+        userId: id,
+        message: rejecting
+          ? `${reportLabel(report)}: staff asked to reject it. It is waiting for your verification.`
+          : `${reportLabel(report)} is waiting for your verification.`,
       })),
     ],
   });
@@ -347,12 +409,12 @@ export async function reviewClosure({ report, user, decision, details }: { repor
       .from("reports")
       .update({ closure_requested_at: null, closure_requested_by: null, closure_outcome: null, closure_reason: null })
       .eq("id", report.id)
-      .eq("status", "in_progress")
+      .in("status", REQUESTABLE)
       .not("closure_requested_at", "is", null)
       .is("verified_at", null)
       .select(REPORT_FIELDS)
       .maybeSingle();
-    throwIfFailed({ error }, "The resolution request could not be returned.");
+    throwIfFailed({ error }, "The request could not be returned.");
     if (!data) throw alreadyDecided();
 
     await recordUpdate({
@@ -367,7 +429,7 @@ export async function reviewClosure({ report, user, decision, details }: { repor
   }
 
   const newStatus = workflow.closure_outcome ? OUTCOME_STATUS[workflow.closure_outcome] : undefined;
-  if (!newStatus) throw badRequest("This request asks for an outcome that cannot be applied yet. Return it instead.");
+  if (!newStatus) throw badRequest("This request asks for an outcome that cannot be applied. Return it instead.");
 
   const now = new Date().toISOString();
   const { data, error } = await db
@@ -381,7 +443,7 @@ export async function reviewClosure({ report, user, decision, details }: { repor
       is_public: true,
     })
     .eq("id", report.id)
-    .eq("status", "in_progress")
+    .in("status", REQUESTABLE)
     .not("closure_requested_at", "is", null)
     .is("verified_at", null)
     .select(REPORT_FIELDS)
@@ -397,7 +459,14 @@ export async function reviewClosure({ report, user, decision, details }: { repor
     newStatus,
     details,
     notify: [
-      { userId: report.citizen.id, message: `Report ${report.reference_code} is now "${newStatus}".` },
+      {
+        userId: report.citizen.id,
+        // The citizen needs the reason, not just the word (SW-7).
+        message:
+          newStatus === "rejected"
+            ? `Report ${report.reference_code} was rejected: ${workflow.closure_reason ?? details}`
+            : `Report ${report.reference_code} is now "${newStatus}".`,
+      },
       ...tellStaff(`${reportLabel(report)} was verified and closed as "${newStatus}".`),
     ],
   });

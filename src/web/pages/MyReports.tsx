@@ -54,9 +54,11 @@ export function MyReportsPage() {
       reportColumn.title((report) => `/reports/${report.id}`),
       reportColumn.category,
       reportColumn.status,
+      reportColumn.problems,
       reportColumn.location,
       reportColumn.filed,
       reportColumn.completed,
+      reportColumn.rating,
       {
         id: "actions",
         header: "Actions",

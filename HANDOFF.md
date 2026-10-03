@@ -8,7 +8,6 @@ Updated 2026-10-03 (S1 committed; Phase 2 planned in [PHASE2_PLAN.md](PHASE2_PLA
 - **One stream at a time** in the main session. No parallel agents (7 parallel agents hit the session limit on 2026-10-02).
 - **Pause for approval** after each stream or checkpoint. Report: what changed, review findings, check results.
 - **Be critical.** Review agent drafts before accepting; fix bugs; say what was wrong.
-- **Commit trailer** on every commit: `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>` and `Claude-Session: https://claude.ai/code/session_01F2YXueyCAknu3LPazw69pd`.
 - Never `git add -A` in the main checkout: `.claude/worktrees/` would be staged as embedded repos (it is now in `.git/info/exclude`).
 
 ## 2. Where the facts live
@@ -52,7 +51,7 @@ Updated 2026-10-03 (S1 committed; Phase 2 planned in [PHASE2_PLAN.md](PHASE2_PLA
 ## 5. Stream status (`888e112`: typecheck, 425 tests, build all green)
 | Stream | Reqs | Status | Review fixes made |
 | :--- | :--- | :--- | :--- |
-| S7 Feedback | FB-1 | Merged; UI not on pages yet (B4) | Notification failure no longer 500s after a saved rating |
+| S7 Feedback | FB-1 | Merged; B4 wired in C5 (form, summary, averages) | Notification failure no longer 500s after a saved rating |
 | S5 Data | DM-1, DM-2 | Merged; purge has no UI/schedule | Wrote missing handoff; browser cleanup skips rated reports |
 | S4 Workflow | SW-1–6 | Merged | Work needs an assignee before `in_progress`; labels for S5/S7 actions; test typing |
 | S2 Maps | MP-1, MP-2 | Merged; B2 done in C2, B3 done in C3 (Leaflet removed) | Verified boundary independently; flagged fixture pins in Manila |
@@ -105,7 +104,7 @@ Exact edits are in each `handoffs/S*.md`. Summary, roughly in order:
 16. `/code-review high` + `/security-review` on `improve/integration`; fix; report; local merge to `main` on the user's "okay".
 
 ## 8. Actions only the user (migration owner) can do
-- Apply migrations on a **disposable/local** Supabase first: `bunx supabase db push --dry-run`. Order: `…000100` no-delete, `…000200` accounts, `…000300` problem types, `…000400` workflow, `…000500` feedback, `…000600` Makati bbox.
+- Apply migrations on a **disposable/local** Supabase first: `bunx supabase db push --dry-run`. Order: `…000100` no-delete, `…000200` accounts, `…000300` problem types, `…000400` workflow, `…000500` feedback, `…000600` Makati bbox, `…000700` rejected status, `…000710` public rejection reason (each in its own transaction: Postgres cannot use a new enum value in the transaction that adds it).
 - Before or right after `…000600`: move existing `[FIXTURE]` and any out-of-Makati report pins inside Makati, then `validate constraint reports_within_makati_bbox` (a NOT VALID check still blocks UPDATEs on bad rows).
 - After `…000100`, deleting a user in the Supabase dashboard fails on purpose; deactivate instead.
 - Google Cloud: enable Maps JavaScript API + Places API (New); restrict the key by HTTP referrer and API; set `VITE_GOOGLE_MAPS_API_KEY` (optional `VITE_GOOGLE_MAPS_MAP_ID`).

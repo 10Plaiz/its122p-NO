@@ -2,12 +2,12 @@
 // frontend has one place to look; when a route's response changes, change it here.
 // Sources are named per block so a mismatch is traceable.
 
-export const STATUSES = ["pending", "under_review", "in_progress", "resolved", "cancelled"] as const;
+export const STATUSES = ["pending", "under_review", "in_progress", "resolved", "cancelled", "rejected"] as const;
 export type ReportStatus = (typeof STATUSES)[number];
 
 // The only statuses the public board can show — see PUBLIC_STATUSES in
 // src/server/services/reports.service.ts.
-export const PUBLIC_STATUSES = ["under_review", "in_progress", "resolved"] as const;
+export const PUBLIC_STATUSES = ["under_review", "in_progress", "resolved", "rejected"] as const;
 
 export const ROLES = ["citizen", "staff", "admin"] as const;
 export type Role = (typeof ROLES)[number];
@@ -22,6 +22,7 @@ export const STATUS_LABEL: Record<ReportStatus, string> = {
   in_progress: "In progress",
   resolved: "Resolved",
   cancelled: "Cancelled",
+  rejected: "Rejected",
 };
 
 // Roles follow the same rule as statuses above. `admin` reads as "Administrator"
@@ -44,6 +45,7 @@ export const NEXT_STATUS: Record<ReportStatus, ReportStatus | null> = {
   in_progress: null,
   resolved: null,
   cancelled: null,
+  rejected: null,
 };
 
 // The verb for taking that step, used on the button that takes it.
@@ -53,15 +55,21 @@ export const NEXT_STATUS_LABEL: Record<ReportStatus, string | null> = {
   in_progress: null,
   resolved: null,
   cancelled: null,
+  rejected: null,
 };
 
 // Mirrors STAFF_STATUSES in src/server/services/reports.workflow.ts: what staff and
 // admins can set by hand through PATCH /status.
 export const STAFF_STATUSES = ["under_review", "in_progress"] as const;
 
-// Mirrors CLOSURE_OUTCOMES: what a resolution request can ask for today.
-export const CLOSURE_OUTCOMES = ["resolved"] as const;
-export type ClosureOutcome = "resolved" | "rejected";
+// Mirrors CLOSURE_OUTCOMES: the work is done (SW-4), or the report cannot be fixed
+// (SW-7). Rejection can be asked from under review or in progress (CLOSURE_FROM).
+export const CLOSURE_OUTCOMES = ["resolved", "rejected"] as const;
+export type ClosureOutcome = (typeof CLOSURE_OUTCOMES)[number];
+export const REJECTABLE_STATUSES: readonly ReportStatus[] = ["under_review", "in_progress"];
+
+// Mirrors OPEN_STATUSES: reports that still need work.
+export const OPEN_STATUSES = ["pending", "under_review", "in_progress"] as const;
 
 // Mirrors DELAY_THRESHOLD_DAYS and VERIFICATION_DELAY_DAYS: days a report may sit
 // at a stage before it shows as delayed. The server computes the flag; these are
@@ -86,6 +94,19 @@ export const UPDATE_TYPE_LABEL: Record<string, string> = {
 
 export function updateTypeLabel(type: string) {
   return UPDATE_TYPE_LABEL[type] ?? type.replace(/[._]/g, " ");
+}
+
+// A history entry's heading when it is not a status change. A remark written by
+// the reporter is their comment (RS-6); staff and admin remarks stay "Remark".
+export function historyLabel(update: { update_type: string; author: { role: Role } | null }) {
+  if (update.update_type === "remark" && update.author?.role === "citizen") return "Comment from the reporter";
+  return updateTypeLabel(update.update_type);
+}
+
+// A closure request (resolution or rejection) waits for an administrator until it
+// is approved; returning it clears it. Mirrors closurePending on the server.
+export function closurePendingOf(report: { closure_requested_at: string | null; verified_at: string | null }) {
+  return Boolean(report.closure_requested_at) && !report.verified_at;
 }
 
 export type Profile = {
@@ -178,6 +199,8 @@ export type PublicReport = {
   submitted_at: string;
   resolved_at: string | null;
   photos: PublicPhoto[];
+  // SW-7: the approved reason, shown publicly; null unless the report was rejected.
+  rejection_reason: string | null;
 };
 
 // src/server/routes/reports.routes.ts — GET /:id/updates

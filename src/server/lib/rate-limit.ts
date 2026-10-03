@@ -24,6 +24,9 @@ type LimitOptions = {
   // Also key by the email in the body, so one address cannot be hammered from
   // a rotating set of IPs faster than a single IP could manage.
   perEmail?: boolean;
+  // Key by the signed-in account instead of the client, and count citizens only.
+  // Needs requireAuth first.
+  perCitizen?: boolean;
 };
 
 function clientKey(req: Request) {
@@ -35,14 +38,20 @@ function emailKey(req: Request) {
   return `${clientKey(req)}|${email}`;
 }
 
-export function limit({ windowMs, limit: max, message, failuresOnly = false, perEmail = false }: LimitOptions) {
+function citizenKey(req: Request) {
+  return `user:${req.user?.id ?? clientKey(req)}`;
+}
+
+export function limit({ windowMs, limit: max, message, failuresOnly = false, perEmail = false, perCitizen = false }: LimitOptions) {
   return rateLimit({
     windowMs,
     limit: max,
     standardHeaders: "draft-8",
     legacyHeaders: false,
     skipSuccessfulRequests: failuresOnly,
-    keyGenerator: perEmail ? emailKey : clientKey,
+    keyGenerator: perCitizen ? citizenKey : perEmail ? emailKey : clientKey,
+    // Staff and admin remarks are the work itself and are never throttled.
+    skip: perCitizen ? (req) => req.user?.role !== "citizen" : undefined,
     // Goes through the shared error handler so a 429 has the same { error } shape
     // as every other rejection and the screens show it like any other message.
     handler: (_req, _res, next) => next(new ApiError(429, message)),
@@ -69,4 +78,12 @@ export const limits = {
   refresh: limit({ windowMs: 15 * MINUTE, limit: 60, message: WAIT }),
   // UA-8: a few retries for a wrong or blurry file, not a way to fill the bucket.
   proofUpload: limit({ windowMs: 60 * MINUTE, limit: 10, message: "Too many uploads. Try again in an hour." }),
+  // RS-6: each comment notifies staff and every administrator, so ten an hour per
+  // citizen keeps real follow-ups and stops a flood (decision 2026-10-03).
+  citizenComment: limit({
+    windowMs: 60 * MINUTE,
+    limit: 10,
+    message: "You can send up to 10 comments an hour. Try again later.",
+    perCitizen: true,
+  }),
 };

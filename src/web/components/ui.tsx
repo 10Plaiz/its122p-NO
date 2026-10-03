@@ -152,7 +152,7 @@ export function Alert({ title, children }: { title: string; children?: ReactNode
 
 // Small glyphs that travel with a status word. Decorative: the word next to them
 // carries the meaning, so they are hidden from screen readers.
-function BadgeIcon({ kind }: { kind: "check" | "clock" | "alert" }) {
+function BadgeIcon({ kind }: { kind: "check" | "clock" | "alert" | "cross" }) {
   return (
     <svg
       aria-hidden="true"
@@ -167,6 +167,7 @@ function BadgeIcon({ kind }: { kind: "check" | "clock" | "alert" }) {
       className="shrink-0"
     >
       {kind === "check" && <path d="M2 6.5 4.75 9 10 3" />}
+      {kind === "cross" && <path d="M3 3l6 6M9 3 3 9" />}
       {kind === "clock" && (
         <>
           <circle cx="6" cy="6" r="4.5" />
@@ -196,10 +197,10 @@ export function StatusBadge({
   awaitingVerification = false,
 }: {
   status: ReportStatus;
-  /** True while a resolution request waits for an administrator (in_progress only). */
+  /** True while a closure request waits for an administrator (under review or in progress). */
   awaitingVerification?: boolean;
 }) {
-  if (status === "in_progress" && awaitingVerification) {
+  if ((status === "in_progress" || status === "under_review") && awaitingVerification) {
     return (
       <span className={WARNING_TAG}>
         <BadgeIcon kind="clock" />
@@ -211,6 +212,16 @@ export function StatusBadge({
     return (
       <span className={SUCCESS_TAG}>
         <BadgeIcon kind="check" />
+        {STATUS_LABEL[status]}
+      </span>
+    );
+  }
+  // SW-7: closed without a repair. Neutral, not red: red is the accent for active
+  // work and for errors, and a rejection is a decision, not a failure.
+  if (status === "rejected") {
+    return (
+      <span className="tag tag-neutral gap-1 border border-neutral-700">
+        <BadgeIcon kind="cross" />
         {STATUS_LABEL[status]}
       </span>
     );

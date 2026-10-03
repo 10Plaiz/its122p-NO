@@ -347,7 +347,8 @@ describe("FUNC-07 staff remark creation and audit preservation", () => {
 
 describe("FUNC-08 public transparency board visibility and query rules", () => {
   it("restricts public board display strictly to reviewed statuses", () => {
-    expect(PUBLIC_STATUSES).toEqual(["under_review", "in_progress", "resolved"]);
+    // Rejected reports stay public with their reason (SW-7, decision 2026-10-03).
+    expect(PUBLIC_STATUSES).toEqual(["under_review", "in_progress", "resolved", "rejected"]);
     expect(PUBLIC_STATUSES.includes("pending" as any)).toBe(false);
     expect(PUBLIC_STATUSES.includes("cancelled" as any)).toBe(false);
   });

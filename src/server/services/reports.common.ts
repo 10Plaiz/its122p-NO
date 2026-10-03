@@ -2,7 +2,7 @@ import { db } from "../config/supabase.js";
 import { badRequest, notFound, throwIfFailed } from "../lib/errors.js";
 import { photoUrl } from "../lib/photos.js";
 
-export type ReportStatus = "pending" | "under_review" | "in_progress" | "resolved" | "cancelled";
+export type ReportStatus = "pending" | "under_review" | "in_progress" | "resolved" | "cancelled" | "rejected";
 export type Report = {
   id: string;
   reference_code: string;

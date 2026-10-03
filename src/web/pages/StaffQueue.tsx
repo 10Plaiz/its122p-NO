@@ -12,6 +12,7 @@ import {
   useColumnVisibility,
 } from "../components/data-table/index.js";
 import { Alert, Card, EmptyState, Field, Input, Loading, Select, StatusBadge, formatDate } from "../components/ui.js";
+import { RatingAverage } from "../components/FeedbackSummary.js";
 import { describeFilters } from "../lib/export.js";
 import type { Column } from "../lib/table-types.js";
 import { useApi } from "../lib/useApi.js";
@@ -212,6 +213,12 @@ export function StaffQueuePage() {
           label="Queue pages"
         />
       )}
+
+      {/* FB-1: the staff member's own average from the reporters' ratings. */}
+      <section className="flex flex-col gap-2 border-t border-divider pt-4">
+        <h6 className="!m-0">Your rating</h6>
+        <RatingAverage />
+      </section>
     </div>
   );
 }

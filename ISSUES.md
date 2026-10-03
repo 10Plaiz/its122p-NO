@@ -35,7 +35,7 @@ Updated 2026-10-03, after the S1 Accounts work. A staging list for the team: [CO
 
 ### KI-01
 **Apply the new migrations to the shared Supabase project** · P1 · Database (migration owner)
-- **Problem:** six migrations (`supabase/migrations/20261003000100` to `…000600`) exist only in the repository. The API now reads the S1 account columns on every signed-in request, so deploying the code before `…000200_accounts.sql` makes every sign-in fail. Report pages and lists also read columns from `…000100`, `…000300`, and `…000400`.
+- **Problem:** eight migrations (`supabase/migrations/20261003000100` to `…000710`) exist only in the repository. The API now reads the S1 account columns on every signed-in request, so deploying the code before `…000200_accounts.sql` makes every sign-in fail. Report pages and lists also read columns from `…000100`, `…000300`, and `…000400`.
 - **Where:** `supabase/migrations/`; order and checks in [HANDOFF.md](HANDOFF.md) section 8.
 - **Done when:**
   - [ ] All six applied on a disposable or local project first (they applied cleanly to a fresh local database on 2026-10-03).
@@ -115,6 +115,7 @@ Updated 2026-10-03, after the S1 Accounts work. A staging list for the team: [CO
   - [ ] Locked citizen gets 403 `residency_required` on reports, notifications, feedback, and exports.
   - [ ] Anonymous and signed-in clients cannot read the `residency-proofs` bucket; only admins get a proof link.
   - [ ] `report_feedback` cannot be read or written directly; the feedback rules return 403, 400, and 409 as documented.
+  - [ ] `public_reports.rejection_reason` is filled only for rejected reports; a resolved report's closure reason never reaches the public board (SW-7).
 
 ---
 
@@ -126,10 +127,10 @@ Updated 2026-10-03, after the S1 Accounts work. A staging list for the team: [CO
 - **Where:** [HANDOFF.md](HANDOFF.md) section 7 (order) and [docs/updates/handoffs/](docs/updates/handoffs/) (exact edits).
 - **Done when** each is merged:
   - [ ] REPORT_FIELDS carries problems, workflow columns, and photo purge state.
-  - [ ] B1 `rejected` report status with a required reason (SW-7).
+  - [x] B1 `rejected` report status with a required reason (SW-7), Phase 2 C4.
   - [x] B2 server-side Makati check (see KI-04).
   - [x] B3 ReportDetail and StaffReport use Google Maps; Leaflet removed (C3).
-  - [ ] B4 feedback form and summary on the report pages.
+  - [x] B4 feedback form and summary on the report pages (C5).
   - [ ] B5 AdminUsers on `DataTable`, keeping the residency column, review dialog, and phone control.
   - [ ] B6 table and export columns, including residency and phone verified.
   - [ ] B7 area routing by barangay, or documented as a limitation.
@@ -226,7 +227,7 @@ Updated 2026-10-03, after the S1 Accounts work. A staging list for the team: [CO
 
 ### KI-21
 **Web bundle is over 500 kB** · P3 · Frontend
-- **Problem:** `bun run build` warned that the main chunk was over 500 kB. Removing Leaflet (C3) brought it to about 492 kB, so the warning is gone for now, with little headroom.
+- **Problem:** `bun run build` warns that the main chunk is over 500 kB. Removing Leaflet (C3) brought it to about 492 kB; wiring the feedback components (C5) put it back to about 503 kB.
 - **Where:** `src/web/routes.tsx` (pages are imported eagerly).
 - **Done when:** admin and staff pages are lazy-loaded and the warning is gone, or the threshold is raised with a reason.
 

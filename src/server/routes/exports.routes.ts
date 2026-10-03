@@ -15,7 +15,9 @@ import {
   sortColumn,
 } from "../lib/query.js";
 import { currentUser, requireAuth, requireResidency, requireRole } from "../middleware/auth.js";
-import { REPORT_FIELDS, present, type Report } from "../services/reports.common.js";
+import { present, type Report } from "../services/reports.common.js";
+import { REPORT_ROW_FIELDS } from "../services/reports.rows.js";
+import { applyLogFilters, logFilterFields, logSelect } from "../lib/log-filters.js";
 import { scopeReportQuery } from "../services/reports.access.js";
 import { STATUSES } from "../services/reports.workflow.js";
 
@@ -35,7 +37,9 @@ export const reportExportSchema = z.object({
   format: z.enum(EXPORT_FORMATS).default("csv"),
 });
 
+// The same filters as GET /api/admin/logs (B9), so the file matches the screen.
 export const logExportSchema = z.object({
+  ...logFilterFields,
   format: z.enum(EXPORT_FORMATS).default("csv"),
 });
 
@@ -68,7 +72,7 @@ router.get("/reports", async (req, res) => {
   const build = () => {
     let query = db
       .from("reports")
-      .select(REPORT_FIELDS, { count: "exact" })
+      .select(REPORT_ROW_FIELDS, { count: "exact" })
       .order(order.column, { ascending: order.ascending })
       // A tiebreaker, so rows that share a sort value cannot shift between chunks.
       .order("id", { ascending: true });
@@ -99,16 +103,17 @@ router.get("/reports", async (req, res) => {
 // GET /api/exports/logs — the system-wide activity log, newest first. Admin only,
 // like the log screen itself.
 router.get("/logs", requireRole("admin"), async (req, res) => {
-  const { format } = parse(logExportSchema, req.query);
+  const { format, ...filters } = parse(logExportSchema, req.query);
 
   const build = () =>
-    db
-      .from("activity_logs")
-      .select("id, action, entity_type, entity_id, metadata, created_at, actor:profiles ( id, name, role )", {
-        count: "exact",
-      })
-      .order("created_at", { ascending: false })
-      .order("id", { ascending: false });
+    applyLogFilters(
+      db
+        .from("activity_logs")
+        .select(logSelect(filters), { count: "exact" })
+        .order("created_at", { ascending: false })
+        .order("id", { ascending: false }),
+      filters,
+    );
 
   const { rows, total, capped } = await readAll(build, "The activity log could not be exported.");
 
