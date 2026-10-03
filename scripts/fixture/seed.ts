@@ -282,6 +282,15 @@ async function main(): Promise<void> {
     categoryIdByTitle.set(spec.title, chosen.id);
   }
 
+  // RS-4: every new report has a main problem. The fixture takes its category's
+  // first active problem type, which is the seed's most common one.
+  const problems = await db.from("problem_types").select("id, category_id").eq("is_active", true).order("id");
+  if (problems.error) throw new Error(problems.error.message);
+  const mainProblemByCategory = new Map<number, number>();
+  for (const problem of (problems.data ?? []) as { id: number; category_id: number }[]) {
+    if (!mainProblemByCategory.has(problem.category_id)) mainProblemByCategory.set(problem.category_id, problem.id);
+  }
+
   // ----------------------------------------------------------------- reports
 
   const reportLines: string[] = [];
@@ -289,7 +298,7 @@ async function main(): Promise<void> {
   for (const spec of REPORTS) {
     const existing = await db
       .from("reports")
-      .select("id, reference_code, citizen_id, assigned_staff_id, status, resolved_at")
+      .select("id, reference_code, citizen_id, assigned_staff_id, status, resolved_at, primary_problem_id")
       .eq("title", spec.title)
       .order("submitted_at")
       .limit(1)
@@ -307,8 +316,12 @@ async function main(): Promise<void> {
         assigned_staff_id: string | null;
         status: string;
         resolved_at: string | null;
+        primary_problem_id: number | null;
       };
       const fixes: Record<string, unknown> = {};
+      if (row.primary_problem_id === null) {
+        fixes.primary_problem_id = mainProblemByCategory.get(categoryIdByTitle.get(spec.title)!) ?? null;
+      }
       if (row.citizen_id !== citizenId) fixes.citizen_id = citizenId;
       if ((row.assigned_staff_id ?? null) !== staffId) fixes.assigned_staff_id = staffId;
       if (row.status !== spec.status) {
@@ -333,7 +346,9 @@ async function main(): Promise<void> {
           description: spec.description,
           citizen_id: citizenId,
           category_id: categoryIdByTitle.get(spec.title)!,
+          primary_problem_id: mainProblemByCategory.get(categoryIdByTitle.get(spec.title)!) ?? null,
           assigned_staff_id: staffId,
+          assigned_at: staffId ? new Date().toISOString() : null,
           status: spec.status,
           latitude: spec.latitude,
           longitude: spec.longitude,

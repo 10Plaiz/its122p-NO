@@ -7,6 +7,7 @@ import { parseArgs } from "node:util";
 import { createClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import { DEMO_DATASET as DATASET, generateSeed } from "./generate_seed.js";
+import { nameParts, workflowColumns } from "./workflow-columns.js";
 
 const directory = resolve(".seed");
 const privateDirectory = resolve(homedir(), ".local/share/kamoti/demo-seeds");
@@ -246,17 +247,39 @@ async function apply(db: Client, manifest: Manifest, state: State, fingerprint: 
     if (!result.data.user) throw new Error(`Could not create ${account.key}`);
     state.accountIds.set(account.key, result.data.user.id);
   }
-  const profiles = manifest.accounts.map(account => ({ id: accountId(state, account.key), email: account.email, name: account.name, role: account.role, contact_number: null, created_at: account.created_at, updated_at: account.created_at }));
+  // UA-7 name parts, and UA-8: demo citizens are confirmed residents, like the
+  // fixture's, or every one of them is locked to the proof-upload step.
+  const profiles = manifest.accounts.map(account => ({ id: accountId(state, account.key), email: account.email, name: account.name, ...nameParts(account.name), role: account.role, contact_number: null,
+    residency_status: account.role === "citizen" ? "verified" : null, created_at: account.created_at, updated_at: account.created_at }));
   await insertMissing(db, "profiles", missingRows(profiles, state.profiles));
+  // Demo citizens seeded before UA-8 existed are confirmed too.
+  const citizenIds = manifest.accounts.filter(account => account.role === "citizen").map(account => accountId(state, account.key));
+  fail((await db.from("profiles").update({ residency_status: "verified" }).in("id", citizenIds).is("residency_status", null)).error);
   await uploadAssets(db, files);
+  // RS-4: each category's first active problem type, the seed's most common one.
+  const problemRows = await db.from("problem_types").select("id, category_id").eq("is_active", true).order("id");
+  fail(problemRows.error);
+  const mainProblem = new Map<number, number>();
+  for (const row of (problemRows.data ?? []) as { id: number; category_id: number }[]) if (!mainProblem.has(row.category_id)) mainProblem.set(row.category_id, row.id);
+  const adminId = accountId(state, "admin");
+  const extraColumns = new Map<string, Record<string, unknown>>();
   const reports = manifest.reports.map(report => {
     const category = state.categoryRows.find(row => row.name === report.category);
     if (!category) throw new Error(`Missing category: ${report.category}`);
-    return { id: report.id, citizen_id: accountId(state, report.ownerKey), assigned_staff_id: report.staffKey ? accountId(state, report.staffKey) : null,
+    const staffId = report.staffKey ? accountId(state, report.staffKey) : null;
+    const extra = workflowColumns(report, { adminId, staffId, mainProblemId: mainProblem.get(category.id) ?? null });
+    extraColumns.set(report.id, extra);
+    return { id: report.id, citizen_id: accountId(state, report.ownerKey), assigned_staff_id: staffId,
       category_id: category.id, title: report.title, description: report.description, latitude: report.latitude, longitude: report.longitude,
-      address_text: report.address_text, status: report.status, is_public: report.is_public, submitted_at: report.submitted_at, updated_at: report.updated_at, resolved_at: report.resolved_at };
+      address_text: report.address_text, status: report.status, is_public: report.is_public, submitted_at: report.submitted_at, updated_at: report.updated_at, resolved_at: report.resolved_at, ...extra };
   });
   await insertMissing(db, "reports", missingRows(reports, state.tables.reports));
+  // Demo reports seeded before these columns existed get them once; rows that
+  // already have a main problem are left alone.
+  for (const existing of state.tables.reports) {
+    const extra = extraColumns.get(String(existing.id));
+    if (extra) fail((await db.from("reports").update(extra).eq("id", String(existing.id)).is("primary_problem_id", null)).error);
+  }
   const updates = manifest.reports.flatMap(report => report.updates.map(({ actorKey, ...update }) => ({ ...update, report_id: report.id, updated_by: accountId(state, actorKey) })));
   const notices = manifest.reports.flatMap(report => report.notifications.map(({ userKey, ...notice }) => ({ ...notice, report_id: report.id, user_id: accountId(state, userKey) })));
   const photos = manifest.reports.flatMap(report => report.photos.map(({ uploadedByKey, asset, ...photo }) => ({ ...photo, report_id: report.id, uploaded_by: accountId(state, uploadedByKey), storage_path: `${DATASET}/${asset}` })));
