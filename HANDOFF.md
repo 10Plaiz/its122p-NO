@@ -20,6 +20,7 @@ Updated 2026-10-03 (S1 committed; Phase 2 planned in [PHASE2_PLAN.md](PHASE2_PLA
 | [ISSUES.md](ISSUES.md) | Open issues and future work (KI-01 to KI-22), written for teammates to copy into GitHub Issues |
 | [COMMITS.md](COMMITS.md) | S1b/S1c commit list (done: `d27fd46`..`888e112`) |
 | [PHASE2_PLAN.md](PHASE2_PLAN.md) | Phase 2 checkpoints C0–C11, decisions D1–D5 |
+| [TEAM_HANDOFF.md](TEAM_HANDOFF.md) | For teammates: what changed C1–C9, how to run it, and the gaps left |
 | This file | Current state, S1 progress, what to do next |
 
 ## 3. Git state
@@ -27,7 +28,7 @@ Updated 2026-10-03 (S1 committed; Phase 2 planned in [PHASE2_PLAN.md](PHASE2_PLA
 | :--- | :--- | :--- | :--- |
 | `main` | `afb2d51` | — | Untouched |
 | `improve/base` | `3ac34c9` | — | Phase 0 seams (service/route split, stub routers, deps, env names) |
-| `improve/integration` | `888e112` | main checkout | S7, S5, S4, S2, S3, S6 merged; S1a–S1c committed by the user (`d27fd46`, `74e0af0`, `c417cd5`, `888e112`); pushed to `origin` by the user |
+| `improve/integration` | `e93a8a8` (GitHub) | main checkout | Everything to C6 committed and pushed. C7, C7b/C8, and C9 are uncommitted; the user commits them from `COMMITS_C7.md`, `COMMITS_C7b_C8.md`, then `COMMITS_C9.md`. Team handoff: `TEAM_HANDOFF.md`. |
 | `improve/s1-accounts` | `aa5ef17` | `.claude/worktrees/agent-ac23402bb12c6f069` | Holds an uncommitted duplicate of S1b + S1c; now redundant (discard in PHASE2_PLAN C0) |
 | tag `backup/s1-session-2026-10-03` | `46d5c1a` | local tag | The six removed commits, for reference; delete when no longer needed |
 | `improve/s2…s7-*` | merged | `.claude/worktrees/agent-*` | Done; kept until cleanup |
@@ -104,7 +105,7 @@ Exact edits are in each `handoffs/S*.md`. Summary, roughly in order:
 16. `/code-review high` + `/security-review` on `improve/integration`; fix; report; local merge to `main` on the user's "okay".
 
 ## 8. Actions only the user (migration owner) can do
-- Apply migrations on a **disposable/local** Supabase first: `bunx supabase db push --dry-run`. Order: `…000100` no-delete, `…000200` accounts, `…000300` problem types, `…000400` workflow, `…000500` feedback, `…000600` Makati bbox, `…000700` rejected status, `…000710` public rejection reason (each in its own transaction: Postgres cannot use a new enum value in the transaction that adds it).
+- Apply migrations on a **disposable/local** Supabase first: `bunx supabase db push --dry-run`. Order: `…000100` no-delete, `…000200` accounts, `…000300` problem types, `…000400` workflow, `…000500` feedback, `…000600` Makati bbox, `…000700` rejected status, `…000710` public rejection reason, `…000800` area routing (barangays, report barangay trigger and backfill, staff areas, public view) (each in its own transaction: Postgres cannot use a new enum value in the transaction that adds it).
 - Before or right after `…000600`: move existing `[FIXTURE]` and any out-of-Makati report pins inside Makati, then `validate constraint reports_within_makati_bbox` (a NOT VALID check still blocks UPDATEs on bad rows).
 - After `…000100`, deleting a user in the Supabase dashboard fails on purpose; deactivate instead.
 - Google Cloud: enable Maps JavaScript API + Places API (New); restrict the key by HTTP referrer and API; set `VITE_GOOGLE_MAPS_API_KEY` (optional `VITE_GOOGLE_MAPS_MAP_ID`).

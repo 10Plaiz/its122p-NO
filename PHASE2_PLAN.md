@@ -37,10 +37,10 @@ Written 2026-10-03 after reviewing commits `d27fd46..888e112`, [HANDOFF.md](HAND
 | C4 ✅ | `rejected` status | SW-7, B1 | KI-09 | L |
 | C5 ✅ | Report page wiring and citizen comments | FB-1, RS-6, SW-3/6, B4 | KI-09 | M |
 | C6 ✅ | Tables, admin users, logs | TB, SW-1, B5, B6, B9 | KI-09 | L |
-| C7 | Area routing by barangay | SW-1, B7 | KI-09 | L |
-| C7b | Leftovers | DM-2 purge UI, B10 | KI-09 | S |
-| C8 | Tests and seeds | B12 | KI-05–08 | L |
-| C9 | Citizen self-edit, polish, cheap hardening | UA-13, UA-10/11 | KI-10, 13, 16, 18, 20, 21 | M |
+| C7 ✅ | Area routing by barangay | SW-1, B7 | KI-09 | L |
+| C7b ✅ | Leftovers | DM-2 purge UI, B10 | KI-09 | S |
+| C8 ✅ | Tests and seeds | B12 | KI-05–08 | L |
+| C9 ✅ | Citizen self-edit, polish, cheap hardening | UA-13, UA-10/11 | KI-10, 13, 16, 18, 20, 21 | M |
 | C10 | Documentation | UA-1, UA-10, B13 | KI-22 | M |
 | C11 | Review and merge | — | — | M |
 
@@ -90,42 +90,28 @@ Why this order: C1 adds the fields that C4–C6 read. C2 must land before C8, be
 - B5: "Specializations" disclosure on staff rows; `api.put()`; PATCH alias removed. No DataTable move (no requirement).
 - Local run: 18/18 API checks, 18/18 unit tests, and the browser check (two header checks failed on capitalisation only).
 
-### C7 Area routing by barangay (SW-1, B7; ranked suggestions)
-- Migration `…000800`: a `barangays` table (23 Makati barangays with simplified OSM polygons), `reports.barangay_id`, and a `staff_areas` table (RLS, service_role only).
-- The server derives the barangay from the pin on create and edit, and backfills existing reports.
-- Admins set staff barangays next to specializations. `/api/staff` ranks staff who match both the category and the barangay first.
-- Barangay appears as a column and filter in tables and exports, and in Final_Project.md (roles, data model).
+### C7 Area routing by barangay ✅ (2026-10-04)
+- Migration `…000800`: `barangays` (23 OSM polygons, full detail, built-in `polygon`) and `barangay_at()` (the containing barangay, else the nearest within about 500 m). A trigger sets `reports.barangay` on insert and when the pin moves, with a backfill. `staff_areas` mirrors `staff_specializations`. `public_reports.barangay` is added at the end of the view.
+- Server: `barangay` filter on the list, export, and board; GET/PUT `/staff/:id/areas`; `rankStaff` orders both matches, then category, then area, then the rest.
+- Web: `AreaEditor` beside `SpecializationEditor` under "Routing" on Users; the assign dialog groups and subtitle; the barangay on report pages and board cards; `BarangayFilter` on the board (in the URL), All reports, and the staff queue; an optional Barangay column.
+- Decisions: shown on the board with a filter; filter and column on the tables.
+- Local run: 18/18 API and browser checks; 9 unit tests (the ranking mutation is caught).
 
-### C7b Leftovers
-- DM-2: AdminDashboard "Check photo retention" (dry run) → "Remove expired photos", with a confirmation. A Vercel cron is optional and needs the user.
-- B10: fold the stream type files and `ResidencyStep` into `lib/types.ts`.
+### C7b Leftovers ✅ (2026-10-04)
+- DM-2: `PhotoRetention` on the admin dashboard checks expired photos, then removes them after an inline confirmation. Local run 8/8: the dry run keeps the file; removal deletes the file, keeps the row with `purged_at`, and the report page says so.
+- B10 dropped on purpose (no behaviour change; it would mix into the C7 files). No cron (needs deploy settings).
 
-### C8 Tests and seeds
-- KI-05: seed demo citizens as `verified`. The demo flow closes reports through a closure request plus approval. Update `tests/fast/demo-seed.test.ts`.
-- KI-06: update `tests/browser/*`:
-  - Register uses the split-name fields.
-  - Comments are required on status changes.
-  - Closure goes through request and verification.
-  - Cancellation needs a reason; the new report needs a main problem.
-  - Add the table selectors.
-- KI-07: new account flows:
-  - Mailpit code, proof lock and redirect, reject and re-upload.
-  - Unconfirmed sign-in, reset, refresh, and idle sign-out.
-  - Start from `s1-run.ts`, which is in the old session's scratchpad; if it is gone, rebuild it from the selectors in `handoffs/S1.md`.
-- KI-08: `tests/integration/security.ts`:
-  - `residency_required` 403s.
-  - The private `residency-proofs` bucket.
-  - `report_feedback` and `feedback_summary` closed to direct clients; feedback 403/400/409.
-  - The `rejected` transition rules.
+### C8 Tests and seeds ✅ (2026-10-04)
+- Fixture: main problem and `assigned_at`. Demo seed: verified citizens, name parts, and a closure record from history (`workflow-columns.ts`); checked by a rolled-back insert of each status.
+- Browser suite on local Supabase: 41 passed, 1 skipped (was 28/6/1). New `accounts.browser.ts` (7 tests, Mailpit). FUNC-02 drives the request-and-verify flow itself. Pins come from a faked device location.
+- Security suite: 37/37 including IMP-01 to IMP-09; fixture state restored.
+- Runs must set `EVIDENCE_DIR`: the default writes into the committed `tests/evidence/` (a first run overwrote 27 files; restored from git).
 
-### C9 Polish and cheap hardening
-- KI-18: on Entry, grey out citizen buttons when `residencyLocked(user)`, with a reason.
-- KI-16: after a failed reset, say "Ask for a new code".
-- KI-13: logout refreshes first, or revokes by refresh token. Add a test that the old refresh token fails.
-- KI-21: `React.lazy` admin and staff pages in `routes.tsx`, with a `Suspense` fallback "Loading…".
-- KI-20: replace characters outside WinAnsi ("→" becomes "->", emoji are dropped) before the PDF render.
-- Documented, not built: KI-11, KI-12, KI-14, KI-15, and KI-17. These go in the UA-10 security review (C10).
-- UA-13 / KI-10: `PATCH /api/auth/me` and an account page, using the registration rules. The rules for a changed phone number or address are asked when this is built.
+### C9 Citizen self-edit, polish, cheap hardening ✅ (2026-10-04)
+- UA-13: My account (`/account`) and `PATCH /api/auth/me`. A new number clears its verified mark (old and new number go to the log). A new address goes back to review. An account verified with no proof file is asked for one.
+- KI-13: logout takes the refresh token. KI-16: a clear "code used up" message. KI-18: greyed home button. KI-20: `pdfText()`. KI-21: lazy admin and staff pages (main chunk about 440 kB).
+- Checks: 517 unit tests; security 39/39 (IMP-10, IMP-11); browser spot check 13/15 (two failed on script faults, both re-checked).
+- Gap: the full browser suite was not re-run after C9 (stopped by the user).
 
 ### C10 Documentation (B13, KI-22)
 - Apply each handoff's "Doc changes" list to `docs/API.md`, `FRONTEND.md`, `ARCHITECTURE.md`, `DEVELOPER_JOURNEYS` (state machine with `rejected`), and `LOCAL_DEV.md` (local Supabase, Mailpit, maps key).

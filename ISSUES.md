@@ -35,7 +35,7 @@ Updated 2026-10-03, after the S1 Accounts work. A staging list for the team: [CO
 
 ### KI-01
 **Apply the new migrations to the shared Supabase project** · P1 · Database (migration owner)
-- **Problem:** eight migrations (`supabase/migrations/20261003000100` to `…000710`) exist only in the repository. The API now reads the S1 account columns on every signed-in request, so deploying the code before `…000200_accounts.sql` makes every sign-in fail. Report pages and lists also read columns from `…000100`, `…000300`, and `…000400`.
+- **Problem:** nine migrations (`supabase/migrations/20261003000100` to `…000800`) exist only in the repository. The API now reads the S1 account columns on every signed-in request, so deploying the code before `…000200_accounts.sql` makes every sign-in fail. Report pages and lists also read columns from `…000100`, `…000300`, and `…000400`.
 - **Where:** `supabase/migrations/`; order and checks in [HANDOFF.md](HANDOFF.md) section 8.
 - **Done when:**
   - [ ] All six applied on a disposable or local project first (they applied cleanly to a fresh local database on 2026-10-03).
@@ -81,15 +81,15 @@ Updated 2026-10-03, after the S1 Accounts work. A staging list for the team: [CO
 - **Problem:** citizens without an accepted proof of residency are locked to the upload step (decision 2026-10-03). The demo seed does not mark its citizens as verified, so every demo citizen will land on "Prove you live in Makati".
 - **Where:** `scripts/demo/*`; copy `residencyFor()` from `scripts/fixture/seed.ts`.
 - **Done when:**
-  - [ ] Demo citizens are seeded with `residency_status = 'verified'`.
-  - [ ] A demo citizen signs in straight to My reports.
+  - [x] Demo citizens are seeded with `residency_status = 'verified'`, and ones seeded earlier are switched to it on the next `seed:apply` (C8). Name parts, the main problem, workflow dates, and a verified closure request for resolved reports are filled too (`scripts/demo/workflow-columns.ts`).
+  - [ ] A demo citizen signs in straight to My reports. Not run: `seed:apply` only targets a hosted project. Checked instead by inserting one demo report of each status into a local database in a rolled-back transaction.
 
 ### KI-06
 **Browser tests still use old flows** · P2 · Tests
 - **Problem:** `tests/browser/auth.browser.ts` fills `#name`, which became first, middle, and last name fields. Other browser tests still expect "Mark resolved" and an optional cancel reason.
 - **Where:** `tests/browser/*.browser.ts`; details in [docs/updates/handoffs/](docs/updates/handoffs/) S1, S3, S4.
 - **Done when:**
-  - [ ] `bun run test:browser` passes against a local Supabase with the fixture data.
+  - [x] `bun run test:browser` passes against a local Supabase with the fixture data (C8, 2026-10-04: 41 passed, 1 skipped for lack of a second board page). Report flows place the pin with a faked device location, so only two map checks need `VITE_GOOGLE_MAPS_API_KEY`; they skip without it.
 
 ---
 
@@ -100,22 +100,22 @@ Updated 2026-10-03, after the S1 Accounts work. A staging list for the team: [CO
 - **Problem:** sign-up code, password reset, refresh, idle sign-out, and the residency lock were checked once with a throwaway script on a local Supabase (18 of 18 passed). They need permanent Playwright tests.
 - **Where:** `tests/browser/`. Selectors and the Mailpit trick are listed in [handoffs/S1.md](docs/updates/handoffs/S1.md) (Breadcrumbs, `tests/browser/*` row).
 - **Done when:** tests cover:
-  - [ ] Register, then the code (read from Mailpit at `http://127.0.0.1:54324`), then the proof step.
-  - [ ] Locked citizen: greyed menu, redirect, API 403.
-  - [ ] Admin rejects with a reason; the citizen sees it and uploads again.
-  - [ ] Signing in while unconfirmed switches to the code step.
-  - [ ] Password reset signs out the other sessions.
-  - [ ] Idle warning and sign-out.
+  - [x] Register, then the code (read from Mailpit at `http://127.0.0.1:54324`), then the proof step.
+  - [x] Locked citizen: greyed menu, redirect, API 403.
+  - [x] Admin rejects with a reason; the citizen sees it and uploads again.
+  - [x] Signing in while unconfirmed switches to the code step.
+  - [x] Password reset signs out the other sessions.
+  - [x] Idle warning and sign-out. All in `tests/browser/accounts.browser.ts` (C8), which skips unless Mailpit answers.
 
 ### KI-08
 **Security tests for the new routes, table, and bucket** · P2 · API, tests
 - **Problem:** `tests/integration/security.ts` predates the improvements.
 - **Where:** `tests/integration/security.ts`; rows in [handoffs/S1.md](docs/updates/handoffs/S1.md) and [handoffs/S7.md](docs/updates/handoffs/S7.md).
 - **Done when:**
-  - [ ] Locked citizen gets 403 `residency_required` on reports, notifications, feedback, and exports.
-  - [ ] Anonymous and signed-in clients cannot read the `residency-proofs` bucket; only admins get a proof link.
-  - [ ] `report_feedback` cannot be read or written directly; the feedback rules return 403, 400, and 409 as documented.
-  - [ ] `public_reports.rejection_reason` is filled only for rejected reports; a resolved report's closure reason never reaches the public board (SW-7).
+  - [x] Locked citizen gets 403 `residency_required` on reports, notifications, feedback, and exports (IMP-01).
+  - [x] Anonymous and signed-in clients cannot read the `residency-proofs` bucket; only admins get a proof link (IMP-02, IMP-03).
+  - [x] `report_feedback` cannot be read or written directly; the feedback rules return 403 and 400 (IMP-04 to IMP-06). The 409 for a second rating is covered by `tests/fast/feedback.test.ts`, not live.
+  - [x] `public_reports.rejection_reason` is filled only for rejected reports (IMP-07). Also: `barangays` and `staff_areas` are closed, comments on another citizen's report get 403, and a Bataan pin is refused (IMP-04, IMP-08, IMP-09). Local run 2026-10-04: 37/37.
 
 ---
 
@@ -133,11 +133,11 @@ Updated 2026-10-03, after the S1 Accounts work. A staging list for the team: [CO
   - [x] B4 feedback form and summary on the report pages (C5).
   - [x] B5 AdminUsers: specializations editable per staff member, `api.put()`, PATCH alias removed (C6). Moving the screen onto `DataTable` was left out on purpose: no requirement needs it.
   - [x] B6 table and export columns, including residency and phone verified (C6). Report barangay comes with C7.
-  - [ ] B7 area routing by barangay, or documented as a limitation.
-  - [ ] B8 "Photo removed after the 90-day retention period"; optional purge schedule.
+  - [x] B7 area routing by barangay (C7).
+  - [x] B8 "Photo removed after the 90-day retention period" (C1), and the admin dashboard's check-then-remove control (C7b). A scheduled purge (Vercel cron) is left out: it needs deployment settings.
   - [x] B9 readable activity log labels and server-side log filters (C6).
-  - [ ] B10 type files folded into `src/web/lib/types.ts`.
-  - [ ] B12 and B13: see KI-05 to KI-08 and KI-22.
+  - [x] B10 dropped on purpose (C7b): moving the stream type files into `types.ts` changes no behaviour, touches most pages, and would have mixed into the uncommitted C7 files.
+  - [x] B12: see KI-05 to KI-08 (C8). B13: see KI-22.
 
 ---
 
@@ -148,8 +148,8 @@ Updated 2026-10-03, after the S1 Accounts work. A staging list for the team: [CO
 - **Problem:** there is no screen for a citizen to correct their name, contact number, barangay, or street after registering. Only an administrator can change them. Signing up again does not help: for an address that is not yet confirmed, Supabase keeps the first details.
 - **Where:** new `PATCH /api/auth/me` (reuse `nameParts`, `contactNumber`, `barangay`, `addressLine` from `src/server/lib/validate.ts`); a page or panel for it. Adding a route needs team agreement. A changed contact number must clear `phone_verified_at`; a changed address may need a new proof review.
 - **Done when:**
-  - [ ] A citizen updates their details with the same rules as registration.
-  - [ ] The phone and residency side effects above are applied and tested.
+  - [x] A citizen updates their details with the same rules as registration (My account, `PATCH /api/auth/me`, C9).
+  - [x] The phone and residency side effects above are applied and tested (`tests/fast/account-edit.test.ts`, security IMP-11).
 
 ### KI-11
 **Phone verification by text message (UA-6)** · P3 · API
@@ -178,6 +178,7 @@ Updated 2026-10-03, after the S1 Accounts work. A staging list for the team: [CO
 - **Problem:** logout revokes with the access token. If it has already expired, the server cannot revoke the session; the refresh token is only cleared in the browser.
 - **Where:** `src/server/routes/auth.routes.ts` (`/logout`), `src/web/lib/auth.tsx` (`signOut`).
 - **Done when:** logout also revokes by refresh token, or refreshes first; there is a test that an old refresh token stops working.
+- **Status:** done locally (C9): logout takes the refresh token and ends the session even after the access token expired; security IMP-10 checks the old refresh token then fails.
 
 ### KI-14
 **Rate limits are per server instance** · P3 · API
@@ -196,6 +197,7 @@ Updated 2026-10-03, after the S1 Accounts work. A staging list for the team: [CO
 - **Problem:** the code is used up before the new password is saved. If Supabase then refuses the password (for example under its leaked-password check), the person has to ask for a new code.
 - **Where:** `resetPassword` in `src/server/lib/accounts-email.ts`.
 - **Done when:** the screen says clearly that a new code is needed, or the password is checked before the code is spent.
+- **Status:** done locally (C9): the error now says the code is used up and to ask for a new one; the form's existing "send a new code" control is right below it.
 
 ---
 
@@ -212,6 +214,7 @@ Updated 2026-10-03, after the S1 Accounts work. A staging list for the team: [CO
 - **Problem:** the menu greys out citizen links while a citizen has no accepted proof, but buttons on the home page still look active and redirect to the proof step when clicked.
 - **Where:** `src/web/pages/Entry.tsx`; use `residencyLocked(user)` from `src/web/lib/residency.ts`.
 - **Done when:** those buttons match the menu (greyed out with a reason).
+- **Status:** done locally (C9): "Report an issue" is greyed with "Send your proof of residency first" and a link to the upload step.
 
 ### KI-19
 **Report edit form has no draft** · P3 · Frontend
@@ -224,12 +227,14 @@ Updated 2026-10-03, after the S1 Accounts work. A staging list for the team: [CO
 - **Problem:** the PDF is built in the browser with the built-in Helvetica font, so "→" and emoji print as wrong characters. CSV export is fine.
 - **Where:** `src/web/lib/export.ts` (`doc.setFont("helvetica", …)`); the rows come from `src/server/routes/exports.routes.ts`.
 - **Done when:** a Unicode font is embedded, or those characters are replaced before rendering.
+- **Status:** done locally (C9): `pdfText()` turns arrows into ASCII, drops emoji, and prints "?" for anything else outside the font; CSV keeps the original.
 
 ### KI-21
 **Web bundle is over 500 kB** · P3 · Frontend
-- **Problem:** `bun run build` warns that the main chunk is over 500 kB. Removing Leaflet (C3) brought it to about 492 kB; wiring the feedback components (C5) put it back to about 503 kB.
+- **Problem:** `bun run build` warns that the main chunk is over 500 kB. Removing Leaflet (C3) brought it to about 492 kB; wiring the feedback components (C5) put it back to about 503 kB, and area routing (C7) to about 513 kB.
 - **Where:** `src/web/routes.tsx` (pages are imported eagerly).
 - **Done when:** admin and staff pages are lazy-loaded and the warning is gone, or the threshold is raised with a reason.
+- **Status:** done locally (C9): admin and staff pages load on first visit; the main chunk is about 440 kB and the warning is gone.
 
 ---
 

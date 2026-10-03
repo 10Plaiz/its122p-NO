@@ -11,6 +11,7 @@ import { PASSWORD_MAX, validatePassword } from "../lib/passwords.js";
 import { PasswordRules } from "../components/PasswordRules.js";
 import { ResidencyReview } from "../components/ResidencyReview.js";
 import { SpecializationEditor } from "../components/SpecializationEditor.js";
+import { AreaEditor } from "../components/AreaEditor.js";
 import { RESIDENCY_LABEL, residencyStep } from "../lib/residency.js";
 import type { Profile, Role } from "../lib/types.js";
 
@@ -109,7 +110,7 @@ function UserRow({ user, onDone }: { user: Profile; onDone: () => void }) {
   const { user: currentUser } = useAuth();
   const [editing, setEditing] = useState(false);
   const [reviewing, setReviewing] = useState(false);
-  // SW-1: a staff member's categories open in a row of their own under theirs.
+  // SW-1: a staff member's categories and barangays open in a row of their own.
   const [specializing, setSpecializing] = useState(false);
   const specializationsId = `specializations-row-${user.id}`;
   const [role, setRole] = useState<Role>(user.role);
@@ -253,8 +254,8 @@ function UserRow({ user, onDone }: { user: Profile; onDone: () => void }) {
                     aria-controls={specializing ? specializationsId : undefined}
                     onClick={() => setSpecializing((open) => !open)}
                   >
-                    {specializing ? "Close specializations" : "Specializations"}
-                    <span className="sr-only"> for {user.name}</span>
+                    {specializing ? "Close routing" : "Routing"}
+                    <span className="sr-only"> for {user.name}: specializations and areas</span>
                   </Button>
                 )}
                 {/* Accounts are deactivated, never deleted, so their reports and
@@ -276,7 +277,10 @@ function UserRow({ user, onDone }: { user: Profile; onDone: () => void }) {
       {specializing && (
         <tr id={specializationsId}>
           <td colSpan={8} className="bg-neutral-200/60">
-            <SpecializationEditor staffId={user.id} staffName={user.name} onSaved={() => setSpecializing(false)} />
+            <div className="grid gap-3 lg:grid-cols-2 items-start">
+              <SpecializationEditor staffId={user.id} staffName={user.name} />
+              <AreaEditor staffId={user.id} staffName={user.name} />
+            </div>
           </td>
         </tr>
       )}

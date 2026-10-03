@@ -113,7 +113,8 @@ export function ReportDetailPage() {
         </div>
         <h2>{report.title}</h2>
         <p className="text-muted font-mono text-[11px]">
-          {report.category?.name ?? "Uncategorised"} &middot; filed {formatDateTime(report.submitted_at)}
+          {report.category?.name ?? "Uncategorised"}
+          {report.barangay ? ` · ${report.barangay}` : ""} &middot; filed {formatDateTime(report.submitted_at)}
           {report.resolved_at ? ` · resolved ${formatDateTime(report.resolved_at)}` : ""}
           {report.status === "rejected" && report.verified_at ? ` · closed ${formatDateTime(report.verified_at)}` : ""}
         </p>

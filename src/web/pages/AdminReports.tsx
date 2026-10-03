@@ -13,6 +13,7 @@ import {
   useColumnVisibility,
 } from "../components/data-table/index.js";
 import { Alert, Button, EmptyState, Field, Input, Loading, Select } from "../components/ui.js";
+import { BarangayFilter } from "../components/BarangayFilter.js";
 import { describeFilters } from "../lib/export.js";
 import type { Column } from "../lib/table-types.js";
 import { useApi } from "../lib/useApi.js";
@@ -28,6 +29,7 @@ export function AdminReportsPage() {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("");
   const [categoryId, setCategoryId] = useState("");
+  const [barangay, setBarangay] = useState("");
   const [sort, setSort] = useState<Sort>("newest");
   const [page, setPage] = useState(1);
   const [assigning, setAssigning] = useState<Report | null>(null);
@@ -35,8 +37,8 @@ export function AdminReportsPage() {
 
   // Paging stays out of the filters so an export can reuse them unchanged.
   const filters = useMemo(
-    () => ({ q: search.trim(), status, category_id: categoryId, sort }),
-    [search, status, categoryId, sort],
+    () => ({ q: search.trim(), status, category_id: categoryId, barangay, sort }),
+    [search, status, categoryId, barangay, sort],
   );
   const query = useMemo(() => ({ ...filters, page, per_page: PER_PAGE }), [filters, page]);
 
@@ -57,6 +59,7 @@ export function AdminReportsPage() {
       reportColumn.assigned,
       reportColumn.assignedOn,
       reportColumn.daysInStage,
+      reportColumn.barangay,
       reportColumn.location,
       reportColumn.filed,
       reportColumn.completed,
@@ -93,6 +96,7 @@ export function AdminReportsPage() {
         ["Search", filters.q ? `“${filters.q}”` : null],
         ["Status", status ? STATUS_LABEL[status as ReportStatus] : null],
         ["Category", categoryName],
+        ["Barangay", barangay || null],
         ["Sort", sortLabel(sort)],
       ]),
     });
@@ -137,6 +141,16 @@ export function AdminReportsPage() {
               ))}
             </Select>
           </Field>
+        </ToolbarItem>
+
+        <ToolbarItem>
+          <BarangayFilter
+            value={barangay}
+            onChange={(value) => {
+              setBarangay(value);
+              setPage(1);
+            }}
+          />
         </ToolbarItem>
 
         <ToolbarItem>

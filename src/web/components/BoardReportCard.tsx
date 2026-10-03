@@ -47,6 +47,7 @@ export function BoardReportCard({ report, isSelected, onToggle }: BoardReportCar
 
         {/* Date on the left of Chevron button */}
         <div className="flex items-center gap-3 shrink-0">
+          {report.barangay && <span className="text-[12px] font-medium text-neutral-700">{report.barangay}</span>}
           <time
             dateTime={report.submitted_at}
             className="text-[12px] font-medium text-neutral-700 select-text"

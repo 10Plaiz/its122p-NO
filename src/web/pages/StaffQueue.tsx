@@ -13,6 +13,7 @@ import {
 } from "../components/data-table/index.js";
 import { Alert, Card, EmptyState, Field, Input, Loading, Select, StatusBadge, formatDate } from "../components/ui.js";
 import { RatingAverage } from "../components/FeedbackSummary.js";
+import { BarangayFilter } from "../components/BarangayFilter.js";
 import { describeFilters } from "../lib/export.js";
 import type { Column } from "../lib/table-types.js";
 import { useApi } from "../lib/useApi.js";
@@ -27,10 +28,11 @@ const TABLE_ID = "staff-queue";
 export function StaffQueuePage() {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("");
+  const [barangay, setBarangay] = useState("");
   const [page, setPage] = useState(1);
 
   // Oldest first by default: the queue is work to get through, not a news feed.
-  const filters = useMemo(() => ({ q: search.trim(), status, sort: "oldest" }), [search, status]);
+  const filters = useMemo(() => ({ q: search.trim(), status, barangay, sort: "oldest" }), [search, status, barangay]);
   const query = useMemo(() => ({ ...filters, page, per_page: PER_PAGE }), [filters, page]);
 
   const { data, error, loading } = useApi<Paged<"reports", Report>>("/reports", query);
@@ -45,6 +47,7 @@ export function StaffQueuePage() {
       reportColumn.title((report) => `/staff/reports/${report.id}`),
       reportColumn.category,
       reportColumn.status,
+      reportColumn.barangay,
       reportColumn.location,
       reportColumn.filed,
       reportColumn.completed,
@@ -75,6 +78,7 @@ export function StaffQueuePage() {
       filters: describeFilters([
         ["Search", filters.q ? `“${filters.q}”` : null],
         ["Status", status ? STATUS_LABEL[status as ReportStatus] : null],
+        ["Barangay", barangay || null],
         ["Sort", "Oldest first"],
       ]),
     });
@@ -122,6 +126,16 @@ export function StaffQueuePage() {
               ))}
             </Select>
           </Field>
+        </ToolbarItem>
+
+        <ToolbarItem>
+          <BarangayFilter
+            value={barangay}
+            onChange={(value) => {
+              setBarangay(value);
+              setPage(1);
+            }}
+          />
         </ToolbarItem>
 
         {/* The column menu only changes the table, which phones do not show. */}

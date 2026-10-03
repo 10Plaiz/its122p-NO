@@ -117,7 +117,7 @@ export function StaffReportPage() {
           </div>
 
           <time className="text-[12px] font-medium text-neutral-700 font-mono">
-            Filed {formatDateTime(report.submitted_at)}
+            {report.barangay ? `${report.barangay} · ` : ""}Filed {formatDateTime(report.submitted_at)}
           </time>
         </div>
       </header>

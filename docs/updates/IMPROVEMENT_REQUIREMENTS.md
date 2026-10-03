@@ -34,7 +34,7 @@ Work plan and file ownership: [PARALLEL_PLAN.md](PARALLEL_PLAN.md).
 | UA-10 | Review other security features (rate limiting, lockout, secure session handling) and document the results. | Medium | Gap: no rate limiting in Express. |
 | UA-11 | Show a clear reason when an action fails (sign-in, registration, submission) instead of a generic error. | Medium | Partial: field errors on some forms only. |
 | UA-12 | Let a person who forgot their password reset it with a 6-digit code sent to their email. | Medium | Gap: added by the team on 2026-10-03 (see Decisions). |
-| UA-13 | Let a citizen update their own details (name, contact number, barangay, street) under the registration rules. | Medium | Gap: added by the team on 2026-10-03 (see Decisions). Only an Administrator can change them today. |
+| UA-13 | Let a citizen update their own details (name, contact number, barangay, street) under the registration rules. | Medium | Done locally (2026-10-04): My account page and `PATCH /api/auth/me` (citizens only, registration rules). A new number clears its verified mark; a new barangay or street sends residency back to review; email cannot be changed there. |
 
 ## 2. Maps and Location
 
@@ -60,7 +60,7 @@ Work plan and file ownership: [PARALLEL_PLAN.md](PARALLEL_PLAN.md).
 
 | ID | Requirement | Priority | Status |
 | :--- | :--- | :--- | :--- |
-| SW-1 | Assign staff by specialization (category) and area (barangay). | High | Partial (2026-10-03): administrators set each staff member's specializations on the Users screen, and the assign dialog lists specialists first. Area (barangay) routing is Phase 2 C7. |
+| SW-1 | Assign staff by specialization (category) and area (barangay). | High | Done locally (2026-10-03): the database sets each report's barangay from its pin (`…000800`, OpenStreetMap boundaries); administrators set each staff member's categories and barangays; the assign dialog lists staff matching both first, then category, then barangay. |
 | SW-2 | Require a comment with every status change, assignment, cancellation, and verification decision. | High | Partial: remarks require text; status and cancel do not. |
 | SW-3 | Capture each activity on a report (who, what, when) in an activity log. | High | Done locally (2026-10-03): every workflow action is logged; the activity log shows readable labels and filters on the server by action, role, report reference, and date, and its export uses the same filters. |
 | SW-4 | Staff request resolution; an Administrator approves or returns it before the report is closed. | High | Gap: staff set `resolved` directly. |
@@ -73,7 +73,7 @@ Work plan and file ownership: [PARALLEL_PLAN.md](PARALLEL_PLAN.md).
 | ID | Requirement | Priority | Status |
 | :--- | :--- | :--- | :--- |
 | DM-1 | Never delete records from the database. Use soft deletion or deactivation flags. | High | Partial: categories soft-delete; several foreign keys still cascade. |
-| DM-2 | After 90 days, remove the stored image files of cancelled reports. The photo rows stay with a `purged_at` date. | Medium | Gap. |
+| DM-2 | After 90 days, remove the stored image files of cancelled reports. The photo rows stay with a `purged_at` date. | Medium | Done locally (2026-10-04): the admin dashboard checks which photos are past 90 days, then removes them after a confirmation; rows stay with `purged_at`, and report pages say the photo was removed. No automatic schedule. |
 
 ## 6. Tables, Search, and Export
 
@@ -120,6 +120,7 @@ Work plan and file ownership: [PARALLEL_PLAN.md](PARALLEL_PLAN.md).
 | SW-1 | "Staff for each specialization or area" (2026-10-03) | Area routing is required. The server derives a report's barangay from its pin; Administrators set each staff member's barangays; the assign dialog lists staff matching both category and barangay first. The Administrator still chooses (no auto-assignment). |
 | RS-6 | "Comments required" (2026-10-03) | Citizens can comment on their own reports at any status, including resolved, rejected, and cancelled. Not on other people's reports. |
 | FB-1, SW-7 | Rating a rejected report (2026-10-03) | Ratings stay for resolved reports only; comments (RS-6) cover every other status. A rejected report shows a "Closed" date (`verified_at`); `resolved_at` stays empty. |
-| UA-13 | Citizen self-edit (2026-10-03) | In scope. The rules for a changed number or address are settled when it is built. |
+| UA-13 | Citizen self-edit (2026-10-03, rules 2026-10-04) | In scope, on a new My account page. A changed barangay or street goes back to review and the account stays usable; an account verified without any uploaded proof is asked for one before it opens again. A changed number loses its verified mark; the activity log keeps the old and new number for administrators. |
 | SW-7 | Rejected reports on the board; when staff can reject (2026-10-03) | Rejected reports stay on the public board with the approved reason; other closure reasons stay private. Staff can request rejection from under review or in progress, without a proof photo. |
 | RS-6 | Who hears about a comment; spam (2026-10-03) | A citizen's comment notifies the assigned staff member and every active administrator. Ten comments an hour per citizen (per account, not per network); staff and admin remarks are not limited. |
+| SW-1 | Barangay on the board; filters (2026-10-03) | Each report's barangay is shown on the public board, which can be filtered by it; All reports and the staff queue get a Barangay filter and an optional column, and exports follow the filter. |

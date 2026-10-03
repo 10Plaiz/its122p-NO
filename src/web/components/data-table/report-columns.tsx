@@ -86,6 +86,16 @@ export const reportColumn = {
     exportValue: statusText,
   },
 
+  // SW-1: the barangay the pin is in.
+  barangay: {
+    id: "barangay",
+    header: "Barangay",
+    defaultHidden: true,
+    className: "text-[13px] whitespace-nowrap",
+    cell: (report) => report.barangay ?? "—",
+    exportValue: (report) => report.barangay ?? "",
+  },
+
   // RS-4: the main problem first, then the other one.
   problems: {
     id: "problems",

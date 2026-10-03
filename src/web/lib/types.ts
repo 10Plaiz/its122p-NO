@@ -165,6 +165,8 @@ export type Report = {
   submitted_at: string;
   updated_at: string;
   resolved_at: string | null;
+  // SW-1: set by the database from the pin; null only for a pin outside Makati.
+  barangay: string | null;
   // Workflow dates (SW-6) and closure state (SW-4). See ReportWorkflow for the
   // requester and verifier names and the computed delay.
   assigned_at: string | null;
@@ -198,6 +200,7 @@ export type PublicReport = {
   status: ReportStatus;
   submitted_at: string;
   resolved_at: string | null;
+  barangay: string | null;
   photos: PublicPhoto[];
   // SW-7: the approved reason, shown publicly; null unless the report was rejected.
   rejection_reason: string | null;
@@ -246,8 +249,11 @@ export type ReportWorkflow = {
 // src/server/routes/staff.routes.ts — GET /api/staff
 export type StaffOption = Pick<Profile, "id" | "name" | "email"> & {
   specializations: Pick<Category, "id" | "name">[];
+  // SW-1: the barangays this staff member covers.
+  areas: string[];
   open_load: number;
   is_specialist: boolean;
+  in_area: boolean;
 };
 
 export type Notification = {

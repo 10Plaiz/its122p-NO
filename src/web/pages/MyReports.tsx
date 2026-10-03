@@ -55,6 +55,7 @@ export function MyReportsPage() {
       reportColumn.category,
       reportColumn.status,
       reportColumn.problems,
+      reportColumn.barangay,
       reportColumn.location,
       reportColumn.filed,
       reportColumn.completed,

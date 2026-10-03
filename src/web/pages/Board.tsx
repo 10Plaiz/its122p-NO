@@ -11,9 +11,11 @@ import {
   Select,
 } from "../components/ui.js";
 import { BoardReportCard } from "../components/BoardReportCard.js";
+import { BarangayFilter } from "../components/BarangayFilter.js";
 import { useApi } from "../lib/useApi.js";
 import { PUBLIC_STATUSES, SORTS, STATUS_LABEL } from "../lib/types.js";
 import type { Category, Paged, PublicReport, PublicStats, Sort } from "../lib/types.js";
+import { BARANGAYS } from "../lib/barangays.js";
 
 const PER_PAGE = 50;
 
@@ -40,6 +42,7 @@ function readParams(params: URLSearchParams) {
     // STATUS_LABEL lookup below loses its key type.
     status: (PUBLIC_STATUSES as readonly string[]).includes(status) ? (status as PublicStatus) : ("" as const),
     categoryId: params.get("category") ?? "",
+    barangay: (BARANGAYS as readonly string[]).includes(params.get("barangay") ?? "") ? (params.get("barangay") as string) : "",
     sort: ((SORTS as readonly string[]).includes(sort) ? sort : "newest") as Sort,
     page: Number.isInteger(page) && page > 0 ? page : 1,
     // Which pane a narrow viewport shows. The list leads, because burying the cards
@@ -51,7 +54,7 @@ function readParams(params: URLSearchParams) {
 
 export function BoardPage() {
   const [params, setParams] = useSearchParams();
-  const { q, status, categoryId, sort, page, pane } = readParams(params);
+  const { q, status, categoryId, barangay, sort, page, pane } = readParams(params);
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
@@ -92,8 +95,8 @@ export function BoardPage() {
   }, [q]);
 
   const query = useMemo(
-    () => ({ q, status, category_id: categoryId, sort, page, per_page: PER_PAGE }),
-    [q, status, categoryId, sort, page],
+    () => ({ q, status, category_id: categoryId, barangay, sort, page, per_page: PER_PAGE }),
+    [q, status, categoryId, barangay, sort, page],
   );
 
   const { data, error, loading } = useApi<Paged<"reports", PublicReport>>("/public/reports", query);
@@ -121,13 +124,14 @@ export function BoardPage() {
     (category) => String(category.id) === categoryId,
   )?.name;
 
-  const filtered = q !== "" || status !== "" || categoryId !== "";
+  const filtered = q !== "" || status !== "" || categoryId !== "" || barangay !== "";
   const total = data?.total ?? 0;
   const firstLoad = loading && !data;
 
   // What the visitor is looking at, in their words rather than the query string's.
   const describing = [
     categoryName,
+    barangay || null,
     status ? STATUS_LABEL[status] : null,
     q ? `“${q}”` : null,
   ].filter((part): part is string => Boolean(part));
@@ -164,7 +168,7 @@ export function BoardPage() {
         ))}
       </div>
 
-      <div className="grid gap-3 md:grid-cols-4">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
         <Field label="Search" htmlFor="q">
           <Input
             id="q"
@@ -210,6 +214,8 @@ export function BoardPage() {
               ))}
           </Select>
         </Field>
+
+        <BarangayFilter value={barangay} onChange={(value) => update({ barangay: value || null, page: null })} />
 
         <Field label="Sort" htmlFor="sort">
           <Select

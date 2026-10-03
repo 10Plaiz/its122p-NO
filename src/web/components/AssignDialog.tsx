@@ -10,9 +10,20 @@ function openLoadLabel(count: number) {
   return count === 1 ? "1 open report" : `${count} open reports`;
 }
 
+// What the dialog says about the person picked: what they handle and where, and
+// how busy they are.
+function describeStaff(member: StaffOption) {
+  const parts = [];
+  if (member.specializations.length > 0) parts.push(`Handles ${member.specializations.map((c) => c.name).join(", ")}.`);
+  if (member.areas.length > 0) parts.push(`Covers ${member.areas.join(", ")}.`);
+  parts.push(`Holds ${openLoadLabel(member.open_load)}.`);
+  return parts.join(" ");
+}
+
 // Wireframe 1p's dialog. Only active staff are offered; the server checks the role
-// and is_active again in assignStaff(). Specialists in the report's category come
-// first (SW-1), each with how much open work they already hold, and the assignment
+// and is_active again in assignStaff(). Staff who handle the report's category and
+// cover its barangay come first, then category specialists, then those covering the
+// barangay (SW-1), each with how much open work they already hold. The assignment
 // needs a comment (SW-2) that goes into the report's history.
 export function AssignDialog({
   report,
@@ -28,17 +39,25 @@ export function AssignDialog({
   const dialogRef = useRef<HTMLDivElement>(null);
   const fields = useLeftFields();
 
-  // Ranked by the server: specialists first, then least open work.
+  // Ranked by the server: category and barangay matches first, then least open work.
   const { data, loading, error: loadError } = useApi<{ staff: StaffOption[] }>("/staff", {
     category_id: report.category?.id,
+    barangay: report.barangay ?? undefined,
   });
   const { run, pending, error } = useAction((body: { staff_id: string; details: string }) =>
     api.patch<{ report: Report }>(`/reports/${report.id}/assign`, body),
   );
 
   const staff = data?.staff ?? [];
-  const specialists = staff.filter((member) => member.is_specialist);
-  const others = staff.filter((member) => !member.is_specialist);
+  const category = report.category?.name ?? "this category";
+  const area = report.barangay ?? "this barangay";
+  const groups = [
+    { label: `${category} in ${area}`, members: staff.filter((m) => m.is_specialist && m.in_area) },
+    { label: `Specialists in ${category}`, members: staff.filter((m) => m.is_specialist && !m.in_area) },
+    { label: `Cover ${area}`, members: staff.filter((m) => !m.is_specialist && m.in_area) },
+    { label: "Other staff", members: staff.filter((m) => !m.is_specialist && !m.in_area) },
+  ].filter((group) => group.members.length > 0);
+  const anyMatch = staff.some((member) => member.is_specialist || member.in_area);
   const chosen = staff.find((member) => member.id === staffId);
 
   const errors: Record<string, string> = {};
@@ -121,6 +140,7 @@ export function AssignDialog({
           <p className="text-[13px] text-muted">
             {report.title}
             {report.category && <> &middot; {report.category.name}</>}
+            {report.barangay && <> &middot; {report.barangay}</>}
           </p>
 
           {loading && <Loading label="Loading staff" />}
@@ -141,32 +161,23 @@ export function AssignDialog({
               // picked, there is no failed attempt to report, only a step still to take.
               hint={
                 chosen
-                  ? `${chosen.specializations.length > 0 ? `Handles ${chosen.specializations.map((category) => category.name).join(", ")}. ` : ""}Holds ${openLoadLabel(chosen.open_load)}.`
-                  : specialists.length > 0
-                    ? "Specialists in this category are listed first."
-                    : "Nobody specialises in this category yet. Staff are listed by open work."
+                  ? describeStaff(chosen)
+                  : anyMatch
+                    ? `Staff who handle ${category} and cover ${area} are listed first.`
+                    : `Nobody handles ${category} or covers ${area} yet. Staff are listed by open work.`
               }
             >
               <Select id="staff" value={staffId} onChange={(event) => setStaffId(event.target.value)}>
                 <option value="">Choose a staff member</option>
-                {specialists.length > 0 && (
-                  <optgroup label={`Specialists in ${report.category?.name ?? "this category"}`}>
-                    {specialists.map((member) => (
+                {groups.map((group) => (
+                  <optgroup key={group.label} label={anyMatch ? group.label : "Staff"}>
+                    {group.members.map((member) => (
                       <option key={member.id} value={member.id}>
-                        {member.name} — Specialist, {openLoadLabel(member.open_load)}
+                        {member.name}, {openLoadLabel(member.open_load)}
                       </option>
                     ))}
                   </optgroup>
-                )}
-                {others.length > 0 && (
-                  <optgroup label={specialists.length > 0 ? "Other staff" : "Staff"}>
-                    {others.map((member) => (
-                      <option key={member.id} value={member.id}>
-                        {member.name} — {openLoadLabel(member.open_load)}
-                      </option>
-                    ))}
-                  </optgroup>
-                )}
+                ))}
               </Select>
             </Field>
           )}
