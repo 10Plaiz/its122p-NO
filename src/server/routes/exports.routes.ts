@@ -3,7 +3,7 @@ import { z } from "zod";
 import { db } from "../config/supabase.js";
 import { orThrow } from "../lib/errors.js";
 import { logActivity } from "../lib/activity.js";
-import { parse } from "../lib/validate.js";
+import { BARANGAYS, parse } from "../lib/validate.js";
 import {
   EXPORT_CHUNK,
   EXPORT_FORMATS,
@@ -34,6 +34,7 @@ export const reportExportSchema = z.object({
   ...searchFields,
   status: z.enum(STATUSES).optional(),
   category_id: z.coerce.number().int().positive().optional(),
+  barangay: z.enum(BARANGAYS).optional(),
   format: z.enum(EXPORT_FORMATS).default("csv"),
 });
 
@@ -64,7 +65,7 @@ async function readAll(build: () => RangeQuery, message: string) {
 
 // GET /api/exports/reports — scoped by role exactly as GET /api/reports is.
 router.get("/reports", async (req, res) => {
-  const { status, category_id, q, from, to, sort, format } = parse(reportExportSchema, req.query);
+  const { status, category_id, barangay, q, from, to, sort, format } = parse(reportExportSchema, req.query);
   const user = currentUser(req);
   const order = sortColumn(sort);
   const search = q && searchFilter(q);
@@ -82,6 +83,7 @@ router.get("/reports", async (req, res) => {
     query = scopeReportQuery(query, user);
     if (status) query = query.eq("status", status);
     if (category_id) query = query.eq("category_id", category_id);
+    if (barangay) query = query.eq("barangay", barangay);
     if (from) query = query.gte("submitted_at", from);
     if (to) query = query.lte("submitted_at", endOfDay(to));
     if (search) query = query.or(search);

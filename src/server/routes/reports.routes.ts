@@ -2,7 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { db } from "../config/supabase.js";
 import { badRequest, forbidden, orThrow } from "../lib/errors.js";
-import { parse } from "../lib/validate.js";
+import { BARANGAYS, parse } from "../lib/validate.js";
 import { photoUpload, photoUrl, savePhoto } from "../lib/photos.js";
 import { endOfDay, pageFields, searchFields, searchFilter, sortColumn } from "../lib/query.js";
 import { currentUser, requireAuth, requireResidency } from "../middleware/auth.js";
@@ -27,12 +27,14 @@ const listSchema = z.object({
   ...pageFields(20, 50),
   status: z.enum(STATUSES).optional(),
   category_id: z.coerce.number().int().positive().optional(),
+  // SW-1: the barangay the pin is in (set by the database from the pin).
+  barangay: z.enum(BARANGAYS).optional(),
 });
 
 // GET /api/reports — one handler, scoped by role.
 // Citizens see their own, staff see what is assigned to them, admins see all.
 router.get("/", async (req, res) => {
-  const { status, category_id, q, from, to, sort, page, per_page } = parse(listSchema, req.query);
+  const { status, category_id, barangay, q, from, to, sort, page, per_page } = parse(listSchema, req.query);
   const order = sortColumn(sort);
 
   let query = db
@@ -46,6 +48,7 @@ router.get("/", async (req, res) => {
   query = scopeReportQuery(query, currentUser(req));
   if (status) query = query.eq("status", status);
   if (category_id) query = query.eq("category_id", category_id);
+  if (barangay) query = query.eq("barangay", barangay);
   if (from) query = query.gte("submitted_at", from);
   if (to) query = query.lte("submitted_at", endOfDay(to));
 

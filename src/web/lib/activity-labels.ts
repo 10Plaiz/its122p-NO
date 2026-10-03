@@ -28,6 +28,7 @@ export const ACTIVITY_LABEL: Record<string, string> = {
   "report.closure_returned": "Returned a report for more work",
 
   "staff.specializations_updated": "Updated staff specializations",
+  "staff.areas_updated": "Updated staff areas",
 
   "feedback.created": "Rated a resolved report",
 

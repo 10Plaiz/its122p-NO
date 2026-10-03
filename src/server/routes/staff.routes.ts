@@ -3,12 +3,13 @@ import { z } from "zod";
 import { db } from "../config/supabase.js";
 import { logActivity } from "../lib/activity.js";
 import { badRequest, orThrow, throwIfFailed } from "../lib/errors.js";
-import { parse } from "../lib/validate.js";
+import { BARANGAYS, parse } from "../lib/validate.js";
 import { requireAuth, requireRole } from "../middleware/auth.js";
 import { OPEN_STATUSES } from "../services/reports.workflow.js";
 
-// Staff specializations (SW-1): which categories each staff member is suited to,
-// so an administrator assigning a report sees the right people first. Admins only.
+// Staff specializations and areas (SW-1): which categories each staff member is
+// suited to and which barangays they cover, so an administrator assigning a report
+// sees the right people first. Admins only.
 const router = Router();
 router.use(requireAuth, requireRole("admin"));
 
@@ -17,12 +18,21 @@ export type StaffOption = {
   name: string;
   email: string;
   specializations: { id: number; name: string }[];
+  areas: string[];
   open_load: number;
   is_specialist: boolean;
+  in_area: boolean;
 };
 
 const listSchema = z.object({
   category_id: z.coerce.number().int().positive().optional(),
+  barangay: z.enum(BARANGAYS).optional(),
+});
+
+export const areaSchema = z.object({
+  barangays: z
+    .array(z.enum(BARANGAYS, "Choose barangays from the list."), { error: "Send the chosen barangays as a list." })
+    .refine((names) => new Set(names).size === names.length, "Each barangay can be chosen once."),
 });
 
 export const specializationSchema = z.object({
@@ -32,20 +42,25 @@ export const specializationSchema = z.object({
     .refine((ids) => new Set(ids).size === ids.length, "Each category can be chosen once."),
 });
 
-// Specialists in the report's category first, then whoever has the least open
-// work, then by name. Without a category it is simply least-loaded first.
-export function rankStaff(staff: Omit<StaffOption, "is_specialist">[], categoryId?: number): StaffOption[] {
+type StaffInput = Omit<StaffOption, "is_specialist" | "in_area" | "areas"> & { areas?: string[] };
+
+// Staff who match both the report's category and its barangay first, then
+// category specialists, then those who cover the barangay, then everyone else
+// (SW-1). Within each group, whoever has the least open work, then by name. The
+// administrator still chooses; this only orders the list.
+export function rankStaff(staff: StaffInput[], categoryId?: number, barangay?: string): StaffOption[] {
+  const score = (member: StaffOption) => Number(member.is_specialist) * 2 + Number(member.in_area);
   return staff
-    .map((member) => ({
-      ...member,
-      is_specialist: categoryId !== undefined && member.specializations.some((category) => category.id === categoryId),
-    }))
-    .sort(
-      (a, b) =>
-        Number(b.is_specialist) - Number(a.is_specialist) ||
-        a.open_load - b.open_load ||
-        a.name.localeCompare(b.name),
-    );
+    .map((member) => {
+      const areas = member.areas ?? [];
+      return {
+        ...member,
+        areas,
+        is_specialist: categoryId !== undefined && member.specializations.some((category) => category.id === categoryId),
+        in_area: barangay !== undefined && areas.includes(barangay),
+      };
+    })
+    .sort((a, b) => score(b) - score(a) || a.open_load - b.open_load || a.name.localeCompare(b.name));
 }
 
 // Open reports per staff member: assigned and not yet resolved or cancelled.
@@ -83,14 +98,27 @@ async function activeSpecializations(staffId?: string) {
   return groupSpecializations(rows as unknown as SpecializationRow[]);
 }
 
-// GET /api/staff?category_id= — active staff, ranked for a report in that category.
-router.get("/", async (req, res) => {
-  const { category_id } = parse(listSchema, req.query);
+// Each staff member's active barangays, sorted by name.
+async function activeAreas(staffId?: string) {
+  let query = db.from("staff_areas").select("staff_id, barangay").eq("is_active", true);
+  if (staffId) query = query.eq("staff_id", staffId);
+  const rows = orThrow(await query, "Staff areas could not be loaded.") as { staff_id: string; barangay: string }[];
+  const byStaff = new Map<string, string[]>();
+  for (const row of rows) byStaff.set(row.staff_id, [...(byStaff.get(row.staff_id) ?? []), row.barangay]);
+  for (const list of byStaff.values()) list.sort((a, b) => a.localeCompare(b));
+  return byStaff;
+}
 
-  const [staffResult, loadResult, specializations] = await Promise.all([
+// GET /api/staff?category_id=&barangay= — active staff, ranked for a report in that
+// category and barangay.
+router.get("/", async (req, res) => {
+  const { category_id, barangay } = parse(listSchema, req.query);
+
+  const [staffResult, loadResult, specializations, areas] = await Promise.all([
     db.from("profiles").select("id, name, email").eq("role", "staff").eq("is_active", true),
     db.from("reports").select("assigned_staff_id").in("status", OPEN_STATUSES).not("assigned_staff_id", "is", null),
     activeSpecializations(),
+    activeAreas(),
   ]);
 
   const staff = orThrow(staffResult, "Staff could not be loaded.") as { id: string; name: string; email: string }[];
@@ -101,9 +129,11 @@ router.get("/", async (req, res) => {
       staff.map((member) => ({
         ...member,
         specializations: specializations.get(member.id) ?? [],
+        areas: areas.get(member.id) ?? [],
         open_load: load.get(member.id) ?? 0,
       })),
       category_id,
+      barangay,
     ),
   });
 });
@@ -127,6 +157,43 @@ router.get("/:id/specializations", async (req, res) => {
 // PUT /api/staff/:id/specializations { category_ids } — replaces the set. Nothing is
 // deleted: a dropped category is switched off and comes back if chosen again.
 router.put("/:id/specializations", saveSpecializations);
+
+// GET /api/staff/:id/areas — one staff member's barangays.
+router.get("/:id/areas", async (req, res) => {
+  const staff = await findStaffMember(parse(idSchema, req.params).id);
+  const areas = await activeAreas(staff.id);
+  res.json({ areas: areas.get(staff.id) ?? [] });
+});
+
+// PUT /api/staff/:id/areas { barangays } — replaces the set. Like specializations,
+// nothing is deleted: a dropped barangay is switched off and comes back if chosen.
+router.put("/:id/areas", async (req, res) => {
+  const { id } = parse(idSchema, req.params);
+  const { barangays } = parse(areaSchema, req.body);
+  const staff = await findStaffMember(id);
+
+  if (barangays.length > 0) {
+    throwIfFailed(
+      await db
+        .from("staff_areas")
+        .upsert(
+          barangays.map((barangay) => ({ staff_id: staff.id, barangay, is_active: true })),
+          { onConflict: "staff_id,barangay" },
+        ),
+      "The areas could not be saved.",
+    );
+  }
+
+  let switchOff = db.from("staff_areas").update({ is_active: false }).eq("staff_id", staff.id).eq("is_active", true);
+  // Quoted: names such as "Forbes Park" have spaces. They come from the fixed list.
+  if (barangays.length > 0) switchOff = switchOff.not("barangay", "in", `(${barangays.map((name) => `"${name}"`).join(",")})`);
+  throwIfFailed(await switchOff, "The areas could not be saved.");
+
+  await logActivity(req, "staff.areas_updated", { entityType: "user", entityId: staff.id, metadata: { barangays } });
+
+  const areas = await activeAreas(staff.id);
+  res.json({ areas: areas.get(staff.id) ?? [] });
+});
 
 async function saveSpecializations(req: Request, res: Response) {
   const { id } = parse(idSchema, req.params);

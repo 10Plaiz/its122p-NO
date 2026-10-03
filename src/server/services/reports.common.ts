@@ -24,7 +24,7 @@ type ProblemName = { id: number; name: string };
 // requested and verified a closure, and the computed delay.
 export const REPORT_FIELDS = `
   id, reference_code, title, description, status, latitude, longitude,
-  address_text, is_public, submitted_at, updated_at, resolved_at,
+  address_text, is_public, submitted_at, updated_at, resolved_at, barangay,
   assigned_at, status_changed_at, closure_requested_at, closure_outcome,
   closure_reason, verified_at,
   category:categories ( id, name ),

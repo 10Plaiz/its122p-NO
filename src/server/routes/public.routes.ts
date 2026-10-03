@@ -2,7 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { db } from "../config/supabase.js";
 import { orThrow } from "../lib/errors.js";
-import { parse } from "../lib/validate.js";
+import { BARANGAYS, parse } from "../lib/validate.js";
 import { photoUrl } from "../lib/photos.js";
 import { endOfDay, pageFields, searchFields, searchFilter, sortColumn } from "../lib/query.js";
 import { PUBLIC_STATUSES } from "../services/reports.service.js";
@@ -16,12 +16,14 @@ const boardSchema = z.object({
   ...pageFields(50, 100),
   status: z.enum(PUBLIC_STATUSES).optional(),
   category_id: z.coerce.number().int().positive().optional(),
+  // SW-1: the board shows and filters by barangay (decision 2026-10-03).
+  barangay: z.enum(BARANGAYS).optional(),
 });
 
 // The transparency board. No sign-in, and no citizen details — it reads from the
 // public_reports view, which only exposes reviewed reports and non-personal columns.
 router.get("/reports", async (req, res) => {
-  const { status, category_id, q, from, to, sort, page, per_page } = parse(boardSchema, req.query);
+  const { status, category_id, barangay, q, from, to, sort, page, per_page } = parse(boardSchema, req.query);
   const order = sortColumn(sort);
 
   let query = db
@@ -32,6 +34,7 @@ router.get("/reports", async (req, res) => {
 
   if (status) query = query.eq("status", status);
   if (category_id) query = query.eq("category_id", category_id);
+  if (barangay) query = query.eq("barangay", barangay);
   if (from) query = query.gte("submitted_at", from);
   if (to) query = query.lte("submitted_at", endOfDay(to));
 
