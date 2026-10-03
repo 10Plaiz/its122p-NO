@@ -131,11 +131,11 @@ Updated 2026-10-03, after the S1 Accounts work. A staging list for the team: [CO
   - [x] B2 server-side Makati check (see KI-04).
   - [x] B3 ReportDetail and StaffReport use Google Maps; Leaflet removed (C3).
   - [x] B4 feedback form and summary on the report pages (C5).
-  - [ ] B5 AdminUsers on `DataTable`, keeping the residency column, review dialog, and phone control.
-  - [ ] B6 table and export columns, including residency and phone verified.
+  - [x] B5 AdminUsers: specializations editable per staff member, `api.put()`, PATCH alias removed (C6). Moving the screen onto `DataTable` was left out on purpose: no requirement needs it.
+  - [x] B6 table and export columns, including residency and phone verified (C6). Report barangay comes with C7.
   - [ ] B7 area routing by barangay, or documented as a limitation.
   - [ ] B8 "Photo removed after the 90-day retention period"; optional purge schedule.
-  - [ ] B9 readable activity log labels and server-side log filters.
+  - [x] B9 readable activity log labels and server-side log filters (C6).
   - [ ] B10 type files folded into `src/web/lib/types.ts`.
   - [ ] B12 and B13: see KI-05 to KI-08 and KI-22.
 

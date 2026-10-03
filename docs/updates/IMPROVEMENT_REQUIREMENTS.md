@@ -60,12 +60,12 @@ Work plan and file ownership: [PARALLEL_PLAN.md](PARALLEL_PLAN.md).
 
 | ID | Requirement | Priority | Status |
 | :--- | :--- | :--- | :--- |
-| SW-1 | Assign staff by specialization (category) and area (barangay). | High | Gap. Area is required (decision 2026-10-03). |
+| SW-1 | Assign staff by specialization (category) and area (barangay). | High | Partial (2026-10-03): administrators set each staff member's specializations on the Users screen, and the assign dialog lists specialists first. Area (barangay) routing is Phase 2 C7. |
 | SW-2 | Require a comment with every status change, assignment, cancellation, and verification decision. | High | Partial: remarks require text; status and cancel do not. |
-| SW-3 | Capture each activity on a report (who, what, when) in an activity log. | High | Partial: `report_updates` per report; report actions are not in `activity_logs`. |
+| SW-3 | Capture each activity on a report (who, what, when) in an activity log. | High | Done locally (2026-10-03): every workflow action is logged; the activity log shows readable labels and filters on the server by action, role, report reference, and date, and its export uses the same filters. |
 | SW-4 | Staff request resolution; an Administrator approves or returns it before the report is closed. | High | Gap: staff set `resolved` directly. |
 | SW-5 | Show resolved reports in green, with a text label or icon as well. | Low | Done locally: badges (green, check, word) and map pins (green, check). |
-| SW-6 | Track status delays and show the relevant dates (submitted, assigned, completed). | Medium | Partial: submitted and resolved dates exist. |
+| SW-6 | Track status delays and show the relevant dates (submitted, assigned, completed). | Medium | Done locally (2026-10-03): Key dates and a Delayed tag on the staff page; report tables show Delayed in the status column and offer Assigned on and Days in stage columns. |
 | SW-7 | Staff can reject a report that cannot be fixed, with a required reason, through admin verification (new `rejected` status). | High | Done locally (2026-10-03): migrations `…000700` and `…000710`; request from under review or in progress; admin approves or returns; the citizen and the public board see the reason. |
 
 ## 5. Data Management
@@ -80,9 +80,9 @@ Work plan and file ownership: [PARALLEL_PLAN.md](PARALLEL_PLAN.md).
 | ID | Requirement | Priority | Status |
 | :--- | :--- | :--- | :--- |
 | TB-1 | Add Google-style numbered pagination with a jump-to-page control. | Medium | Gap: Previous/Next only. |
-| TB-2 | Let users hide and show columns, including a completion-date column. | Medium | Gap. |
+| TB-2 | Let users hide and show columns, including a completion-date column. | Medium | Done locally (2026-10-03): column choice per table; "Closed" date (resolved or rejected); optional Problems, Assigned on, Days in stage, Reporter residency, Phone verified, and Rating columns. |
 | TB-3 | Place filter and search at the top right of the table. | Low | Gap. |
-| TB-4 | Export table data to PDF and CSV, respecting the current filters and visible columns. | Medium | Gap. |
+| TB-4 | Export table data to PDF and CSV, respecting the current filters and visible columns. | Medium | Done locally (2026-10-03): report and activity-log exports use the screen's filters and visible columns. |
 
 ## 7. Feedback
 

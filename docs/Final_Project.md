@@ -74,13 +74,14 @@ Afonso (2017) notes that centralized web apps drastically lower the transaction 
 * See the reporter's rating on resolved reports and their own average rating
 
 ### Administrator-Facing Features
-* Manage user accounts (citizens and staff)
+* Manage user accounts (citizens and staff), including each staff member's specializations
 * Manage infrastructure categories (roads, streetlights, drainage, signs, etc.)
 * Manage and oversee all submitted records/reports
 * Assign staff to reports
 * Verify staff requests to close a report as resolved or rejected, approving or returning each with a comment
 * Generate analytics and summary reports (volume by category, resolution time, status distribution, average citizen rating)
-* View system-wide activity logs
+* View system-wide activity logs in plain words, filtered by action, role, report, and date, and export them
+* Choose which columns each report table shows (for example problems, days in stage, reporter residency, rating) and export what is shown to CSV or PDF
 
 ### Shared Features
 * Map-based geotagging of reports, limited to Makati City's boundary: a pin outside the city is refused in the browser, by the API, and by a database check

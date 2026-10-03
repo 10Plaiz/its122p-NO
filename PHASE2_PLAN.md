@@ -36,7 +36,7 @@ Written 2026-10-03 after reviewing commits `d27fd46..888e112`, [HANDOFF.md](HAND
 | C3 ✅ | Google Maps on report pages; remove Leaflet | MP-1, SW-5, B3 | KI-09 | M |
 | C4 ✅ | `rejected` status | SW-7, B1 | KI-09 | L |
 | C5 ✅ | Report page wiring and citizen comments | FB-1, RS-6, SW-3/6, B4 | KI-09 | M |
-| C6 | Tables, admin users, logs | TB, SW-1, B5, B6, B9 | KI-09 | L |
+| C6 ✅ | Tables, admin users, logs | TB, SW-1, B5, B6, B9 | KI-09 | L |
 | C7 | Area routing by barangay | SW-1, B7 | KI-09 | L |
 | C7b | Leftovers | DM-2 purge UI, B10 | KI-09 | S |
 | C8 | Tests and seeds | B12 | KI-05–08 | L |
@@ -83,19 +83,12 @@ Why this order: C1 adds the fields that C4–C6 read. C2 must land before C8, be
 - Local run: 21/21 checks, covering the rating, comment, notifications, 403 for another citizen, the staff summary and averages, and the waiting badge.
 - Main chunk is back to about 503 kB (KI-21, planned for C9).
 
-### C6 Tables, admin users, logs
-- B6: optional columns in `report-columns.tsx` and the export select:
-  - Main and other problem, Assigned, Delayed, and Awaiting verification.
-  - Rating (`feedback:report_feedback ( rating, comment )` in the table and export select only).
-  - Barangay/residency and phone verified.
-- B5 AdminUsers:
-  - Server paging on `/admin/users`, then use `DataTable` and `NumberedPagination`.
-  - Keep the residency column and filter, `ResidencyReview`, and "Mark verified".
-  - Add an "Edit specializations" action that opens `SpecializationEditor`.
-  - Add `api.put()` and drop the PATCH alias in `staff.routes.ts`.
-- B9 AdminLogs:
-  - Show `activityLabel(action)`.
-  - Add server-side search and date filters on `/admin/logs`, so the export matches the screen.
+### C6 Tables, admin users, logs ✅ (2026-10-03)
+- Code pushed in `b239258` (the user's commit). The follow-up (Clear filters, caption fix, tests, docs) is in `COMMITS_C6.md`.
+- B6: optional report columns (Problems, Assigned on, Days in stage, Reporter residency, Phone verified, Rating). The status cell shows Awaiting verification and Delayed. The date column is now "Closed" (resolved or rejected). The rating join is in `services/reports.rows.ts`, for list and export only.
+- B9: `lib/log-filters.ts` (action, role, reference, from/to) is shared by `/admin/logs` and `/exports/logs`. The screen shows `activityLabel()`.
+- B5: "Specializations" disclosure on staff rows; `api.put()`; PATCH alias removed. No DataTable move (no requirement).
+- Local run: 18/18 API checks, 18/18 unit tests, and the browser check (two header checks failed on capitalisation only).
 
 ### C7 Area routing by barangay (SW-1, B7; ranked suggestions)
 - Migration `…000800`: a `barangays` table (23 Makati barangays with simplified OSM polygons), `reports.barangay_id`, and a `staff_areas` table (RLS, service_role only).
