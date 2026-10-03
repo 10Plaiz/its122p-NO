@@ -13,6 +13,7 @@ import "dotenv/config";
 import type { Server } from "node:http";
 import { createInterface } from "node:readline";
 import { stdin, exit } from "node:process";
+import { createClient } from "@supabase/supabase-js";
 import { app } from "../../src/server/app.js";
 import { db } from "../../src/server/config/supabase.js";
 
@@ -483,7 +484,16 @@ async function main(): Promise<void> {
     await runCase("XSS-01", "Cross-Site Scripting", "report submission stores XSS payload strictly as literal data", async () => {
       const xssTitle = "<script>alert('xss-title')</script> Pipe leak";
       const xssDescription = '<img src=x onerror="alert(1)"> Flooding reported on sidewalk.';
-      
+      // RS-4: every new report needs its category's main problem.
+      const { data: problem } = await db
+        .from("problem_types")
+        .select("id")
+        .eq("category_id", testCategory.id)
+        .eq("is_active", true)
+        .order("id")
+        .limit(1)
+        .single();
+
       const res = await api("/api/reports", {
         method: "POST",
         headers: { Authorization: `Bearer ${citizen1Token}` },
@@ -491,6 +501,7 @@ async function main(): Promise<void> {
           title: xssTitle,
           description: xssDescription,
           category_id: testCategory.id,
+          primary_problem_id: problem?.id,
           latitude: 14.5547,
           longitude: 121.0244,
           address_text: "Synthetic Test Street corner XSS Ave",
@@ -573,6 +584,186 @@ async function main(): Promise<void> {
       const contentType = res.headers.get("content-type") || "";
       if (!contentType.includes("application/json")) {
         throw new Error(`Expected application/json content type, got ${contentType}`);
+      }
+    });
+
+    // ------------------------------------------------------------------ Section I: Phase 2 improvements
+    // KI-08: the residency lock, the private proofs bucket, the feedback table, and
+    // the tables added for rejection and area routing. Direct-access checks go
+    // through Supabase's Data API with the publishable key, as a browser would.
+    console.log("\n--- Section I: Phase 2 Improvements ---");
+
+    const publishableKey = process.env.SUPABASE_PUBLISHABLE_KEY!;
+    const anonClient = createClient(supabaseUrl!, publishableKey, { auth: { persistSession: false, autoRefreshToken: false } });
+    const userClient = (token: string) =>
+      createClient(supabaseUrl!, publishableKey, {
+        auth: { persistSession: false, autoRefreshToken: false },
+        global: { headers: { Authorization: `Bearer ${token}` } },
+      });
+
+    await runCase("IMP-01", "Residency Lock", "a citizen with no accepted proof gets 403 residency_required on citizen routes", async () => {
+      // Lock fixture citizen 2 for this case only; restored at once and in cleanup.
+      const { data: profile } = await db.from("profiles").select("id, residency_status").eq("email", "fixture-citizen-2@kamoti.invalid").single();
+      const original = profile!.residency_status as string | null;
+      const restore = async () => {
+        await db.from("profiles").update({ residency_status: original }).eq("id", profile!.id);
+      };
+      cleanups.push(restore);
+      await db.from("profiles").update({ residency_status: null }).eq("id", profile!.id);
+      try {
+        const token = await login("fixture-citizen-2@kamoti.invalid");
+        for (const path of ["/api/reports", "/api/notifications", `/api/feedback/${reportPendingCitizen2!.id}`, "/api/exports/reports?format=csv"]) {
+          const res = await api(path, { headers: { Authorization: `Bearer ${token}` } });
+          if (res.status !== 403 || res.body?.details?.code !== "residency_required") {
+            throw new Error(`${path}: expected 403 residency_required, got ${res.status} ${JSON.stringify(res.body?.details)}`);
+          }
+        }
+      } finally {
+        await restore();
+      }
+    });
+
+    await runCase("IMP-02", "Residency Proofs", "neither anonymous nor signed-in clients can list or read the residency-proofs bucket", async () => {
+      const path = `security-test/${Date.now()}.pdf`;
+      const upload = await db.storage.from("residency-proofs").upload(path, Buffer.from("%PDF-1.4\n%%EOF\n"), { contentType: "application/pdf" });
+      if (upload.error) throw new Error(`Set-up upload failed: ${upload.error.message}`);
+      cleanups.push(async () => {
+        await db.storage.from("residency-proofs").remove([path]);
+      });
+      for (const [who, client] of [["anonymous", anonClient], ["citizen", userClient(citizen1Token)]] as const) {
+        const download = await client.storage.from("residency-proofs").download(path);
+        if (!download.error) throw new Error(`${who} could download a residency proof`);
+        const list = await client.storage.from("residency-proofs").list("security-test");
+        if (!list.error && (list.data ?? []).length > 0) throw new Error(`${who} could list residency proofs`);
+      }
+    });
+
+    await runCase("IMP-03", "Residency Proofs", "only an administrator gets a link to a proof", async () => {
+      const { data: profile } = await db.from("profiles").select("id").eq("email", "fixture-citizen-1@kamoti.invalid").single();
+      for (const [who, token] of [["staff", staff1Token], ["citizen", citizen1Token]] as const) {
+        const res = await api(`/api/admin/users/${profile!.id}/residency-proof`, { headers: { Authorization: `Bearer ${token}` } });
+        if (res.status !== 403) throw new Error(`${who}: expected 403, got ${res.status}`);
+      }
+    });
+
+    await runCase("IMP-04", "Direct Data Access", "report_feedback, barangays, and staff_areas are closed to direct clients; feedback_summary cannot be called", async () => {
+      for (const table of ["report_feedback", "barangays", "staff_areas"]) {
+        for (const [who, client] of [["anonymous", anonClient], ["citizen", userClient(citizen1Token)]] as const) {
+          const read = await client.from(table).select("*").limit(1);
+          if (!read.error && (read.data ?? []).length > 0) throw new Error(`${who} could read ${table}`);
+        }
+      }
+      const write = await userClient(citizen1Token).from("report_feedback").insert({ report_id: reportPendingCitizen1!.id, rating: 5 });
+      if (!write.error) throw new Error("A citizen could write report_feedback directly");
+      const rpc = await anonClient.rpc("feedback_summary");
+      if (!rpc.error) throw new Error("Anonymous clients could call feedback_summary");
+    });
+
+    await runCase("IMP-05", "Feedback Rules", "a citizen cannot rate someone else's report (403) or an unresolved one (400)", async () => {
+      const notMine = await api(`/api/feedback/${reportPendingCitizen1!.id}`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${citizen2Token}` },
+        body: JSON.stringify({ rating: 5 }),
+      });
+      if (notMine.status !== 403) throw new Error(`Rating another citizen's report: expected 403, got ${notMine.status}`);
+      const unresolved = await api(`/api/feedback/${reportPendingCitizen1!.id}`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${citizen1Token}` },
+        body: JSON.stringify({ rating: 5 }),
+      });
+      if (unresolved.status !== 400) throw new Error(`Rating a pending report: expected 400, got ${unresolved.status}`);
+    });
+
+    await runCase("IMP-06", "Feedback Rules", "staff cannot read another staff member's rating summary", async () => {
+      const { data: other } = await db.from("profiles").select("id").eq("email", "fixture-staff-2@kamoti.invalid").single();
+      const res = await api(`/api/feedback/summary/staff?staff_id=${other!.id}`, { headers: { Authorization: `Bearer ${staff1Token}` } });
+      if (res.status !== 403) throw new Error(`Expected 403, got ${res.status}`);
+    });
+
+    await runCase("IMP-07", "Public Data", "the public board exposes a closure reason only for rejected reports", async () => {
+      const { data, error } = await anonClient.from("public_reports").select("status, rejection_reason, barangay");
+      if (error) throw new Error(`public_reports unreadable: ${error.message}`);
+      const leaked = (data ?? []).filter((row) => row.status !== "rejected" && row.rejection_reason !== null);
+      if (leaked.length > 0) throw new Error(`${leaked.length} non-rejected report(s) expose a closure reason`);
+    });
+
+    await runCase("IMP-08", "Citizen Comments", "a citizen cannot comment on another citizen's report", async () => {
+      const res = await api(`/api/reports/${reportPendingCitizen1!.id}/remarks`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${citizen2Token}` },
+        body: JSON.stringify({ details: "Not my report." }),
+      });
+      if (res.status !== 403) throw new Error(`Expected 403, got ${res.status}`);
+    });
+
+    await runCase("IMP-09", "Makati Bounds", "a report pinned outside Makati is refused on the latitude field", async () => {
+      const res = await api("/api/reports", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${citizen1Token}` },
+        body: JSON.stringify({ title: "Bataan pin", description: "A pin far outside the city.", category_id: testCategory.id, primary_problem_id: 1, latitude: 14.676, longitude: 120.536 }),
+      });
+      if (res.status !== 400) throw new Error(`Expected 400, got ${res.status}`);
+      if (!JSON.stringify(res.body?.details ?? "").includes("Pick a spot inside Makati")) throw new Error("Missing the Makati field error");
+    });
+
+    await runCase("IMP-10", "Session Handling", "signing out with an expired access token still ends the session (KI-13)", async () => {
+      // A session of its own, so the tokens the rest of the suite uses stay valid.
+      const session = await api("/api/auth/login", {
+        method: "POST",
+        body: JSON.stringify({ email: "fixture-citizen-1@kamoti.invalid", password: fixturePassword }),
+      });
+      const refreshToken = session.body?.refresh_token as string;
+      if (!refreshToken) throw new Error("No refresh token from login");
+      const out = await api("/api/auth/logout", {
+        method: "POST",
+        headers: { Authorization: "Bearer expired.or.garbage" },
+        body: JSON.stringify({ refresh_token: refreshToken }),
+      });
+      if (out.status !== 204) throw new Error(`Expected 204 from logout, got ${out.status}`);
+      const reused = await api("/api/auth/refresh", { method: "POST", body: JSON.stringify({ refresh_token: refreshToken }) });
+      if (reused.status !== 401) throw new Error(`The old refresh token still works after sign-out: ${reused.status}`);
+    });
+
+    await runCase("IMP-11", "Account Details", "a citizen edits their own details; a new number loses its verified mark and a new barangay goes back to review (UA-13)", async () => {
+      const staffEdit = await api("/api/auth/me", {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${staff1Token}` },
+        body: JSON.stringify({ first_name: "Staff", last_name: "One", barangay: "Poblacion", address_line: "1 City Hall Road" }),
+      });
+      if (staffEdit.status !== 403) throw new Error(`Staff using the citizen edit: expected 403, got ${staffEdit.status}`);
+
+      const bad = await api("/api/auth/me", {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${citizen1Token}` },
+        body: JSON.stringify({ first_name: "Fixture", last_name: "Citizen", barangay: "Pembo", address_line: "12 Sample Street" }),
+      });
+      if (bad.status !== 400) throw new Error(`A barangay outside Makati: expected 400, got ${bad.status}`);
+
+      // Restore citizen 1 exactly as it was, whatever happens below.
+      const fields = "first_name, middle_name, last_name, suffix, name, contact_number, phone_verified_at, barangay, address_line, residency_status, residency_note, residency_reviewed_by, residency_reviewed_at";
+      const { data: before } = await db.from("profiles").select(`id, ${fields}`).eq("email", "fixture-citizen-1@kamoti.invalid").single();
+      const restore = async () => {
+        const { id, ...rest } = before as Record<string, unknown>;
+        await db.from("profiles").update(rest).eq("id", id as string);
+      };
+      cleanups.push(restore);
+      try {
+        await db.from("profiles").update({ contact_number: "09171234567", phone_verified_at: new Date().toISOString(), residency_status: "verified" }).eq("id", before!.id);
+        const res = await api("/api/auth/me", {
+          method: "PATCH",
+          headers: { Authorization: `Bearer ${citizen1Token}` },
+          body: JSON.stringify({ first_name: "Fixture", last_name: "Citizen", contact_number: "09181234567", barangay: "Bel-Air", address_line: "45 New Street" }),
+        });
+        if (res.status !== 200) throw new Error(`Expected 200, got ${res.status} ${res.body?.error ?? ""}`);
+        const { data: after } = await db.from("profiles").select("name, phone_verified_at, residency_status, barangay").eq("id", before!.id).single();
+        if (after?.phone_verified_at !== null) throw new Error("A new number kept its verified mark");
+        if (after?.residency_status !== "pending") throw new Error(`A new barangay should go back to review, got ${after?.residency_status}`);
+        if (after?.name !== "Fixture Citizen" || after?.barangay !== "Bel-Air") throw new Error("Details were not saved");
+        const { data: log } = await db.from("activity_logs").select("metadata").eq("action", "user.updated").eq("entity_id", before!.id).order("created_at", { ascending: false }).limit(1).single();
+        const logged = (log?.metadata as { contact_number?: { from: string; to: string } } | null)?.contact_number;
+        if (logged?.from !== "09171234567" || logged?.to !== "09181234567") throw new Error("The old and new number were not logged");
+      } finally {
+        await restore();
       }
     });
 

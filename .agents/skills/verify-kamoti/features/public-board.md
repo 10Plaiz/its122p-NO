@@ -6,7 +6,7 @@ Persona: Public Visitor / Citizen
 ## Sub-features
 - **Public Report Feed:** Chronological cards displaying reviewed public issues with status tags and thumbnail photos.
 - **Filter and Search Bar:** Category dropdown (`#category`), status toggle, and keyword search persisting parameters to URL query params.
-- **Interactive Map:** Leaflet map rendering issue pins with popup previews synchronized with selected card.
+- **Interactive Map:** Google map of Makati with the city outline and one square pin per report, coloured by status (resolved: green with a check; rejected: dark with a cross), synchronized with the selected card.
 - **Mobile Segmented View:** Responsive toggle switching between Map view and List view on viewports under 1024px (`[data-testid="mobile-view-toggle"]`).
 - **Card Expansion:** Clicking a card button expands detailed notes, photo thumbnail, and highlights corresponding map marker.
 
@@ -51,6 +51,6 @@ test("Public Board: Browsing, filtering, and responsive toggle", async ({ page }
 
 ## Gotchas
 - **Mobile Pane:** The query parameter `pane=map` controls the mobile segmented toggle between map and list views. The board has no map-bounds filter; `view=map` is ignored.
-- **Leaflet Container Invalidation:** Hiding the map drops its container to zero dimensions, so the map re-measures and refits when its pane is shown again.
+- **Map Pane Refit:** Hiding the map drops its container to zero dimensions, so the map refits to the reports when its pane is shown again.
 - **Category Dropdown Selector:** The category filter input renders with `id="category"`. Do not use `name="category"` in automation scripts.
 - **Inline Card Expansion:** Clicking a card toggles inline expansion with `aria-expanded` state. It does not navigate to a new route.
