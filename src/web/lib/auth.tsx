@@ -1,18 +1,19 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import {
-  ApiError,
-  EXPIRES_KEY,
-  RESIDENCY_REQUIRED_EVENT,
-  SESSION_REFRESHED_EVENT,
-  TOKEN_KEY,
   api,
+  ApiError,
   clearSession,
+  EXPIRES_KEY,
   getExpiresAt,
+  getRefreshToken,
   getToken,
   refreshDelay,
   refreshSession,
+  RESIDENCY_REQUIRED_EVENT,
+  SESSION_REFRESHED_EVENT,
   storeSession,
+  TOKEN_KEY,
 } from "./api.js";
 import { clearActivity, markActivity } from "./idle.js";
 import { IDLE_SIGNOUT_EVENT } from "./useDraft.js";
@@ -113,7 +114,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // not wait for it or let it fail the sign-out — clearing the session locally is
       // what matters, and it must happen even offline. The token is read when the
       // request starts, before clearSession() below.
-      void api.post<void>("/auth/logout").catch(() => undefined);
+      // The refresh token goes along, so the server can end the session even when
+      // the access token has already expired (KI-13).
+      void api.post<void>("/auth/logout", { refresh_token: getRefreshToken() ?? undefined }).catch(() => undefined);
 
       writeEndReason(reason);
       clearSession();

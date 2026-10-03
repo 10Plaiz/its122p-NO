@@ -90,9 +90,30 @@ const INK: [number, number, number] = [32, 30, 29];
 const PAPER: [number, number, number] = [243, 242, 242];
 const SURFACE: [number, number, number] = [234, 233, 233];
 
+// KI-20: jsPDF's built-in Helvetica covers WinAnsi only (Latin-1 plus a few
+// typographic marks), and anything else prints as garbage. Arrows become ASCII,
+// emoji are dropped, and any other character outside the set becomes "?", so the
+// PDF never shows something other than what was typed. CSV keeps the original.
+const WINANSI_EXTRA = new Set("€‚ƒ„…†‡ˆ‰Š‹ŒŽ‘’“”•–—˜™š›œžŸ");
+const ASCII_FOR: Record<string, string> = { "→": "->", "←": "<-", "↔": "<->", "⇒": "=>", "₱": "PHP " };
+export function pdfText(value: string): string {
+  return Array.from(value.replace(/\p{Extended_Pictographic}\uFE0F?/gu, ""))
+    .map((char) => {
+      if (ASCII_FOR[char]) return ASCII_FOR[char];
+      const code = char.codePointAt(0)!;
+      const latin1 = (code >= 0x20 && code <= 0x7e) || (code >= 0xa0 && code <= 0xff) || char === "\n";
+      return latin1 || WINANSI_EXTRA.has(char) ? char : "?";
+    })
+    .join("");
+}
+
 // jsPDF is loaded only when someone exports a PDF, so its weight stays out of the
 // bundle every visitor downloads.
-export async function downloadPdf({ filename, title, details, headers, body }: PdfInput) {
+export async function downloadPdf({ filename, title: rawTitle, details: rawDetails, headers: rawHeaders, body: rawBody }: PdfInput) {
+  const title = pdfText(rawTitle);
+  const details = rawDetails.map(pdfText);
+  const headers = rawHeaders.map(pdfText);
+  const body = rawBody.map((row) => row.map((cell) => pdfText(String(cell))));
   const [{ jsPDF }, { autoTable }] = await Promise.all([import("jspdf"), import("jspdf-autotable")]);
 
   const doc = new jsPDF({ orientation: "landscape", unit: "pt", format: "a4" });

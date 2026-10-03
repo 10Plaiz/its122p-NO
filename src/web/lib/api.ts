@@ -70,6 +70,12 @@ export function getToken(): string | null {
   }
 }
 
+// KI-13: sign-out sends it, so the server can end a session whose access token has
+// already expired.
+export function getRefreshToken(): string | null {
+  return read(REFRESH_KEY);
+}
+
 function read(key: string): string | null {
   try {
     return localStorage.getItem(key);

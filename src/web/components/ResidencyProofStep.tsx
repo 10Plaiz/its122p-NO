@@ -12,8 +12,10 @@ import type { Profile } from "../lib/types.js";
 // UA-8, the last step of registering and the only screen a locked citizen can use:
 // new citizens after their email code, existing ones at their next sign-in, and
 // anyone whose proof an administrator rejected. Sending a proof unlocks the account
-// at once; an administrator reviews it afterwards.
-export function ResidencyProofStep() {
+// at once; an administrator reviews it afterwards. On My account ("account") the
+// citizen is not locked: they send a proof for the address on file, usually just
+// after changing it (UA-13), and the sign-out offer is left out.
+export function ResidencyProofStep({ variant = "locked" }: { variant?: "locked" | "account" } = {}) {
   const { user, replaceUser, signOut } = useAuth();
   const toast = useToast();
   const [file, setFile] = useState<File | null>(null);
@@ -38,8 +40,9 @@ export function ResidencyProofStep() {
     const result = await run(file);
     if (!result) return;
     // The page around this moves on by itself once the account is unlocked.
-    toast("Proof sent. You can use KAMOTI while an administrator reviews it.");
+    toast(variant === "account" ? "Proof sent. An administrator will review it." : "Proof sent. You can use KAMOTI while an administrator reviews it.");
     replaceUser(result.user);
+    setFile(null);
   }
 
   return (
@@ -49,6 +52,11 @@ export function ResidencyProofStep() {
           {user.residency_note ?? "An administrator could not confirm your address from it."} Upload a new proof to
           continue.
         </Alert>
+      ) : variant === "account" ? (
+        <p className="text-[13px] leading-relaxed">
+          An administrator has not yet confirmed the address on your account. Send one document that shows your name and
+          this address; it replaces any proof you sent before.
+        </p>
       ) : (
         <p className="text-[13px] leading-relaxed">
           KAMOTI is for people who live in Makati. Upload one document that shows your name and your Makati address.
@@ -83,12 +91,16 @@ export function ResidencyProofStep() {
         </Button>
       </form>
 
-      <p className="text-[12px] text-muted">
-        Not ready? You can sign out and finish this later. Until then, the rest of KAMOTI stays locked.
-      </p>
-      <Button type="button" variant="ghost" className="self-start" onClick={() => signOut()}>
-        Sign out
-      </Button>
+      {variant === "locked" && (
+        <>
+          <p className="text-[12px] text-muted">
+            Not ready? You can sign out and finish this later. Until then, the rest of KAMOTI stays locked.
+          </p>
+          <Button type="button" variant="ghost" className="self-start" onClick={() => signOut()}>
+            Sign out
+          </Button>
+        </>
+      )}
     </div>
   );
 }

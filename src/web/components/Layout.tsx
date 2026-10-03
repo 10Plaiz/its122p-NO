@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { Link as RouterLink, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
+import { Loading } from "./ui.js";
 import { useAuth } from "../lib/auth.js";
 import { PROOF_STEP_PATH, residencyLocked } from "../lib/residency.js";
 import { useApi } from "../lib/useApi.js";
@@ -20,6 +21,7 @@ const LINKS_BY_ROLE: Record<string, Link[]> = {
   citizen: [
     { to: "/report/new", label: "Report an issue" },
     { to: "/my-reports", label: "My reports" },
+    { to: "/account", label: "My account" },
   ],
   staff: [{ to: "/staff/queue", label: "My queue" }],
   admin: [{ to: "/admin", label: "Admin" }],
@@ -125,7 +127,10 @@ export function Layout() {
             <RouterLink to={PROOF_STEP_PATH}>Upload your proof of residency</RouterLink>
           </div>
         )}
-        <Outlet />
+        {/* Admin and staff pages load on first visit (KI-21); the header stays put. */}
+        <Suspense fallback={<Loading label="Loading the page" />}>
+          <Outlet />
+        </Suspense>
       </main>
 
       <footer className="border-t-2 border-divider px-4 py-4 text-muted font-mono text-[10px]">

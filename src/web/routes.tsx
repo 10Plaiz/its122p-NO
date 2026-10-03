@@ -1,3 +1,4 @@
+import { lazy } from "react";
 import type { ReactNode } from "react";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { Layout } from "./components/Layout.js";
@@ -15,13 +16,17 @@ import { NewReportPage } from "./pages/NewReport.js";
 import { MyReportsPage } from "./pages/MyReports.js";
 import { ReportDetailPage } from "./pages/ReportDetail.js";
 import { NotificationsPage } from "./pages/Notifications.js";
-import { StaffQueuePage } from "./pages/StaffQueue.js";
-import { StaffReportPage } from "./pages/StaffReport.js";
-import { AdminDashboardPage } from "./pages/AdminDashboard.js";
-import { AdminReportsPage } from "./pages/AdminReports.js";
-import { AdminUsersPage } from "./pages/AdminUsers.js";
-import { AdminCategoriesPage } from "./pages/AdminCategories.js";
-import { AdminLogsPage } from "./pages/AdminLogs.js";
+import { AccountPage } from "./pages/Account.js";
+
+// KI-21: staff and admin screens load on first visit, so citizens, who are most
+// visitors, never download them. Layout and AdminLayout hold the Suspense fallback.
+const StaffQueuePage = lazy(() => import("./pages/StaffQueue.js").then((m) => ({ default: m.StaffQueuePage })));
+const StaffReportPage = lazy(() => import("./pages/StaffReport.js").then((m) => ({ default: m.StaffReportPage })));
+const AdminDashboardPage = lazy(() => import("./pages/AdminDashboard.js").then((m) => ({ default: m.AdminDashboardPage })));
+const AdminReportsPage = lazy(() => import("./pages/AdminReports.js").then((m) => ({ default: m.AdminReportsPage })));
+const AdminUsersPage = lazy(() => import("./pages/AdminUsers.js").then((m) => ({ default: m.AdminUsersPage })));
+const AdminCategoriesPage = lazy(() => import("./pages/AdminCategories.js").then((m) => ({ default: m.AdminCategoriesPage })));
+const AdminLogsPage = lazy(() => import("./pages/AdminLogs.js").then((m) => ({ default: m.AdminLogsPage })));
 
 // Decides what to render, nothing more. Every endpoint behind these screens checks
 // the caller's role again server-side, so editing the URL reveals nothing.
@@ -85,6 +90,16 @@ export function AppRoutes() {
           element={
             <RequireRole roles={["citizen", "staff", "admin"]}>
               <NotificationsPage />
+            </RequireRole>
+          }
+        />
+
+        {/* UA-13: a citizen's own details. */}
+        <Route
+          path="account"
+          element={
+            <RequireRole roles={["citizen"]}>
+              <AccountPage />
             </RequireRole>
           }
         />
