@@ -17,6 +17,7 @@ import { limits } from "../lib/rate-limit.js";
 import {
   addressLine,
   barangay,
+  composeName,
   contactNumber,
   nameParts,
   optional,
@@ -143,6 +144,87 @@ router.get("/me", requireAuth, async (req, res) => {
   res.json({ user: withProofFlag(profile as unknown as { residency_proof_path: string | null }) });
 });
 
+// UA-13: a citizen corrects their own details, under the registration rules. The
+// form always sends the whole set; the server works out what changed.
+export const accountUpdateSchema = z.object({
+  first_name: nameParts.first_name,
+  middle_name: nameParts.middle_name,
+  last_name: nameParts.last_name,
+  suffix: nameParts.suffix,
+  contact_number: optional(contactNumber),
+  barangay,
+  address_line: addressLine,
+});
+
+type AccountBefore = {
+  contact_number: string | null;
+  barangay: string | null;
+  address_line: string | null;
+  residency_status: "pending" | "verified" | "rejected" | null;
+};
+
+// What a change of details does to the rest of the account (decisions 2026-10-04):
+// a new number has not been verified by anyone (UA-6), and a new barangay or street
+// sends residency back to review while the account stays usable (UA-8). An account
+// an administrator verified without any upload has no proof to review, so the same
+// "pending" locks it to the upload step until one is sent (residencyStep). A
+// rejected proof stays rejected: the citizen still has to send a new one.
+export function accountChanges(before: AccountBefore, input: z.output<typeof accountUpdateSchema>) {
+  const changes: Record<string, unknown> = {
+    first_name: input.first_name,
+    middle_name: input.middle_name ?? null,
+    last_name: input.last_name,
+    suffix: input.suffix ?? null,
+    name: composeName(input),
+    contact_number: input.contact_number ?? null,
+    barangay: input.barangay,
+    address_line: input.address_line,
+  };
+  const phoneChanged = (before.contact_number ?? null) !== (input.contact_number ?? null);
+  const addressChanged = before.barangay !== input.barangay || before.address_line !== input.address_line;
+
+  if (phoneChanged) changes.phone_verified_at = null;
+  if (addressChanged && (before.residency_status === "verified" || before.residency_status === "pending")) {
+    Object.assign(changes, {
+      residency_status: "pending",
+      residency_note: null,
+      residency_reviewed_by: null,
+      residency_reviewed_at: null,
+    });
+  }
+  return { changes, phoneChanged, addressChanged };
+}
+
+// PATCH /api/auth/me — UA-13. Citizens only; administrators change other accounts
+// on the Users screen. Email stays out: changing it needs a new confirmation code.
+router.patch("/me", requireAuth, requireRole("citizen"), async (req, res) => {
+  const user = currentUser(req);
+  const input = parse(accountUpdateSchema, req.body);
+  const before = orThrow(
+    await db.from("profiles").select("contact_number, barangay, address_line, residency_status").eq("id", user.id).single(),
+    "Your account could not be loaded.",
+  ) as AccountBefore;
+
+  const { changes, phoneChanged, addressChanged } = accountChanges(before, input);
+  const profile = orThrow(
+    await db.from("profiles").update(changes).eq("id", user.id).select(`${ACCOUNT_FIELDS}, residency_proof_path`).single(),
+    "Your details could not be saved. Try again.",
+  );
+
+  // The old and new number stay in the log for administrators (decision 2026-10-04);
+  // the profile keeps only the current one.
+  await logActivity(req, "user.updated", {
+    entityType: "user",
+    entityId: user.id,
+    metadata: {
+      by: "self",
+      ...(phoneChanged ? { contact_number: { from: before.contact_number, to: input.contact_number ?? null } } : {}),
+      ...(addressChanged ? { barangay: input.barangay, residency_review: changes.residency_status === "pending" } : {}),
+    },
+  });
+  res.json({ user: withProofFlag(profile as unknown as { residency_proof_path: string | null }) });
+});
+
 export const ALREADY_VERIFIED_ERROR = "Your residency is already confirmed. There is nothing more to upload.";
 
 // UA-8. A signed-in citizen sends their proof of residency: right after confirming
@@ -190,11 +272,35 @@ router.post(
   },
 );
 
-// Ends this session on the server too, so a copied token stops working (UA-10).
-router.post("/logout", requireAuth, async (req, res) => {
-  const token = bearerToken(req);
-  if (token) await revokeSession(token);
-  await logActivity(req, "auth.logout");
+const logoutSchema = z.object({ refresh_token: z.string().min(1).max(4096).optional() });
+
+// POST /api/auth/logout { refresh_token? } — ends this session on the server too,
+// so a copied token stops working (UA-10). A live access token is revoked as it
+// is. If it has already expired, the refresh token stands in: it is exchanged once
+// for a fresh token, which is then revoked (KI-13). Always 204: signing out never
+// fails for the person, who is signed out in the browser either way.
+router.post("/logout", limits.refresh, async (req, res) => {
+  const { refresh_token } = parse(logoutSchema, req.body ?? {});
+  let token = bearerToken(req);
+  let userId: string | null = null;
+
+  if (token) {
+    const { data } = await db.auth.getUser(token);
+    userId = data?.user?.id ?? null;
+  }
+  if (!userId && refresh_token) {
+    const { data } = await auth.auth.refreshSession({ refresh_token });
+    token = data.session?.access_token ?? null;
+    userId = data.user?.id ?? null;
+  }
+
+  if (token && userId) {
+    await revokeSession(token);
+    // logActivity takes the actor from req.user, which requireAuth sets on other
+    // routes; here the session may be past its access token, so only the id is known.
+    req.user = { id: userId } as typeof req.user;
+    await logActivity(req, "auth.logout");
+  }
   res.status(204).end();
 });
 

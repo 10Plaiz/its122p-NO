@@ -83,7 +83,15 @@ export async function resetPassword(email: string, token: string, password: stri
   if (!data.user || !data.session) throw new ApiError(400, "That code could not be checked. Send a new code and try again.");
 
   const { error: updateError } = await db.auth.admin.updateUserById(data.user.id, { password });
-  if (updateError) throw accountError(updateError, "Your password could not be changed. Try again.");
+  if (updateError) {
+    // verifyOtp above used the code up, so trying again with it cannot work (KI-16).
+    const refused = accountError(updateError, "Your password could not be changed.");
+    throw new ApiError(
+      refused.status,
+      `${refused.message} That code is now used up: ask for a new code, then choose the password again.`,
+      { ...((refused.details as object | undefined) ?? {}), code_used: true },
+    );
+  }
 
   const { error: signOutError } = await db.auth.admin.signOut(data.session.access_token, "global");
   if (signOutError) console.error("Could not end sessions after a password reset:", signOutError.message);
