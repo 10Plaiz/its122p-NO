@@ -330,8 +330,8 @@ export function BoardPage() {
           </div>
         </div>
 
-        {/* Paging and the map credit sit under the list, flush right: the second column
-            from lg, full width below it, where they follow whichever pane is on screen. */}
+        {/* Paging sits under the list, flush right: the second column from lg, full
+            width below it, where it follows whichever pane is on screen. */}
         <div className="flex flex-col items-end gap-2 text-right lg:col-start-2">
           {data && (
             <Pagination
@@ -342,7 +342,7 @@ export function BoardPage() {
             />
           )}
           <p className="text-muted font-mono text-[10px]">
-            Map data &copy; OpenStreetMap contributors, rendered with Leaflet. &middot;{" "}
+            {/* The map credits Google and the OpenStreetMap boundary itself. */}
             <Link to="/">Back to start</Link>
           </p>
         </div>

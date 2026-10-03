@@ -1,7 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import type { FormEvent } from "react";
 import { Link, useParams } from "react-router-dom";
-import { MapContainer, Marker, TileLayer } from "react-leaflet";
 import {
   Alert,
   Button,
@@ -9,6 +8,7 @@ import {
   Input,
   Loading,
   PhotoFrame,
+  RemovedPhoto,
   Select,
   StatusBadge,
   Textarea,
@@ -18,9 +18,23 @@ import {
 import { MapPicker } from "../components/MapPicker.js";
 import type { Point } from "../components/MapPicker.js";
 import { useToast } from "../components/Toast.js";
-import { TILE_ATTRIBUTION, TILE_URL, pinFor, reverseGeocode } from "../lib/leaflet.js";
+import { VoiceInput } from "../components/VoiceInput.js";
+import { reverseGeocode } from "../lib/maps.js";
+import { LocationMap } from "../components/LocationMap.js";
 import { api } from "../lib/api.js";
 import { useAuth } from "../lib/auth.js";
+import {
+  ADDRESS_MAX,
+  DESCRIPTION_MAX,
+  PRIMARY_PROBLEM_AGAIN_ERROR,
+  PRIMARY_PROBLEM_ERROR,
+  TITLE_MAX,
+  problemOptions,
+  pinError,
+  validateReportFields,
+} from "../lib/report-rules.js";
+import type { ProblemTypesResponse, ReportProblems } from "../lib/submission-types.js";
+import { useUnsavedChangesWarning } from "../lib/useDraft.js";
 import { useAction, useApi } from "../lib/useApi.js";
 import { ROLE_LABEL, STATUS_LABEL } from "../lib/types.js";
 import type { Category, Report, ReportUpdate } from "../lib/types.js";
@@ -40,7 +54,6 @@ export function ReportDetailPage() {
   const { data: history, reload: reloadHistory } = useApi<{ updates: ReportUpdate[] }>(
     id ? `/reports/${id}/updates` : null,
   );
-
   function refresh() {
     reload();
     reloadHistory();
@@ -64,11 +77,13 @@ export function ReportDetailPage() {
   const report = data.report;
   const canEdit =
     user?.role === "citizen" && report.citizen?.id === user.id && report.status === "pending";
+  const problems: ReportProblems = { primary: report.primary_problem, secondary: report.secondary_problem };
 
   if (isEditing && canEdit) {
     return (
       <EditReport
         report={report}
+        problems={problems}
         onDone={() => {
           refresh();
           setIsEditing(false);
@@ -106,6 +121,18 @@ export function ReportDetailPage() {
         <div className="flex flex-col gap-4">
           <section className="flex flex-col gap-2">
             <h6>What was reported</h6>
+            {problems.primary && (
+              <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-[13px] !m-0">
+                <dt className="text-muted">Main problem</dt>
+                <dd className="!m-0">{problems.primary.name}</dd>
+                {problems.secondary && (
+                  <>
+                    <dt className="text-muted">Other problem</dt>
+                    <dd className="!m-0">{problems.secondary.name}</dd>
+                  </>
+                )}
+              </dl>
+            )}
             <p className="text-[14px] whitespace-pre-line">{report.description}</p>
             {report.address_text && <p className="text-muted text-[13px]">{report.address_text}</p>}
           </section>
@@ -121,26 +148,30 @@ export function ReportDetailPage() {
             <section className="flex flex-col gap-2 border-t border-divider pt-3">
               <h6>Evidence</h6>
               <div className="grid grid-cols-2 gap-2">
-                {initial.map((photo, index) => (
-                  <button
-                    key={photo.id}
-                    type="button"
-                    onClick={() =>
-                      setActivePhoto({
-                        src: photo.url,
-                        alt: `Evidence photo ${index + 1} for report ${report.reference_code}`,
-                        title: `Evidence ${index + 1} · ${report.reference_code}`,
-                      })
-                    }
-                    className="block text-left cursor-pointer p-0 bg-transparent border-0"
-                    aria-label={`View evidence photo ${index + 1} in full resolution`}
-                  >
-                    <PhotoFrame
-                      src={photo.url}
-                      alt={`Evidence photo ${index + 1} for report ${report.reference_code}`}
-                    />
-                  </button>
-                ))}
+                {initial.map(({ url, ...photo }, index) =>
+                  url === null ? (
+                    <RemovedPhoto key={photo.id} label={`Evidence ${index + 1}`} />
+                  ) : (
+                    <button
+                      key={photo.id}
+                      type="button"
+                      onClick={() =>
+                        setActivePhoto({
+                          src: url,
+                          alt: `Evidence photo ${index + 1} for report ${report.reference_code}`,
+                          title: `Evidence ${index + 1} · ${report.reference_code}`,
+                        })
+                      }
+                      className="block text-left cursor-pointer p-0 bg-transparent border-0"
+                      aria-label={`View evidence photo ${index + 1} in full resolution`}
+                    >
+                      <PhotoFrame
+                        src={url}
+                        alt={`Evidence photo ${index + 1} for report ${report.reference_code}`}
+                      />
+                    </button>
+                  ),
+                )}
               </div>
             </section>
           )}
@@ -149,26 +180,30 @@ export function ReportDetailPage() {
             <section className="flex flex-col gap-2 border-t border-divider pt-3">
               <h6>Proof of repair</h6>
               <div className="grid grid-cols-2 gap-2">
-                {resolution.map((photo, index) => (
-                  <button
-                    key={photo.id}
-                    type="button"
-                    onClick={() =>
-                      setActivePhoto({
-                        src: photo.url,
-                        alt: `Proof of repair photo ${index + 1} for report ${report.reference_code}`,
-                        title: `Proof of repair ${index + 1} · ${report.reference_code}`,
-                      })
-                    }
-                    className="block text-left cursor-pointer p-0 bg-transparent border-0"
-                    aria-label={`View proof of repair photo ${index + 1} in full resolution`}
-                  >
-                    <PhotoFrame
-                      src={photo.url}
-                      alt={`Proof of repair photo ${index + 1} for report ${report.reference_code}`}
-                    />
-                  </button>
-                ))}
+                {resolution.map(({ url, ...photo }, index) =>
+                  url === null ? (
+                    <RemovedPhoto key={photo.id} label={`Proof of repair ${index + 1}`} />
+                  ) : (
+                    <button
+                      key={photo.id}
+                      type="button"
+                      onClick={() =>
+                        setActivePhoto({
+                          src: url,
+                          alt: `Proof of repair photo ${index + 1} for report ${report.reference_code}`,
+                          title: `Proof of repair ${index + 1} · ${report.reference_code}`,
+                        })
+                      }
+                      className="block text-left cursor-pointer p-0 bg-transparent border-0"
+                      aria-label={`View proof of repair photo ${index + 1} in full resolution`}
+                    >
+                      <PhotoFrame
+                        src={url}
+                        alt={`Proof of repair photo ${index + 1} for report ${report.reference_code}`}
+                      />
+                    </button>
+                  ),
+                )}
               </div>
             </section>
           )}
@@ -176,15 +211,12 @@ export function ReportDetailPage() {
 
         <div className="flex flex-col gap-4">
           <div className="h-[260px] border-2 border-divider">
-            <MapContainer
-              center={[report.latitude, report.longitude]}
-              zoom={16}
-              scrollWheelZoom={false}
-              className="h-full w-full"
-            >
-              <TileLayer url={TILE_URL} attribution={TILE_ATTRIBUTION} />
-              <Marker position={[report.latitude, report.longitude]} icon={pinFor(report.status)} />
-            </MapContainer>
+            <LocationMap
+              latitude={report.latitude}
+              longitude={report.longitude}
+              status={report.status}
+              title={`Location of ${report.title}`}
+            />
           </div>
 
           <section className="flex flex-col gap-3">
@@ -255,20 +287,27 @@ function Timeline({ updates }: { updates: ReportUpdate[] }) {
 // Allows the reporting citizen to edit their pending report before staff begin handling it.
 function EditReport({
   report,
+  problems,
   onDone,
   onCancel,
 }: {
   report: Report;
+  problems: ReportProblems;
   onDone: () => void;
   onCancel: () => void;
 }) {
   const toast = useToast();
   const { data: categoryData } = useApi<{ categories: Category[] }>("/categories");
+  const { data: problemTypeData } = useApi<ProblemTypesResponse>("/reports/meta/problem-types");
 
   const [title, setTitle] = useState(report.title);
   const [description, setDescription] = useState(report.description);
   const [categoryId, setCategoryId] = useState(String(report.category?.id ?? ""));
   const [address, setAddress] = useState(report.address_text ?? "");
+  const savedPrimary = problems.primary ? String(problems.primary.id) : "";
+  const savedSecondary = problems.secondary ? String(problems.secondary.id) : "";
+  const [primaryId, setPrimaryId] = useState(savedPrimary);
+  const [secondaryId, setSecondaryId] = useState(savedSecondary);
   const [point, setPoint] = useState<Point>({ lat: report.latitude, lng: report.longitude });
   const [locating, setLocating] = useState(false);
   const fields = useLeftFields();
@@ -288,7 +327,7 @@ function EditReport({
     const timer = setTimeout(async () => {
       const found = await reverseGeocode(point.lat, point.lng, controller.signal);
       if (found && !addressTouched.current) {
-        setAddress(found.slice(0, 255));
+        setAddress(found.slice(0, ADDRESS_MAX));
       }
     }, 700);
     return () => {
@@ -314,18 +353,20 @@ function EditReport({
     api.patch<{ report: Report }>(`/reports/${report.id}`, changes),
   );
 
+  const categoryChanged = Number(categoryId) !== report.category?.id;
+
+  // Mirrors editSchema: a new category needs a new main problem; a report filed
+  // before problem types existed may keep none while its category stays the same.
   function validate() {
-    const errors: Record<string, string> = {};
-    const trimmedTitle = title.trim();
-    if (trimmedTitle.length < 3) errors.title = "Give the report a title of at least 3 characters.";
-    if (trimmedTitle.length > 150) errors.title = "Keep the title under 150 characters.";
-
-    const trimmedDesc = description.trim();
-    if (trimmedDesc.length < 10) errors.description = "Describe the problem in at least 10 characters.";
-    if (trimmedDesc.length > 1000) errors.description = "Keep the description under 1000 characters.";
-
-    if (!categoryId) errors.category_id = "Choose the category that fits best.";
-    if (address.length > 255) errors.address_text = "Keep the address under 255 characters.";
+    const primaryMessage = categoryChanged
+      ? PRIMARY_PROBLEM_AGAIN_ERROR
+      : savedPrimary
+        ? PRIMARY_PROBLEM_ERROR
+        : null;
+    const errors = validateReportFields({ title, description, categoryId, address, primaryId, secondaryId }, primaryMessage);
+    // Only a moved pin is checked, like editSchema. The map shows the reason.
+    const outside = pointChangedByUser.current ? pinError(point) : undefined;
+    if (outside) errors.latitude = outside;
     return errors;
   }
 
@@ -346,6 +387,8 @@ function EditReport({
     if (cleanAddress !== (report.address_text ?? "")) {
       changes.address_text = cleanAddress || null;
     }
+    if (primaryId !== savedPrimary || categoryChanged) changes.primary_problem_id = Number(primaryId);
+    if (secondaryId !== savedSecondary) changes.secondary_problem_id = secondaryId ? Number(secondaryId) : null;
     return changes;
   }
 
@@ -358,11 +401,31 @@ function EditReport({
     ...fields.visible(errors, {
       title: "edit-title",
       category_id: "edit-category",
+      primary_problem_id: "edit-primary-problem",
+      secondary_problem_id: "edit-secondary-problem",
       description: "edit-description",
       address_text: "edit-address",
     }),
     ...(error?.fieldErrors ?? {}),
   };
+
+  // RS-5: closing the tab or reloading with unsaved edits asks first.
+  useUnsavedChangesWarning(!unchanged && !pending);
+
+  function cancelEditing() {
+    if (!unchanged && !window.confirm("Discard your changes to this report?")) return;
+    onCancel();
+  }
+
+  // RS-2: the category's own problems. A saved problem that has since been retired
+  // stays listed while the category is unchanged, so the form shows what is saved.
+  const primaryOptions = problemOptions(problemTypeData?.groups, categoryId, {
+    keep: categoryChanged ? null : problems.primary,
+  });
+  const secondaryOptions = problemOptions(problemTypeData?.groups, categoryId, {
+    exclude: primaryId,
+    keep: categoryChanged ? null : problems.secondary,
+  });
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
@@ -393,11 +456,11 @@ function EditReport({
 
       <div className="grid gap-6 lg:grid-cols-2">
         <div className="flex flex-col gap-4">
-          <Field label="Title" htmlFor="edit-title" hint="At least 3 characters." count={title.length} max={150} error={shown.title}>
+          <Field label="Title" htmlFor="edit-title" hint="At least 3 characters." count={title.length} max={TITLE_MAX} error={shown.title}>
             <Input
               id="edit-title"
               name="title"
-              maxLength={150}
+              maxLength={TITLE_MAX}
               value={title}
               onChange={(e) => setTitle(e.target.value)}
             />
@@ -408,7 +471,13 @@ function EditReport({
               id="edit-category"
               name="category_id"
               value={categoryId}
-              onChange={(e) => setCategoryId(e.target.value)}
+              onChange={(e) => {
+                setCategoryId(e.target.value);
+                // A new category has its own problems; going back restores the saved ones.
+                const back = Number(e.target.value) === report.category?.id;
+                setPrimaryId(back ? savedPrimary : "");
+                setSecondaryId(back ? savedSecondary : "");
+              }}
             >
               <option value="">Choose a category</option>
               {categories.map((c) => (
@@ -419,36 +488,92 @@ function EditReport({
             </Select>
           </Field>
 
+          {categoryId && (
+            <Field
+              label="Main problem"
+              htmlFor="edit-primary-problem"
+              hint={categoryChanged ? "Required for the new category." : undefined}
+              error={shown.primary_problem_id}
+            >
+              <Select
+                id="edit-primary-problem"
+                name="primary_problem_id"
+                value={primaryId}
+                onChange={(e) => {
+                  setPrimaryId(e.target.value);
+                  if (secondaryId === e.target.value) setSecondaryId("");
+                }}
+              >
+                <option value="">Choose the main problem</option>
+                {primaryOptions.map((problem) => (
+                  <option key={problem.id} value={problem.id}>
+                    {problem.name}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+          )}
+
+          {primaryId && secondaryOptions.length > 0 && (
+            <Field
+              label="Other problem"
+              htmlFor="edit-secondary-problem"
+              hint="Optional."
+              error={shown.secondary_problem_id}
+            >
+              <Select
+                id="edit-secondary-problem"
+                name="secondary_problem_id"
+                value={secondaryId}
+                onChange={(e) => setSecondaryId(e.target.value)}
+              >
+                <option value="">None</option>
+                {secondaryOptions.map((problem) => (
+                  <option key={problem.id} value={problem.id}>
+                    {problem.name}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+          )}
+
           <Field
             label="What is wrong?"
             htmlFor="edit-description"
             hint="At least 10 characters."
             count={description.length}
-            max={1000}
+            max={DESCRIPTION_MAX}
             error={shown.description}
           >
             <Textarea
               id="edit-description"
               name="description"
               rows={5}
-              maxLength={1000}
+              maxLength={DESCRIPTION_MAX}
               value={description}
               onChange={(e) => setDescription(e.target.value)}
             />
           </Field>
+
+          <VoiceInput
+            targetId="edit-description"
+            value={description}
+            maxLength={DESCRIPTION_MAX}
+            onChange={setDescription}
+          />
 
           <Field
             label="Address or landmark"
             htmlFor="edit-address"
             hint="Optional. Updated when the pin moves, or type your own."
             count={address.length}
-            max={255}
+            max={ADDRESS_MAX}
             error={shown.address_text}
           >
             <Input
               id="edit-address"
               name="address"
-              maxLength={255}
+              maxLength={ADDRESS_MAX}
               value={address}
               onChange={(e) => {
                 addressTouched.current = true;
@@ -482,7 +607,7 @@ function EditReport({
         <Button type="submit" variant="primary" disabled={pending || invalid || unchanged}>
           {pending ? "Saving changes…" : "Save changes"}
         </Button>
-        <Button type="button" variant="secondary" disabled={pending} onClick={onCancel}>
+        <Button type="button" variant="secondary" disabled={pending} onClick={cancelEditing}>
           Cancel
         </Button>
       </div>

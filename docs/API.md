@@ -114,7 +114,7 @@ From **Nominatim**, KAMOTI reads exactly one field of the response,
   `requireAuth`, then `requireRole` and the finer service-level checks, and only
   then queries Supabase. That order is the security model: see
   [How authentication works](#how-authentication-works).
-- **Nominatim.** Called from `src/web/lib/leaflet.ts` as `reverseGeocode()`, used
+- **Nominatim.** Called from `src/web/lib/maps.ts` as `reverseGeocode()`, used
   by the report wizard. Debounced 1000 ms and throttled to start no more than
   one request per second, cancelled with `AbortController` when the pin moves
   again, and silent on failure: the address field stays empty and typeable, so a

@@ -58,7 +58,7 @@ Afonso (2017) notes that centralized web apps drastically lower the transaction 
 
 ### Citizen-Facing Features
 * Account registration and login
-* Submit infrastructure reports (category, description, photo, map location)
+* Submit infrastructure reports (category, description, photo, map location inside Makati City)
 * Track status of submitted reports (Pending -> Under Review -> In Progress -> Resolved)
 * View public transparency board of all community reports
 * Receive notifications on status updates
@@ -78,7 +78,7 @@ Afonso (2017) notes that centralized web apps drastically lower the transaction 
 * View system-wide activity logs
 
 ### Shared Features
-* Map-based geotagging of reports
+* Map-based geotagging of reports, limited to Makati City's boundary: a pin outside the city is refused in the browser, by the API, and by a database check
 * Photo upload/attachment support
 * Notification system for status changes
 * Public transparency board (view-only, no login required)
@@ -136,8 +136,8 @@ flowchart LR
   personal details.
 - Report status changes are recorded in report history and create in-app
   notifications for the submitting citizen.
-- A map provider will be chosen when the map interface is implemented. Email
-  notifications remain optional.
+- Maps use Google Maps, limited to Makati City. Email notifications remain
+  optional.
 
 ---
 
@@ -239,7 +239,7 @@ show which parts have been completed.
 | Database | Supabase PostgreSQL |
 | Authentication and authorization | Supabase Auth issues tokens; the Express API verifies tokens and enforces roles |
 | Photo handling | Multer parses uploads; Supabase Storage holds files |
-| Maps | Leaflet with OpenStreetMap or Google Maps, to be decided during frontend work |
+| Maps | Google Maps (Maps JavaScript API and Places API (New)); Makati boundary from OpenStreetMap; addresses from OpenStreetMap Nominatim |
 | Notifications | In-app notifications; email is optional |
 | Hosting | One Vercel project for the built web app and Node.js API functions |
 | Version control | Git and GitHub |

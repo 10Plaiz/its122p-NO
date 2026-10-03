@@ -5,8 +5,24 @@ import { MapPicker } from "../components/MapPicker.js";
 import type { Point } from "../components/MapPicker.js";
 import { ALLOWED_TYPES, MAX_PHOTO_BYTES, PhotoPicker, formatFileSize, formatMimeType } from "../components/PhotoPicker.js";
 import { Alert, Button, Field, Input, Select, Textarea, useLeftFields } from "../components/ui.js";
+import { VoiceInput } from "../components/VoiceInput.js";
 import { api } from "../lib/api.js";
-import { reverseGeocode } from "../lib/leaflet.js";
+import { useAuth } from "../lib/auth.js";
+import { reverseGeocode } from "../lib/maps.js";
+import {
+  ADDRESS_MAX,
+  DESCRIPTION_MAX,
+  NEW_REPORT_DRAFT_KEY,
+  TITLE_MAX,
+  isNewReportDraftEmpty,
+  parseNewReportDraft,
+  problemOptions,
+  pinError,
+  validateReportFields,
+} from "../lib/report-rules.js";
+import type { NewReportDraft } from "../lib/report-rules.js";
+import type { ProblemTypesResponse } from "../lib/submission-types.js";
+import { useDraft, useUnsavedChangesWarning } from "../lib/useDraft.js";
 import { useAction, useApi } from "../lib/useApi.js";
 import type { Category, Report } from "../lib/types.js";
 
@@ -15,26 +31,19 @@ import type { Category, Report } from "../lib/types.js";
 
 const STEPS = ["Where is it?", "What is wrong?", "Show us"] as const;
 
-// Mirrors createSchema in src/server/routes/reports.routes.ts, message for message.
+// The field rules mirror createSchema (see report-rules.ts); this only splits them
+// across the wizard's steps.
 function validateStep(step: number, values: Values): Record<string, string> {
   const errors: Record<string, string> = {};
 
-  if (step === 0 && !values.point) {
-    errors.point = "Tap the map or use Place pin at map center.";
+  if (step === 0) {
+    const outside = pinError(values.point);
+    if (!values.point) errors.point = "Tap the map or use Place pin at map center.";
+    // The map shows why; this keeps Continue disabled until the pin is moved.
+    else if (outside) errors.point = outside;
   }
 
-  if (step === 1) {
-    const title = values.title.trim();
-    if (title.length < 3) errors.title = "Give the report a title of at least 3 characters.";
-    if (title.length > 150) errors.title = "Keep the title under 150 characters.";
-    const description = values.description.trim();
-    if (description.length < 10) {
-      errors.description = "Describe the problem in at least 10 characters.";
-    }
-    if (description.length > 1000) errors.description = "Keep the description under 1000 characters.";
-    if (!values.categoryId) errors.category_id = "Choose the category that fits best.";
-    if (values.address.length > 255) errors.address_text = "Keep the address under 255 characters.";
-  }
+  if (step === 1) Object.assign(errors, validateReportFields(values));
 
   if (step === 2 && values.photo) {
     if (!ALLOWED_TYPES.includes(values.photo.type)) {
@@ -53,12 +62,16 @@ type Values = {
   title: string;
   description: string;
   categoryId: string;
+  primaryId: string;
+  secondaryId: string;
   photo: File | null;
 };
 
 export function NewReportPage() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const { data: categoryData } = useApi<{ categories: Category[] }>("/categories");
+  const { data: problemData } = useApi<ProblemTypesResponse>("/reports/meta/problem-types");
 
   const [step, setStep] = useState(0);
   const [maxStep, setMaxStep] = useState(0);
@@ -69,6 +82,8 @@ export function NewReportPage() {
     title: "",
     description: "",
     categoryId: "",
+    primaryId: "",
+    secondaryId: "",
     photo: null,
   });
 
@@ -82,6 +97,54 @@ export function NewReportPage() {
   const { run, pending, error } = useAction((formData: FormData) =>
     api.upload<{ report: Report }>("/reports", formData),
   );
+
+  // RS-5: everything but the photo is kept as a draft in this tab. The key carries
+  // the citizen's id so a shared phone never offers one person's draft to the next.
+  const draft: NewReportDraft = {
+    version: 1,
+    step,
+    point: values.point,
+    address: values.address,
+    title: values.title,
+    description: values.description,
+    categoryId: values.categoryId,
+    primaryId: values.primaryId,
+    secondaryId: values.secondaryId,
+  };
+  const drafts = useDraft({
+    key: user ? `${NEW_REPORT_DRAFT_KEY}.${user.id}` : null,
+    value: draft,
+    isEmpty: isNewReportDraftEmpty,
+    parse: parseNewReportDraft,
+  });
+  const [submitted, setSubmitted] = useState(false);
+  useUnsavedChangesWarning(!submitted && (!isNewReportDraftEmpty(draft) || values.photo !== null));
+
+  function restoreDraft() {
+    const saved = drafts.restore();
+    if (!saved) return;
+    // A restored address is the citizen's, whether typed or looked up, so a lookup
+    // for the restored pin must not replace it.
+    addressTouched.current = saved.address.trim() !== "";
+    setAddressAuto(false);
+    setValues((current) => ({
+      ...current,
+      point: saved.point,
+      address: saved.address,
+      title: saved.title,
+      description: saved.description,
+      categoryId: saved.categoryId,
+      primaryId: saved.primaryId,
+      secondaryId: saved.secondaryId,
+    }));
+    setStep(saved.step);
+    setMaxStep(saved.step);
+  }
+
+  // RS-2: only the chosen category's problems, and never the main one twice.
+  const primaryOptions = problemOptions(problemData?.groups, values.categoryId);
+  const secondaryOptions = problemOptions(problemData?.groups, values.categoryId, { exclude: values.primaryId });
+  const problemName = (id: string) => primaryOptions.find((problem) => String(problem.id) === id)?.name;
 
   const errors = validateStep(step, values);
   const stepInvalid = Object.keys(errors).length > 0;
@@ -106,7 +169,7 @@ export function NewReportPage() {
     const timer = setTimeout(async () => {
       const found = await reverseGeocode(point.lat, point.lng, controller.signal);
       if (found && !addressTouched.current && !controller.signal.aborted) {
-        setValues((current) => ({ ...current, address: found.slice(0, 255) }));
+        setValues((current) => ({ ...current, address: found.slice(0, ADDRESS_MAX) }));
         setAddressAuto(true);
       }
     }, 1000);
@@ -164,10 +227,16 @@ export function NewReportPage() {
     formData.set("latitude", String(values.point.lat));
     formData.set("longitude", String(values.point.lng));
     if (values.address.trim()) formData.set("address_text", values.address.trim());
+    formData.set("primary_problem_id", values.primaryId);
+    if (values.secondaryId) formData.set("secondary_problem_id", values.secondaryId);
     if (values.photo) formData.set("photo", values.photo);
 
     const created = await run(formData);
-    if (created) navigate(`/reports/${created.report.id}`, { replace: true });
+    if (created) {
+      drafts.clear();
+      setSubmitted(true);
+      navigate(`/reports/${created.report.id}`, { replace: true });
+    }
   }
 
   return (
@@ -227,6 +296,28 @@ export function NewReportPage() {
         </nav>
       </header>
 
+      {drafts.offer && (
+        <section aria-labelledby="draft-title" className="border-2 border-accent bg-surface p-4 flex flex-col gap-3">
+          <h6 id="draft-title" className="!m-0">
+            You have an unfinished report
+          </h6>
+          <p className="text-[13px] !m-0">
+            {drafts.offer.title.trim()
+              ? `“${drafts.offer.title.trim()}” was saved in this tab. `
+              : "A draft was saved in this tab. "}
+            Photos are not kept, so attach yours again.
+          </p>
+          <div className="flex flex-wrap gap-3">
+            <Button type="button" variant="primary" onClick={restoreDraft}>
+              Restore draft
+            </Button>
+            <Button type="button" onClick={drafts.discard}>
+              Discard it
+            </Button>
+          </div>
+        </section>
+      )}
+
       {step === 0 && (
         <div className="flex flex-col gap-3">
           <p className="text-muted text-[13px]">
@@ -280,12 +371,12 @@ export function NewReportPage() {
             }
             error={shown.address_text}
             count={values.address.length}
-            max={255}
+            max={ADDRESS_MAX}
           >
             <Input
               id="address"
               value={values.address}
-              maxLength={255}
+              maxLength={ADDRESS_MAX}
               onChange={(event) => {
                 addressTouched.current = true;
                 setAddressAuto(false);
@@ -302,7 +393,10 @@ export function NewReportPage() {
             <Select
               id="category"
               value={values.categoryId}
-              onChange={(event) => setValues((current) => ({ ...current, categoryId: event.target.value }))}
+              // A new category has its own problems, so earlier choices no longer apply.
+              onChange={(event) =>
+                setValues((current) => ({ ...current, categoryId: event.target.value, primaryId: "", secondaryId: "" }))
+              }
             >
               <option value="">Choose a category</option>
               {(categoryData?.categories ?? [])
@@ -315,18 +409,69 @@ export function NewReportPage() {
             </Select>
           </Field>
 
+          {values.categoryId && (
+            <Field
+              label="Main problem"
+              htmlFor="primary-problem"
+              hint="What the crew will find when they arrive."
+              error={shown.primary_problem_id}
+            >
+              <Select
+                id="primary-problem"
+                value={values.primaryId}
+                onChange={(event) =>
+                  setValues((current) => ({
+                    ...current,
+                    primaryId: event.target.value,
+                    // The other problem can never be the main one.
+                    secondaryId: current.secondaryId === event.target.value ? "" : current.secondaryId,
+                  }))
+                }
+              >
+                <option value="">Choose the main problem</option>
+                {primaryOptions.map((problem) => (
+                  <option key={problem.id} value={problem.id}>
+                    {problem.name}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+          )}
+
+          {values.primaryId && secondaryOptions.length > 0 && (
+            <Field
+              label="Other problem"
+              htmlFor="secondary-problem"
+              hint="Optional. Only if there is a second problem at the same spot."
+              error={shown.secondary_problem_id}
+            >
+              <Select
+                id="secondary-problem"
+                value={values.secondaryId}
+                onChange={(event) => setValues((current) => ({ ...current, secondaryId: event.target.value }))}
+              >
+                <option value="">None</option>
+                {secondaryOptions.map((problem) => (
+                  <option key={problem.id} value={problem.id}>
+                    {problem.name}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+          )}
+
           <Field
             label="Title"
             htmlFor="title"
             hint="A short headline, at least 3 characters."
             error={shown.title}
             count={values.title.length}
-            max={150}
+            max={TITLE_MAX}
           >
             <Input
               id="title"
               value={values.title}
-              maxLength={150}
+              maxLength={TITLE_MAX}
               onChange={(event) => setValues((current) => ({ ...current, title: event.target.value }))}
             />
           </Field>
@@ -337,18 +482,25 @@ export function NewReportPage() {
             hint="What is wrong, how bad is it, and is anyone at risk? At least 10 characters."
             error={shown.description}
             count={values.description.length}
-            max={1000}
+            max={DESCRIPTION_MAX}
           >
             <Textarea
               id="description"
               rows={5}
-              maxLength={1000}
+              maxLength={DESCRIPTION_MAX}
               value={values.description}
               onChange={(event) =>
                 setValues((current) => ({ ...current, description: event.target.value }))
               }
             />
           </Field>
+
+          <VoiceInput
+            targetId="description"
+            value={values.description}
+            maxLength={DESCRIPTION_MAX}
+            onChange={(description) => setValues((current) => ({ ...current, description }))}
+          />
         </div>
       )}
 
@@ -368,6 +520,8 @@ export function NewReportPage() {
             <Summary label="Category">
               {categoryData?.categories.find((c) => String(c.id) === values.categoryId)?.name ?? "—"}
             </Summary>
+            <Summary label="Main problem">{problemName(values.primaryId) ?? "—"}</Summary>
+            {values.secondaryId && <Summary label="Other problem">{problemName(values.secondaryId) ?? "—"}</Summary>}
             <Summary label="Title">{values.title || "—"}</Summary>
             <Summary label="Location">
               {values.address || (values.point ? `${values.point.lat.toFixed(5)}, ${values.point.lng.toFixed(5)}` : "—")}

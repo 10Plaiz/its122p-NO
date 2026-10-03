@@ -163,6 +163,9 @@ textarea.input { min-height: 90px; resize: vertical; }
 }
 .nav a { color: inherit; text-decoration: none; font-size: 14px; }
 .nav a:hover, .nav a[aria-current='page'] { color: var(--color-accent); }
+/* UA-8: a link the person cannot use yet stays visible, dimmed, and inert. */
+.nav a[aria-disabled='true'] { opacity: 0.45; cursor: not-allowed; }
+.nav a[aria-disabled='true']:hover { color: inherit; }
 
 /* — tables — */
 .table { width: 100%; border-collapse: collapse; font-size: 14px; }

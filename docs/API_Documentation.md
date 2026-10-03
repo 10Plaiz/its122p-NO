@@ -100,13 +100,13 @@ GET https://nominatim.openstreetmap.org/reverse
       &addressdetails=1
 ```
 
-### OpenStreetMap tiles
+### Google Maps
 
-```
-https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png
-```
-
-Requested by Leaflet as the map is panned, not by application code.
+Map tiles, markers, and Makati place search come from the Maps JavaScript API and
+Places API (New), loaded in the browser by `@vis.gl/react-google-maps` with the
+key in `VITE_GOOGLE_MAPS_API_KEY`. The key is restricted to the site's addresses
+and to those two APIs. Without a key, every map says "Map unavailable" and the
+report form still takes a pin from the device's location.
 
 ---
 
@@ -279,8 +279,9 @@ database roles are revoked from every protected table, leaving them only
 
 ### How Nominatim was integrated
 
-Implemented in `src/web/lib/leaflet.ts` as `reverseGeocode()`, called from the
-report wizard in `src/web/pages/NewReport.tsx`.
+Implemented in `src/web/lib/maps.ts` as `reverseGeocode()`, called from the
+report wizard in `src/web/pages/NewReport.tsx` and the edit form in
+`src/web/pages/ReportDetail.tsx`.
 
 The flow: the citizen taps the map → the pin's coordinates change → a debounced
 effect calls Nominatim → `display_name` is written into the address field →
@@ -306,7 +307,7 @@ the authoritative location; the address is a convenience laid on top.
 | :--- | :--- |
 | Browser HTTP wrapper, token, errors | `src/web/lib/api.ts` |
 | Read and write hooks | `src/web/lib/useApi.ts` |
-| Nominatim and tile configuration | `src/web/lib/leaflet.ts` |
+| Nominatim, map settings, and the Makati boundary | `src/web/lib/maps.ts`, `src/server/lib/makati-boundary.ts` |
 | Express app and route mounting | `src/server/app.ts` |
 | Route handlers | `src/server/routes/*.routes.ts` |
 | Report permissions and status flow | `src/server/services/reports.service.ts` |

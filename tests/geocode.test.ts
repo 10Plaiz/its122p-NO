@@ -1,38 +1,12 @@
 import { describe, expect, it, beforeEach } from "bun:test";
 
-// Leaflet requires a window object when loaded in non-browser environments
-if (typeof globalThis.window === "undefined") {
-  (globalThis as any).window = {
-    setTimeout: globalThis.setTimeout.bind(globalThis),
-    clearTimeout: globalThis.clearTimeout.bind(globalThis),
-    devicePixelRatio: 1,
-    screen: {},
-  };
-  (globalThis as any).document = {
-    documentElement: {
-      style: {},
-    },
-    createElement: () => ({
-      getContext: () => ({}),
-    }),
-  };
-  (globalThis as any).navigator = {
-    userAgent: "bun",
-    platform: "Win32",
-  };
-}
+// The address lookup behind "Filled in from the pin": OpenStreetMap's Nominatim,
+// throttled to its one-request-per-second policy (src/web/lib/maps.ts).
+const { reverseGeocode, resetLookupThrottleForTesting } = await import("../src/web/lib/maps.js");
 
-const { reverseGeocode, resetLookupThrottleForTesting, TILE_ATTRIBUTION, TILE_URL } =
-  await import("../src/web/lib/leaflet.js");
-
-describe("leaflet reverse geocoding", () => {
+describe("reverse geocoding", () => {
   beforeEach(() => {
     resetLookupThrottleForTesting();
-  });
-
-  it("keeps OpenStreetMap attribution and tile url", () => {
-    expect(TILE_URL).toBe("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png");
-    expect(TILE_ATTRIBUTION).toContain("OpenStreetMap");
   });
 
   it("returns address on successful lookup", async () => {

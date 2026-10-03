@@ -4,6 +4,7 @@ import { Layout } from "./components/Layout.js";
 import { AdminLayout } from "./components/AdminLayout.js";
 import { Loading } from "./components/ui.js";
 import { useAuth } from "./lib/auth.js";
+import { PROOF_STEP_PATH, residencyLocked } from "./lib/residency.js";
 import type { Role } from "./lib/types.js";
 
 import { EntryPage } from "./pages/Entry.js";
@@ -36,6 +37,10 @@ function RequireRole({ roles, children }: { roles: Role[]; children: ReactNode }
   if (!user) return <Navigate to="/signin" replace state={{ from: location.pathname }} />;
 
   if (!roles.includes(user.role)) return <Navigate to="/" replace />;
+
+  // UA-8: a citizen without an accepted proof of residency can use nothing signed
+  // in until they upload one. The server refuses the same requests.
+  if (residencyLocked(user)) return <Navigate to={PROOF_STEP_PATH} replace />;
 
   return <>{children}</>;
 }

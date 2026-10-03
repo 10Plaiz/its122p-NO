@@ -1,0 +1,94 @@
+import { useState } from "react";
+import type { FormEvent } from "react";
+import { PhotoPicker } from "./PhotoPicker.js";
+import { useToast } from "./Toast.js";
+import { Alert, Button } from "./ui.js";
+import { api } from "../lib/api.js";
+import { useAuth } from "../lib/auth.js";
+import { PROOF_TYPES, residencyStep, validateProof } from "../lib/residency.js";
+import { useAction } from "../lib/useApi.js";
+import type { Profile } from "../lib/types.js";
+
+// UA-8, the last step of registering and the only screen a locked citizen can use:
+// new citizens after their email code, existing ones at their next sign-in, and
+// anyone whose proof an administrator rejected. Sending a proof unlocks the account
+// at once; an administrator reviews it afterwards.
+export function ResidencyProofStep() {
+  const { user, replaceUser, signOut } = useAuth();
+  const toast = useToast();
+  const [file, setFile] = useState<File | null>(null);
+
+  const { run, pending, error } = useAction((proof: File) => {
+    const form = new FormData();
+    form.append("proof", proof);
+    return api.upload<{ user: Profile }>("/auth/me/residency-proof", form);
+  });
+
+  if (!user) return null;
+  const rejected = residencyStep(user) === "rejected";
+
+  // KR-07: Send stays disabled until a usable file is chosen. A wrong file says
+  // why at once; no file yet is explained by the drop zone itself.
+  const fileError = validateProof(file);
+  const shownError = (file ? fileError : undefined) ?? error?.fieldErrors.proof;
+
+  async function handleSubmit(event: FormEvent) {
+    event.preventDefault();
+    if (fileError || !file) return;
+    const result = await run(file);
+    if (!result) return;
+    // The page around this moves on by itself once the account is unlocked.
+    toast("Proof sent. You can use KAMOTI while an administrator reviews it.");
+    replaceUser(result.user);
+  }
+
+  return (
+    <div className="flex flex-col gap-5">
+      {rejected ? (
+        <Alert title="Your last proof was not accepted">
+          {user.residency_note ?? "An administrator could not confirm your address from it."} Upload a new proof to
+          continue.
+        </Alert>
+      ) : (
+        <p className="text-[13px] leading-relaxed">
+          KAMOTI is for people who live in Makati. Upload one document that shows your name and your Makati address.
+          Your account opens as soon as it is sent; an administrator then checks it.
+        </p>
+      )}
+
+      <ul className="m-0 flex list-disc flex-col gap-1 pl-5 text-[13px] text-muted">
+        <li>A utility bill (water, electricity, internet) from the last 3 months</li>
+        <li>A barangay certificate or clearance</li>
+        <li>A lease or a government ID with your Makati address</li>
+      </ul>
+
+      <form className="flex flex-col gap-4" onSubmit={handleSubmit} noValidate>
+        <PhotoPicker
+          id="proof"
+          label="Proof of residency"
+          purpose="A clear photo or scan where your name and address can be read."
+          accept={PROOF_TYPES}
+          chooseLabel="Choose a file"
+          limits={"JPG, PNG, WebP, PDF · up to 5 MB"}
+          hint="Only City administrators can open it. It is used to confirm your address and nothing else."
+          error={shownError}
+          value={file}
+          onChange={setFile}
+        />
+
+        {error && !error.fieldErrors.proof && <Alert title="Could not send your proof">{error.message}</Alert>}
+
+        <Button type="submit" variant="primary" block disabled={pending || Boolean(fileError)}>
+          {pending ? "Uploading…" : "Send proof"}
+        </Button>
+      </form>
+
+      <p className="text-[12px] text-muted">
+        Not ready? You can sign out and finish this later. Until then, the rest of KAMOTI stays locked.
+      </p>
+      <Button type="button" variant="ghost" className="self-start" onClick={() => signOut()}>
+        Sign out
+      </Button>
+    </div>
+  );
+}

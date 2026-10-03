@@ -491,8 +491,8 @@ async function main(): Promise<void> {
           title: xssTitle,
           description: xssDescription,
           category_id: testCategory.id,
-          latitude: 14.5995,
-          longitude: 120.9842,
+          latitude: 14.5547,
+          longitude: 121.0244,
           address_text: "Synthetic Test Street corner XSS Ave",
         }),
       });

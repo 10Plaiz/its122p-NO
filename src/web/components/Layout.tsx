@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
-import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
+import { Link as RouterLink, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../lib/auth.js";
+import { PROOF_STEP_PATH, residencyLocked } from "../lib/residency.js";
 import { useApi } from "../lib/useApi.js";
 import { ROLE_LABEL } from "../lib/types.js";
 import type { Notification } from "../lib/types.js";
@@ -23,6 +24,18 @@ const LINKS_BY_ROLE: Record<string, Link[]> = {
   staff: [{ to: "/staff/queue", label: "My queue" }],
   admin: [{ to: "/admin", label: "Admin" }],
 };
+
+// UA-8: a citizen locked to the proof upload still sees where things are, greyed
+// out, rather than a menu that changes shape. No href, so it cannot be followed or
+// focused; the banner under the header says why and links to the fix.
+function LockedLink({ label }: { label: string }) {
+  return (
+    <a role="link" aria-disabled="true" title="Upload your proof of residency to unlock this.">
+      {label}
+      <span className="sr-only"> (locked until you upload your proof of residency)</span>
+    </a>
+  );
+}
 
 function NotificationLink() {
   // Signed-in only; the badge is the unread count the notifications route returns.
@@ -51,6 +64,7 @@ export function Layout() {
   useEffect(() => setMenuOpen(false), [location.pathname]);
 
   const links = [...PUBLIC_LINKS, ...(user ? (LINKS_BY_ROLE[user.role] ?? []) : [])];
+  const locked = residencyLocked(user);
 
   function handleSignOut() {
     signOut();
@@ -78,15 +92,19 @@ export function Layout() {
           id="main-menu"
           className={`${menuOpen ? "flex" : "hidden"} md:flex w-full md:w-auto flex-col md:flex-row md:items-center gap-3 md:gap-4 pt-3 md:pt-0`}
         >
-          {links.map((link) => (
-            <NavLink key={link.to} to={link.to}>
-              {link.label}
-            </NavLink>
-          ))}
+          {links.map((link) =>
+            locked && !PUBLIC_LINKS.includes(link) ? (
+              <LockedLink key={link.to} label={link.label} />
+            ) : (
+              <NavLink key={link.to} to={link.to}>
+                {link.label}
+              </NavLink>
+            ),
+          )}
 
           {user ? (
             <>
-              <NotificationLink />
+              {locked ? <LockedLink label="Notifications" /> : <NotificationLink />}
               <span data-testid="user-identity" className="text-muted font-mono text-[11px]">
                 {user.name} &middot; {ROLE_LABEL[user.role]}
               </span>
@@ -101,6 +119,12 @@ export function Layout() {
       </header>
 
       <main className="flex-1 w-full max-w-6xl mx-auto px-4 py-6 md:py-8">
+        {locked && location.pathname !== "/register" && (
+          <div role="status" className="mb-6 flex flex-wrap items-center gap-x-3 gap-y-1 border border-accent p-3 text-[13px]">
+            <span>Finish setting up your account to use KAMOTI.</span>
+            <RouterLink to={PROOF_STEP_PATH}>Upload your proof of residency</RouterLink>
+          </div>
+        )}
         <Outlet />
       </main>
 

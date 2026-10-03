@@ -6,12 +6,20 @@ import { describe, expect, test } from "bun:test";
 import { z } from "zod";
 import { ApiError } from "../../src/server/lib/errors.js";
 import {
+  BARANGAYS as SERVER_BARANGAYS,
+  PASSWORD_DIGIT_ERROR,
+  PASSWORD_LETTER_ERROR,
   PASSWORD_MAX_ERROR,
   PASSWORD_MIN_ERROR,
+  PASSWORD_SPECIAL_ERROR,
+  composeName,
   contactNumber,
   parse,
   passwordRule,
 } from "../../src/server/lib/validate.js";
+import { BARANGAYS as WEB_BARANGAYS } from "../../src/web/lib/barangays.js";
+import { validateNameParts } from "../../src/web/lib/names.js";
+import { validatePassword as validateWebPassword } from "../../src/web/lib/passwords.js";
 import { registerSchema } from "../../src/server/routes/auth.routes.js";
 import {
   createSchema as reportCreateSchema,
@@ -94,20 +102,22 @@ describe("VAL-03 rejected input names the fields that were wrong", () => {
   });
 });
 
+// UA-4: 8 to 72 characters with a letter, a number, and a special character.
 const PASSWORD_INPUTS = [
-  { value: "a".repeat(8), valid: true, note: "minimum length of 8 characters" },
-  { value: "a".repeat(72), valid: true, note: "maximum length of 72 characters" },
-  { value: "correct-horse-battery-staple", valid: true, note: "typical passphrase" },
-  { value: "a".repeat(7), valid: false, expectedMessage: PASSWORD_MIN_ERROR, note: "7 characters is too short" },
+  { value: "abcdef1!", valid: true, note: "minimum length of 8 characters" },
+  { value: `a1!${"a".repeat(69)}`, valid: true, note: "maximum length of 72 characters" },
+  { value: "correct-horse-battery-staple-9", valid: true, note: "typical passphrase" },
+  { value: "Peñafl0r ok", valid: true, note: "an accented letter or a space counts as special" },
+  { value: "Abc1!", valid: false, expectedMessage: PASSWORD_MIN_ERROR, note: "5 characters is too short" },
   { value: "", valid: false, expectedMessage: PASSWORD_MIN_ERROR, note: "empty string is too short" },
-  { value: "a".repeat(73), valid: false, expectedMessage: PASSWORD_MAX_ERROR, note: "73 characters is too long" },
+  { value: `a1!${"a".repeat(70)}`, valid: false, expectedMessage: PASSWORD_MAX_ERROR, note: "73 characters is too long" },
+  { value: "12345678!", valid: false, expectedMessage: PASSWORD_LETTER_ERROR, note: "no letter" },
+  { value: "abcdefgh!", valid: false, expectedMessage: PASSWORD_DIGIT_ERROR, note: "no number" },
+  { value: "abcdefg1", valid: false, expectedMessage: PASSWORD_SPECIAL_ERROR, note: "no special character" },
 ];
 
-function validateClientPassword(password: string): string | undefined {
-  if (password.length < 8) return "Use at least 8 characters.";
-  if (password.length > 72) return "Keep the password under 72 characters.";
-  return undefined;
-}
+// The real browser rule, so this compares the two sides rather than a copy.
+const validateClientPassword = validateWebPassword;
 
 describe("VAL-04 password creation rule", () => {
   for (const { value, valid, note } of PASSWORD_INPUTS) {
@@ -139,8 +149,9 @@ describe("VAL-06 report submission validation schema", () => {
     title: "Large pothole on highway",
     description: "Deep pothole damaging front tires near the intersection.",
     category_id: 1,
-    latitude: 14.5995,
-    longitude: 120.9842,
+    primary_problem_id: 1,
+    latitude: 14.5547,
+    longitude: 121.0244,
     address_text: "Sample Avenue corner Main St",
   };
 
@@ -190,10 +201,14 @@ describe("VAL-06 report submission validation schema", () => {
 
 describe("VAL-07 user registration validation schema", () => {
   const validRegistration = {
-    name: "Maria Santos",
+    first_name: "Maria",
+    last_name: "Santos",
     email: "maria.santos@example.com",
     password: "StrongPassword123!",
     contact_number: "09181234567",
+    barangay: "Poblacion",
+    address_line: "123 J.P. Rizal Street",
+    privacy_consent: true,
   };
 
   test("accepts valid registration input", () => {
@@ -201,15 +216,23 @@ describe("VAL-07 user registration validation schema", () => {
     expect(result.success).toBe(true);
   });
 
-  test("rejects name shorter than 2 characters", () => {
-    const result = registerSchema.safeParse({ ...validRegistration, name: "M" });
+  test("rejects a first name shorter than 2 characters", () => {
+    const result = registerSchema.safeParse({ ...validRegistration, first_name: "M" });
     expect(result.success).toBe(false);
-    expect(result.error?.issues[0]?.message).toBe("Enter your full name.");
+    expect(result.error?.issues[0]?.message).toBe("Enter the first name.");
+  });
+
+  test("rejects a middle initial but allows no middle name (UA-7)", () => {
+    const initial = registerSchema.safeParse({ ...validRegistration, middle_name: "D." });
+    expect(initial.success).toBe(false);
+    expect(initial.error?.issues[0]?.message).toBe("Enter the full middle name, not an initial.");
+    expect(registerSchema.safeParse({ ...validRegistration, middle_name: "" }).success).toBe(true);
+    expect(registerSchema.safeParse({ ...validRegistration, middle_name: "Dela Cruz" }).success).toBe(true);
   });
 
   test("rejects names made of symbols or digits", () => {
-    for (const name of ["!@#$%^&*()_+", "J@ne!!", "Agent 007", ".."]) {
-      const result = registerSchema.safeParse({ ...validRegistration, name });
+    for (const last_name of ["!@#$%^&*()_+", "J@ne!!", "Agent 007", ".."]) {
+      const result = registerSchema.safeParse({ ...validRegistration, last_name });
       expect(result.success).toBe(false);
       expect(result.error?.issues[0]?.message).toBe(
         "Use letters, spaces, periods, apostrophes, or hyphens only.",
@@ -218,9 +241,40 @@ describe("VAL-07 user registration validation schema", () => {
   });
 
   test("accepts real names with accents, periods, apostrophes, and hyphens", () => {
-    for (const name of ["Ma. Dela Cruz-Santos", "O'Brien", "José Niño"]) {
-      expect(registerSchema.safeParse({ ...validRegistration, name }).success).toBe(true);
+    for (const last_name of ["Dela Cruz-Santos", "O'Brien", "Niño"]) {
+      expect(registerSchema.safeParse({ ...validRegistration, last_name }).success).toBe(true);
     }
+  });
+
+  test("accepts only a listed suffix", () => {
+    expect(registerSchema.safeParse({ ...validRegistration, suffix: "Jr." }).success).toBe(true);
+    expect(registerSchema.safeParse({ ...validRegistration, suffix: "Esq." }).success).toBe(false);
+  });
+
+  test("needs a Makati barangay, a street address, and privacy consent (UA-7, UA-8)", () => {
+    const pembo = registerSchema.safeParse({ ...validRegistration, barangay: "Pembo" });
+    expect(pembo.success).toBe(false);
+    expect(pembo.error?.issues[0]?.message).toBe("Choose your barangay in Makati.");
+    expect(registerSchema.safeParse({ ...validRegistration, address_line: "abc" }).success).toBe(false);
+    const noConsent = registerSchema.safeParse({ ...validRegistration, privacy_consent: false });
+    expect(noConsent.error?.issues[0]?.message).toBe("Agree to the privacy notice to create an account.");
+  });
+
+  test("web and server agree on the barangay list and the name messages", () => {
+    expect([...WEB_BARANGAYS]).toEqual([...SERVER_BARANGAYS]);
+    expect(WEB_BARANGAYS).toHaveLength(23);
+    expect(validateNameParts({ first: "M", middle: "D.", last: "", suffix: "" })).toEqual({
+      first_name: "Enter the first name.",
+      middle_name: "Enter the full middle name, not an initial.",
+      last_name: "Enter the last name.",
+    });
+  });
+
+  test("composes the display name from its parts", () => {
+    expect(composeName({ first_name: "Juan", middle_name: "Dela Cruz", last_name: "Santos", suffix: "Jr." })).toBe(
+      "Juan Dela Cruz Santos Jr.",
+    );
+    expect(composeName({ first_name: "Maria", last_name: "Santos" })).toBe("Maria Santos");
   });
 
   test("rejects invalid email formats", () => {

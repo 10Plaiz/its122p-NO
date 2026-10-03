@@ -20,28 +20,23 @@ import { createClient } from "@supabase/supabase-js";
 import { createInterface } from "node:readline";
 import { writeSync } from "node:fs";
 import { exit, stdin } from "node:process";
+import { REPORTS } from "./reports.js";
 
 const CONFIRM_PHRASE = "KAMOTI-APPLY-FIXTURE";
 
 type Role = "admin" | "staff" | "citizen";
-type FixtureStatus = "pending" | "under_review";
+
+// UA-8: fixture citizens are confirmed residents, so tests and demos sign in to a
+// working account instead of the proof-upload step. Staff and admins have none.
+function residencyFor(role: Role) {
+  return role === "citizen" ? "verified" : null;
+}
 
 type AccountSpec = {
   key: string;
   email: string;
   name: string;
   role: Role;
-};
-
-type ReportSpec = {
-  title: string;
-  owner: string; // account key
-  assigned: string | null; // account key
-  status: FixtureStatus;
-  category: string;
-  description: string;
-  latitude: number;
-  longitude: number;
 };
 
 const ACCOUNTS: AccountSpec[] = [
@@ -52,43 +47,6 @@ const ACCOUNTS: AccountSpec[] = [
   { key: "staff-2", email: "fixture-staff-2@kamoti.invalid", name: "Fixture Staff Two", role: "staff" },
 ];
 
-// Synthetic coordinates fall inside Metro Manila so the map renders a
-// believable location. Nothing here points at a real address.
-const REPORTS: ReportSpec[] = [
-  {
-    title: "[FIXTURE] Broken streetlight on Sample Avenue",
-    owner: "citizen-1",
-    assigned: null,
-    status: "pending",
-    category: "Streetlight",
-    description:
-      "Fixture data: the streetlight at this synthetic location has stayed unlit for several nights.",
-    latitude: 14.5995,
-    longitude: 120.9842,
-  },
-  {
-    title: "[FIXTURE] Overflowing drainage canal on Test Street",
-    owner: "citizen-2",
-    assigned: null,
-    status: "pending",
-    category: "Drainage",
-    description:
-      "Fixture data: the drainage canal at this synthetic location is clogged and overflows after rain.",
-    latitude: 14.6042,
-    longitude: 120.9822,
-  },
-  {
-    title: "[FIXTURE] Pothole cluster on Demo Boulevard",
-    owner: "citizen-1",
-    assigned: "staff-1",
-    status: "under_review",
-    category: "Road",
-    description:
-      "Fixture data: several deep potholes at this synthetic location damage vehicles every day.",
-    latitude: 14.5961,
-    longitude: 120.9784,
-  },
-];
 
 // ------------------------------------------------------------------- prompts
 
@@ -247,17 +205,18 @@ async function main(): Promise<void> {
   for (const spec of ACCOUNTS) {
     const existing = await db
       .from("profiles")
-      .select("id, name, role, is_active")
+      .select("id, name, role, is_active, residency_status")
       .eq("email", spec.email)
       .maybeSingle();
     if (existing.error) throw new Error(existing.error.message);
 
     if (existing.data) {
-      const row = existing.data as { id: string; name: string; role: string; is_active: boolean };
-      const fixes: { name?: string; role?: Role; is_active?: boolean } = {};
+      const row = existing.data as { id: string; name: string; role: string; is_active: boolean; residency_status: string | null };
+      const fixes: { name?: string; role?: Role; is_active?: boolean; residency_status?: string | null } = {};
       if (row.name !== spec.name) fixes.name = spec.name;
       if (row.role !== spec.role) fixes.role = spec.role;
       if (!row.is_active) fixes.is_active = true;
+      if (row.residency_status !== residencyFor(spec.role)) fixes.residency_status = residencyFor(spec.role);
       if (Object.keys(fixes).length > 0) {
         const updated = await db.from("profiles").update(fixes).eq("id", row.id);
         if (updated.error) throw new Error(updated.error.message);
@@ -281,7 +240,13 @@ async function main(): Promise<void> {
       }
       const inserted = await db
         .from("profiles")
-        .insert({ id: created.data.user.id, name: spec.name, email: spec.email, role: spec.role })
+        .insert({
+          id: created.data.user.id,
+          name: spec.name,
+          email: spec.email,
+          role: spec.role,
+          residency_status: residencyFor(spec.role),
+        })
         .select("id")
         .single();
       if (inserted.error) {

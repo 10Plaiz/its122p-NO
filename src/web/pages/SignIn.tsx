@@ -1,13 +1,16 @@
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
+import { EmailCodeStep } from "../components/EmailCode.js";
+import { PasswordReset } from "../components/PasswordReset.js";
 import { Alert, Button, Field, Input, focusFirstError, PasswordInput } from "../components/ui.js";
 import { homePathFor, useAuth } from "../lib/auth.js";
+import { EMAIL_NOT_CONFIRMED, validateEmail } from "../lib/codes.js";
+import { IDLE_LIMIT_MS } from "../lib/idle.js";
 import { useAction } from "../lib/useApi.js";
 
 type SignInLocationState = {
   from?: string;
-  registered?: boolean;
   email?: string;
 };
 
@@ -18,16 +21,33 @@ function destinationFor(user: Parameters<typeof homePathFor>[0], from?: string) 
   return from;
 }
 
+// A short message above the form: why the last session ended, or what just changed.
+function Notice({ title, children }: { title: string; children: string }) {
+  return (
+    <div role="status" className="border border-divider bg-surface p-3 flex flex-col gap-1">
+      <span className="font-mono text-[9.5px] font-semibold uppercase tracking-wider text-accent">{title}</span>
+      <span className="text-[13px] leading-snug">{children}</span>
+    </div>
+  );
+}
+
+// Three modes on one screen, no extra routes: signing in, confirming an address
+// that was never confirmed (UA-5), and resetting a password (UA-12, kept in the
+// URL as ?step=reset so Back returns to sign-in and the link can be shared).
 export function SignInPage() {
-  const { user, signIn, loading } = useAuth();
+  const { user, signIn, loading, ended } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const state = location.state as SignInLocationState | null;
+  const [searchParams] = useSearchParams();
+  const resetting = searchParams.get("step") === "reset";
 
   const { run, pending, error } = useAction(signIn);
 
   const [email, setEmail] = useState(state?.email ?? "");
   const [password, setPassword] = useState("");
+  const [confirming, setConfirming] = useState(false);
+  const [passwordChanged, setPasswordChanged] = useState(false);
   // Client-side checks mirror loginSchema in src/server/routes/auth.routes.ts. They
   // save a round trip; the server still rejects anything that gets past them.
   const [touched, setTouched] = useState(false);
@@ -39,17 +59,14 @@ export function SignInPage() {
     }
   }, [loading, user, navigate, state?.from]);
 
-  // Empty and malformed are different problems and now say so: the old message
-  // claimed a blank field was badly formatted, and never checked the format at all.
-  // The pattern is the one registerSchema applies on the server, so the field cannot
-  // pass here and fail there.
-  function emailProblem() {
-    if (!email.trim()) return "Enter your email address.";
-    if (!/^\S+@\S+\.\S+$/.test(email.trim())) return "Enter a valid email address.";
-    return undefined;
-  }
+  // UA-5: the right password on an unconfirmed address goes straight to the code.
+  useEffect(() => {
+    if (error?.code === EMAIL_NOT_CONFIRMED) setConfirming(true);
+  }, [error]);
 
-  const emailError = touched ? emailProblem() : undefined;
+  // Empty and malformed are different problems and say so. The pattern is the one
+  // the register screen applies, so the field cannot pass there and fail here.
+  const emailError = touched ? validateEmail(email) : undefined;
   const passwordError = touched && !password ? "Enter your password." : undefined;
   const shownEmailError = emailError ?? error?.fieldErrors?.email;
   const shownPasswordError = passwordError ?? error?.fieldErrors?.password;
@@ -57,13 +74,14 @@ export function SignInPage() {
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
     setTouched(true);
+    setPasswordChanged(false);
 
     // Submit stays enabled even while these fail. Only the server can tell whether a
     // filled-in address and password actually match, and a disabled sign-in button is
     // the one that browser autofill strands: the fields look filled while React has
     // seen no change event, so the person is left pressing a dead control.
     const problems = {
-      ...(emailProblem() ? { email: "" } : {}),
+      ...(validateEmail(email) ? { email: "" } : {}),
       ...(password ? {} : { password: "" }),
     };
     if (Object.keys(problems).length > 0) {
@@ -78,20 +96,52 @@ export function SignInPage() {
     navigate(destinationFor(signedInUser, state?.from), { replace: true });
   }
 
+  if (resetting) {
+    return (
+      <div className="max-w-sm mx-auto flex flex-col gap-6 py-4">
+        <h2>Reset your password</h2>
+        <PasswordReset
+          initialEmail={email.trim()}
+          onCancel={() => navigate("/signin", { replace: true, state })}
+          onDone={(resetEmail) => {
+            setEmail(resetEmail);
+            setPassword("");
+            setTouched(false);
+            setPasswordChanged(true);
+            navigate("/signin", { replace: true, state: { ...state, email: resetEmail } });
+          }}
+        />
+      </div>
+    );
+  }
+
+  if (confirming) {
+    return (
+      <div className="max-w-sm mx-auto flex flex-col gap-6 py-4">
+        <h2>Confirm your email</h2>
+        <EmailCodeStep
+          email={email.trim()}
+          justSent={false}
+          backLabel="Back to sign in"
+          onBack={() => setConfirming(false)}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-sm mx-auto flex flex-col gap-6 py-4">
       <h2>Sign in</h2>
 
-      {state?.registered && (
-        <div role="status" className="border border-divider bg-surface p-3 flex flex-col gap-1">
-          <span className="font-mono text-[9.5px] font-semibold uppercase tracking-wider text-accent">
-            Account created
-          </span>
-          <span className="text-[13px] leading-snug">
-            Your account is ready. Sign in with your password to continue.
-          </span>
-        </div>
-      )}
+      {passwordChanged ? (
+        <Notice title="Password changed">Sign in with your new password.</Notice>
+      ) : ended === "idle" ? (
+        <Notice title="Signed out">
+          {`You were signed out after ${IDLE_LIMIT_MS / 60_000} minutes without activity. Sign in to continue where you left off.`}
+        </Notice>
+      ) : ended === "expired" ? (
+        <Notice title="Session ended">Your session has ended. Sign in again to continue.</Notice>
+      ) : null}
 
       <form className="flex flex-col gap-4" onSubmit={handleSubmit} noValidate>
         <Field label="Email" htmlFor="email" error={shownEmailError}>
@@ -116,7 +166,11 @@ export function SignInPage() {
           />
         </Field>
 
-        {error && <Alert title="Could not sign you in">{error.message}</Alert>}
+        <Link to="/signin?step=reset" state={state} className="self-start text-[13px]">
+          Forgot your password?
+        </Link>
+
+        {error && error.code !== EMAIL_NOT_CONFIRMED && <Alert title="Could not sign you in">{error.message}</Alert>}
 
         <Button type="submit" variant="primary" block disabled={pending}>
           {pending ? "Signing in…" : "Sign in"}

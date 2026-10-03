@@ -21,6 +21,7 @@ const {
 const {
   createSchema: reportCreateSchema,
   remarkSchema,
+  statusSchema,
 } = await import("../../src/server/routes/reports.routes.js");
 
 const { categorySchema } = await import("../../src/server/routes/categories.routes.js");
@@ -38,9 +39,9 @@ function createReport(overrides?: Partial<Report>): Report {
     title: "Damaged Drainage Cover",
     description: "The concrete drainage cover is cracked and hazardous to pedestrians.",
     status: "pending",
-    latitude: 14.5995,
-    longitude: 120.9842,
-    address_text: "Ermita, Manila",
+    latitude: 14.5547,
+    longitude: 121.0244,
+    address_text: "Ayala Avenue, Makati",
     is_public: false,
     citizen: { id: "citizen-func-1" },
     assigned_staff: null,
@@ -66,6 +67,7 @@ describe("FUNC-01 report creation and input validation", () => {
       title: "Pothole on Main Road",
       description: "Deep pothole causing vehicle damage near the intersection.",
       category_id: 1,
+      primary_problem_id: 1,
       latitude: 14.5547,
       longitude: 121.0244,
       address_text: "Ayala Avenue, Makati",
@@ -85,8 +87,9 @@ describe("FUNC-01 report creation and input validation", () => {
       title: "Broken Streetlight",
       description: "Streetlight flickering and completely dark at night.",
       category_id: 2,
-      latitude: 14.5995,
-      longitude: 120.9842,
+      primary_problem_id: 1,
+      latitude: 14.5547,
+      longitude: 121.0244,
       address_text: null,
     };
     expect(reportCreateSchema.safeParse(withNullAddress).success).toBe(true);
@@ -95,8 +98,9 @@ describe("FUNC-01 report creation and input validation", () => {
       title: "Broken Streetlight",
       description: "Streetlight flickering and completely dark at night.",
       category_id: 2,
-      latitude: 14.5995,
-      longitude: 120.9842,
+      primary_problem_id: 1,
+      latitude: 14.5547,
+      longitude: 121.0244,
     };
     expect(reportCreateSchema.safeParse(withoutAddress).success).toBe(true);
   });
@@ -106,8 +110,9 @@ describe("FUNC-01 report creation and input validation", () => {
       title: "Broken Streetlight",
       description: "Streetlight flickering and completely dark at night.",
       category_id: 2,
+      primary_problem_id: 1,
       latitude: 95.0,
-      longitude: 120.9842,
+      longitude: 121.0244,
     };
     expect(reportCreateSchema.safeParse(invalidLat).success).toBe(false);
 
@@ -115,7 +120,8 @@ describe("FUNC-01 report creation and input validation", () => {
       title: "Broken Streetlight",
       description: "Streetlight flickering and completely dark at night.",
       category_id: 2,
-      latitude: 14.5995,
+      primary_problem_id: 1,
+      latitude: 14.5547,
       longitude: 190.0,
     };
     expect(reportCreateSchema.safeParse(invalidLng).success).toBe(false);
@@ -127,8 +133,9 @@ describe("FUNC-01 report creation and input validation", () => {
         title: "No",
         description: "Valid description of the issue.",
         category_id: 1,
-        latitude: 14.5,
-        longitude: 121.0,
+        primary_problem_id: 1,
+        latitude: 14.55,
+        longitude: 121.02,
       }).success,
     ).toBe(false);
 
@@ -137,8 +144,9 @@ describe("FUNC-01 report creation and input validation", () => {
         title: "Yes",
         description: "Valid description of the issue.",
         category_id: 1,
-        latitude: 14.5,
-        longitude: 121.0,
+        primary_problem_id: 1,
+        latitude: 14.55,
+        longitude: 121.02,
       }).success,
     ).toBe(true);
 
@@ -147,8 +155,9 @@ describe("FUNC-01 report creation and input validation", () => {
         title: "A".repeat(150),
         description: "Valid description of the issue.",
         category_id: 1,
-        latitude: 14.5,
-        longitude: 121.0,
+        primary_problem_id: 1,
+        latitude: 14.55,
+        longitude: 121.02,
       }).success,
     ).toBe(true);
 
@@ -157,8 +166,9 @@ describe("FUNC-01 report creation and input validation", () => {
         title: "A".repeat(151),
         description: "Valid description of the issue.",
         category_id: 1,
-        latitude: 14.5,
-        longitude: 121.0,
+        primary_problem_id: 1,
+        latitude: 14.55,
+        longitude: 121.02,
       }).success,
     ).toBe(false);
   });
@@ -169,8 +179,9 @@ describe("FUNC-01 report creation and input validation", () => {
         title: "Valid Title",
         description: "Too short",
         category_id: 1,
-        latitude: 14.5,
-        longitude: 121.0,
+        primary_problem_id: 1,
+        latitude: 14.55,
+        longitude: 121.02,
       }).success,
     ).toBe(false);
 
@@ -179,15 +190,16 @@ describe("FUNC-01 report creation and input validation", () => {
         title: "Valid Title",
         description: "A".repeat(1001),
         category_id: 1,
-        latitude: 14.5,
-        longitude: 121.0,
+        primary_problem_id: 1,
+        latitude: 14.55,
+        longitude: 121.02,
       }).success,
     ).toBe(false);
   });
 });
 
 describe("FUNC-02 report linear status progression", () => {
-  it("progresses sequentially through defined lifecycle states from reports service", () => {
+  it("progresses sequentially through the manual lifecycle states from reports service", () => {
     let current: ReportStatus = "pending";
 
     const step1 = NEXT_STATUS[current];
@@ -198,11 +210,12 @@ describe("FUNC-02 report linear status progression", () => {
     expect(step2).toEqual(["in_progress"]);
     current = step2[0];
 
-    const step3 = NEXT_STATUS[current];
-    expect(step3).toEqual(["resolved"]);
-    current = step3[0];
+    expect(current).toBe("in_progress");
+  });
 
-    expect(current).toBe("resolved");
+  it("leaves in_progress only through a verified resolution request, never by a manual step", () => {
+    // SW-4: staff request resolution and an administrator closes the report.
+    expect(NEXT_STATUS.in_progress).toEqual([]);
   });
 });
 
@@ -218,10 +231,19 @@ describe("FUNC-03 report status transition enforcement", () => {
     expect(NEXT_STATUS.cancelled).toEqual([]);
   });
 
-  it("verifies staff statuses subset excludes cancelled and pending", () => {
-    expect(STAFF_STATUSES).toEqual(["under_review", "in_progress", "resolved"]);
-    expect(STAFF_STATUSES.includes("pending" as any)).toBe(false);
-    expect(STAFF_STATUSES.includes("cancelled" as any)).toBe(false);
+  it("verifies staff statuses subset excludes cancelled, pending, and resolved", () => {
+    expect(STAFF_STATUSES).toEqual(["under_review", "in_progress"]);
+    expect((STAFF_STATUSES as readonly string[]).includes("pending")).toBe(false);
+    expect((STAFF_STATUSES as readonly string[]).includes("cancelled")).toBe(false);
+    // Only an administrator's verification resolves a report.
+    expect((STAFF_STATUSES as readonly string[]).includes("resolved")).toBe(false);
+  });
+
+  it("rejects resolved and a missing comment on the status route", () => {
+    expect(statusSchema.safeParse({ status: "resolved", details: "Done." }).success).toBe(false);
+    expect(statusSchema.safeParse({ status: "in_progress" }).success).toBe(false);
+    expect(statusSchema.safeParse({ status: "in_progress", details: "   " }).success).toBe(false);
+    expect(statusSchema.safeParse({ status: "in_progress", details: "Crew dispatched." }).success).toBe(true);
   });
 });
 
