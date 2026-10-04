@@ -46,3 +46,25 @@ export function sortColumn(sort: Sort) {
 export function endOfDay(date: string) {
   return `${date}T23:59:59.999Z`;
 }
+
+// Exports return every matching row instead of one page, up to this many. Past
+// that a file stops being something a person opens and reads, and the response
+// says it was cut short rather than pretending the file is complete.
+export const EXPORT_LIMIT = 5000;
+
+// Supabase's Data API answers one request with at most 1,000 rows by default
+// (`max_rows`), so an export reads its rows in chunks no larger than that.
+export const EXPORT_CHUNK = 1000;
+
+// The file itself is built in the browser from the columns on screen; the server
+// only needs the format to record what was exported.
+export const EXPORT_FORMATS = ["csv", "pdf"] as const;
+
+// The inclusive row ranges that cover `total` rows, capped at `limit`, in chunks
+// of `chunk`. Each pair is what .range(from, to) takes.
+export function exportRanges(total: number, limit = EXPORT_LIMIT, chunk = EXPORT_CHUNK): [number, number][] {
+  const end = Math.min(Math.max(0, total), limit);
+  const ranges: [number, number][] = [];
+  for (let from = 0; from < end; from += chunk) ranges.push([from, Math.min(from + chunk, end) - 1]);
+  return ranges;
+}

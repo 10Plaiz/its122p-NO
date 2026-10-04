@@ -163,3 +163,41 @@ describe("demo seed generator", () => {
     expect(() => generateSeed({ asOf: "2026-13-40" })).toThrow("YYYY-MM-DD");
   });
 });
+
+describe("demo seed: columns added after the generator (Phase 2 C8)", async () => {
+  const { workflowColumns, nameParts } = await import("../../scripts/demo/workflow-columns.js");
+  const { reports } = generateSeed();
+  const ids = { adminId: "admin-id", staffId: "staff-id", mainProblemId: 7 };
+
+  it("gives every resolved report a complete, verified closure request (SW-4)", () => {
+    const resolved = reports.filter((report) => report.status === "resolved");
+    expect(resolved.length).toBeGreaterThan(0);
+    for (const report of resolved) {
+      const columns = workflowColumns(report, ids);
+      expect(columns).toMatchObject({ closure_outcome: "resolved", closure_requested_by: "staff-id", verified_by: "admin-id" });
+      expect(typeof columns.closure_requested_at).toBe("string");
+      expect(typeof columns.closure_reason).toBe("string");
+      expect(columns.verified_at).toBe(columns.closure_requested_at);
+    }
+  });
+
+  it("leaves other reports without a closure request, and dates every status change", () => {
+    for (const report of reports.filter((report) => report.status !== "resolved")) {
+      const columns = workflowColumns(report, ids);
+      expect(columns).not.toHaveProperty("closure_requested_at");
+      expect(Date.parse(columns.status_changed_at as string)).toBeGreaterThanOrEqual(Date.parse(report.submitted_at));
+    }
+  });
+
+  it("dates the assignment from the report's own history", () => {
+    const assigned = reports.find((report) => report.updates.some((update) => update.update_type === "assignment"))!;
+    const assignment = assigned.updates.find((update) => update.update_type === "assignment")!;
+    expect(workflowColumns(assigned, ids).assigned_at).toBe(assignment.created_at);
+    expect(workflowColumns(assigned, ids).primary_problem_id).toBe(7);
+  });
+
+  it("splits a demo name into first and last name (UA-7)", () => {
+    expect(nameParts("Juan Dela Cruz")).toEqual({ first_name: "Juan", last_name: "Dela Cruz" });
+    expect(nameParts("Admin")).toEqual({ first_name: "Admin", last_name: null });
+  });
+});

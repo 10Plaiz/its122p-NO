@@ -54,6 +54,25 @@
   --color-accent-2-800: #71261b;
   --color-accent-2-900: #471d16;
 
+  /* Status roles (SW-5). Green says "done", amber says "waiting on someone" or
+     "late". Never the only signal: every use pairs them with a word and an icon.
+     Text shades are checked against --color-bg (#f3f2f2), --color-surface, and
+     their own 100 tint: success-800 6.3:1 or better, success-700 4.4:1 (borders
+     and icons only), warning-800 6.9:1 or better, warning-700 4.8:1. */
+  --color-success: #155f35;
+  --color-success-100: #e3f3e8;
+  --color-success-200: #c6e6d0;
+  --color-success-700: #1d7a45;
+  --color-success-800: #155f35;
+  --color-success-900: #0f4426;
+
+  --color-warning: #6b4500;
+  --color-warning-100: #fdf0d5;
+  --color-warning-200: #f8dfa8;
+  --color-warning-700: #8a5a00;
+  --color-warning-800: #6b4500;
+  --color-warning-900: #4a3000;
+
   --font-heading: "Archivo", system-ui, sans-serif;
   --font-body: "Archivo", system-ui, sans-serif;
 
@@ -79,12 +98,6 @@
   --space-4: 16.0px;
   --space-6: 24.0px;
   --space-8: 32.0px;
-}
-
-/* Leaflet ships its own stylesheet; these align the map with the system. */
-.leaflet-container {
-  font-family: var(--font-body);
-  background: var(--color-neutral-200);
 }
 
 /* The header's mobile menu toggle. This cannot be `md:hidden` on the button:

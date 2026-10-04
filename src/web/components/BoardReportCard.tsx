@@ -47,6 +47,7 @@ export function BoardReportCard({ report, isSelected, onToggle }: BoardReportCar
 
         {/* Date on the left of Chevron button */}
         <div className="flex items-center gap-3 shrink-0">
+          {report.barangay && <span className="text-[12px] font-medium text-neutral-700">{report.barangay}</span>}
           <time
             dateTime={report.submitted_at}
             className="text-[12px] font-medium text-neutral-700 select-text"
@@ -101,6 +102,16 @@ export function BoardReportCard({ report, isSelected, onToggle }: BoardReportCar
           <p className="text-[13px] select-text cursor-text leading-relaxed text-text !m-0">
             {report.description}
           </p>
+
+          {/* SW-7: the board says why a report was closed without a repair. */}
+          {report.status === "rejected" && report.rejection_reason && (
+            <div className="flex flex-col gap-1 border-l-2 border-neutral-800 pl-2.5">
+              <span className="font-mono text-[11px] text-neutral-800">Why it was rejected</span>
+              <p className="text-[13px] leading-relaxed text-text whitespace-pre-line break-words !m-0">
+                {report.rejection_reason}
+              </p>
+            </div>
+          )}
 
           {report.photos?.[0] && (
             <PhotoFrame

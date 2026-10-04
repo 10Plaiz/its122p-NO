@@ -11,9 +11,11 @@ import {
   Select,
 } from "../components/ui.js";
 import { BoardReportCard } from "../components/BoardReportCard.js";
+import { BarangayFilter } from "../components/BarangayFilter.js";
 import { useApi } from "../lib/useApi.js";
 import { PUBLIC_STATUSES, SORTS, STATUS_LABEL } from "../lib/types.js";
 import type { Category, Paged, PublicReport, PublicStats, Sort } from "../lib/types.js";
+import { BARANGAYS } from "../lib/barangays.js";
 
 const PER_PAGE = 50;
 
@@ -40,6 +42,7 @@ function readParams(params: URLSearchParams) {
     // STATUS_LABEL lookup below loses its key type.
     status: (PUBLIC_STATUSES as readonly string[]).includes(status) ? (status as PublicStatus) : ("" as const),
     categoryId: params.get("category") ?? "",
+    barangay: (BARANGAYS as readonly string[]).includes(params.get("barangay") ?? "") ? (params.get("barangay") as string) : "",
     sort: ((SORTS as readonly string[]).includes(sort) ? sort : "newest") as Sort,
     page: Number.isInteger(page) && page > 0 ? page : 1,
     // Which pane a narrow viewport shows. The list leads, because burying the cards
@@ -51,7 +54,7 @@ function readParams(params: URLSearchParams) {
 
 export function BoardPage() {
   const [params, setParams] = useSearchParams();
-  const { q, status, categoryId, sort, page, pane } = readParams(params);
+  const { q, status, categoryId, barangay, sort, page, pane } = readParams(params);
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
@@ -92,8 +95,8 @@ export function BoardPage() {
   }, [q]);
 
   const query = useMemo(
-    () => ({ q, status, category_id: categoryId, sort, page, per_page: PER_PAGE }),
-    [q, status, categoryId, sort, page],
+    () => ({ q, status, category_id: categoryId, barangay, sort, page, per_page: PER_PAGE }),
+    [q, status, categoryId, barangay, sort, page],
   );
 
   const { data, error, loading } = useApi<Paged<"reports", PublicReport>>("/public/reports", query);
@@ -121,13 +124,14 @@ export function BoardPage() {
     (category) => String(category.id) === categoryId,
   )?.name;
 
-  const filtered = q !== "" || status !== "" || categoryId !== "";
+  const filtered = q !== "" || status !== "" || categoryId !== "" || barangay !== "";
   const total = data?.total ?? 0;
   const firstLoad = loading && !data;
 
   // What the visitor is looking at, in their words rather than the query string's.
   const describing = [
     categoryName,
+    barangay || null,
     status ? STATUS_LABEL[status] : null,
     q ? `“${q}”` : null,
   ].filter((part): part is string => Boolean(part));
@@ -157,14 +161,14 @@ export function BoardPage() {
           board on purpose: the headline a transparency board exists to publish should
           not move because a visitor picked a category. What the filter matched is
           reported over the list instead. */}
-      <div className="grid grid-cols-2 md:grid-cols-4 border-2 border-divider">
-        <Stat label="All" value={stats?.total} />
+      <div className="grid grid-cols-2 md:grid-cols-5 border-2 border-divider">
+        <Stat label="All" value={stats?.total} className="col-span-2 md:col-span-1" />
         {PUBLIC_STATUSES.map((key) => (
           <Stat key={key} label={STATUS_LABEL[key]} value={stats?.by_status?.[key]} />
         ))}
       </div>
 
-      <div className="grid gap-3 md:grid-cols-4">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
         <Field label="Search" htmlFor="q">
           <Input
             id="q"
@@ -210,6 +214,8 @@ export function BoardPage() {
               ))}
           </Select>
         </Field>
+
+        <BarangayFilter value={barangay} onChange={(value) => update({ barangay: value || null, page: null })} />
 
         <Field label="Sort" htmlFor="sort">
           <Select
@@ -330,8 +336,8 @@ export function BoardPage() {
           </div>
         </div>
 
-        {/* Paging and the map credit sit under the list, flush right: the second column
-            from lg, full width below it, where they follow whichever pane is on screen. */}
+        {/* Paging sits under the list, flush right: the second column from lg, full
+            width below it, where it follows whichever pane is on screen. */}
         <div className="flex flex-col items-end gap-2 text-right lg:col-start-2">
           {data && (
             <Pagination
@@ -342,7 +348,7 @@ export function BoardPage() {
             />
           )}
           <p className="text-muted font-mono text-[10px]">
-            Map data &copy; OpenStreetMap contributors, rendered with Leaflet. &middot;{" "}
+            {/* The map credits Google and the OpenStreetMap boundary itself. */}
             <Link to="/">Back to start</Link>
           </p>
         </div>
@@ -351,9 +357,9 @@ export function BoardPage() {
   );
 }
 
-function Stat({ label, value }: { label: string; value?: number }) {
+function Stat({ label, value, className = "" }: { label: string; value?: number; className?: string }) {
   return (
-    <div className="p-3 flex flex-col gap-0.5 border-r border-b border-divider last:border-r-0">
+    <div className={`p-3 flex flex-col gap-0.5 border-r border-b border-divider last:border-r-0 ${className}`.trim()}>
       <span className="font-mono text-[10px] uppercase tracking-wider text-muted">{label}</span>
       <span className="text-2xl font-extrabold tabular-nums">{value ?? "—"}</span>
     </div>

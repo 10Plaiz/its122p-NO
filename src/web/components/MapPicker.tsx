@@ -1,55 +1,30 @@
-import { useEffect, useState } from "react";
-import { MapContainer, Marker, TileLayer, useMap, useMapEvents } from "react-leaflet";
-import L from "leaflet";
-import { DEFAULT_CENTER, DEFAULT_ZOOM, TILE_ATTRIBUTION, TILE_URL } from "../lib/leaflet.js";
+/// <reference types="google.maps" />
+import { useEffect, useRef, useState } from "react";
+import { AdvancedMarker, Map, useMap, useMapsLibrary } from "@vis.gl/react-google-maps";
+import type { MapMouseEvent } from "@vis.gl/react-google-maps";
+import {
+  DEFAULT_CENTER,
+  DEFAULT_ZOOM,
+  DETAIL_ZOOM,
+  MAKATI_ERROR,
+  MAP_RESTRICTION,
+  MIN_ZOOM,
+  SEARCH_BOUNDS,
+  googleMapId,
+  isInsideMakati,
+} from "../lib/maps.js";
+import { MakatiOutline, MapFrame } from "./MapFrame.js";
 import { Button } from "./ui.js";
+import { PIN_OUTSIDE_ERROR, pinError } from "../lib/report-rules.js";
 
-// Pin drop for the report wizard. The caller owns the coordinates; this reports
-// where the pin was put by click, drag, or the keyboard-accessible map-center button.
-
-// A crosshair rather than the status square used on the board: this pin is being
-// placed, not reported on, and it should not read as an existing report.
-const PICKER_ICON = L.divIcon({
-  className: "",
-  html: `<span style="
-    display:block;
-    width:22px;
-    height:22px;
-    border:3px solid var(--color-accent);
-    background:color-mix(in srgb, var(--color-accent) 25%, transparent);
-    box-shadow:var(--shadow-md);
-  "></span>`,
-  iconSize: [22, 22],
-  iconAnchor: [11, 11],
-});
+// Pin drop for the report wizard and the citizen's edit form. The caller owns the
+// coordinates; this reports where the pin was put by click, drag, place search, or
+// the keyboard-accessible map-center button. Only points inside Makati are reported:
+// anything else leaves the pin where it was and says why, beside the map.
 
 type Point = { lat: number; lng: number };
 
-function ClickToPlace({ onPick }: { onPick: (point: Point) => void }) {
-  useMapEvents({
-    click(event) {
-      onPick({ lat: event.latlng.lat, lng: event.latlng.lng });
-    },
-  });
-  return null;
-}
-
-// Recentres when the value changes from outside (using the device's location, for
-// instance) without fighting the user while they pan.
-function Recentre({ value }: { value: Point | null }) {
-  const map = useMap();
-  const [last, setLast] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!value) return;
-    const key = `${value.lat},${value.lng}`;
-    if (key === last) return;
-    setLast(key);
-    map.setView([value.lat, value.lng], Math.max(map.getZoom(), 16));
-  }, [value, map, last]);
-
-  return null;
-}
+const keyOf = (point: Point) => `${point.lat},${point.lng}`;
 
 export function MapPicker({
   value,
@@ -58,48 +33,224 @@ export function MapPicker({
   value: Point | null;
   onChange: (point: Point) => void;
 }) {
-  const [map, setMap] = useState<L.Map | null>(null);
+  // Without the map its refusal cannot show, but a device location outside Makati
+  // still needs a reason beside the disabled Continue or Save.
+  const outside = pinError(value);
+  return (
+    <MapFrame
+      unavailable={
+        <>
+          Use my location can still place the pin.
+          {outside && (
+            <p
+              role="alert"
+              data-testid="map-picker-refusal"
+              className="!m-0 mt-2 border border-accent bg-surface p-2 text-[13px] leading-snug text-text"
+            >
+              {outside}
+            </p>
+          )}
+        </>
+      }
+    >
+      <Picker value={value} onChange={onChange} />
+    </MapFrame>
+  );
+}
+
+function Picker({ value, onChange }: { value: Point | null; onChange: (point: Point) => void }) {
+  const map = useMap();
+  const marker = useRef<google.maps.marker.AdvancedMarkerElement | null>(null);
+  const [refusal, setRefusal] = useState<string | null>(null);
+
+  // The last point this picker handed its caller. A value equal to it came from the
+  // visitor's own tap, so the view is already on it; anything else came from outside
+  // (the device's location, a saved report) and the map moves to show it.
+  const emitted = useRef<string | null>(null);
+
+  // The caller can set a point the picker never would, such as a device location in
+  // Pasay. It is not drawn as a pin, and the message says why.
+  const valueOutside = value !== null && !isInsideMakati(value.lat, value.lng);
+  const message = valueOutside ? PIN_OUTSIDE_ERROR : refusal;
+
+  function pick(point: Point, what: "spot" | "place"): boolean {
+    if (!isInsideMakati(point.lat, point.lng)) {
+      setRefusal(`That ${what} is outside Makati. ${MAKATI_ERROR}`);
+      return false;
+    }
+    setRefusal(null);
+    emitted.current = keyOf(point);
+    onChange(point);
+    return true;
+  }
+
+  useEffect(() => {
+    if (!map || !value || valueOutside) return;
+    const key = keyOf(value);
+    if (key === emitted.current) return;
+    emitted.current = key;
+    map.panTo(value);
+    if ((map.getZoom() ?? 0) < DETAIL_ZOOM) map.setZoom(DETAIL_ZOOM);
+  }, [map, value, valueOutside]);
 
   return (
-    <div className="relative h-full">
-      <MapContainer
-        ref={setMap}
-        center={value ? [value.lat, value.lng] : DEFAULT_CENTER}
-        zoom={value ? 16 : DEFAULT_ZOOM}
-        scrollWheelZoom
-        className="h-full w-full"
-        style={{ minHeight: "300px" }}
-      >
-        <TileLayer url={TILE_URL} attribution={TILE_ATTRIBUTION} />
-        <ClickToPlace onPick={onChange} />
-        <Recentre value={value} />
-
-        {value && (
-          <Marker
-            position={[value.lat, value.lng]}
-            icon={PICKER_ICON}
-            draggable
-            eventHandlers={{
-              dragend(event) {
-                const { lat, lng } = event.target.getLatLng();
-                onChange({ lat, lng });
-              },
-            }}
-          />
-        )}
-      </MapContainer>
-      <Button
-        type="button"
-        className="absolute bottom-8 left-2 z-[1000] bg-surface shadow-md"
-        disabled={!map}
-        onClick={() => {
-          if (!map) return;
-          const center = map.getCenter();
-          onChange({ lat: center.lat, lng: center.lng });
+    <div className="flex h-full flex-col">
+      <PlaceSearch
+        onPick={(point) => {
+          if (!pick(point, "place") || !map) return;
+          map.panTo(point);
+          if ((map.getZoom() ?? 0) < DETAIL_ZOOM) map.setZoom(DETAIL_ZOOM);
         }}
-      >
-        Place pin at map center
-      </Button>
+      />
+
+      <div className="relative flex-1 min-h-0">
+        <Map
+          mapId={googleMapId()}
+          defaultCenter={value && !valueOutside ? value : DEFAULT_CENTER}
+          defaultZoom={value && !valueOutside ? DETAIL_ZOOM : DEFAULT_ZOOM}
+          minZoom={MIN_ZOOM}
+          restriction={MAP_RESTRICTION}
+          // A tap on a shop's icon should drop the pin there, not open Google's card.
+          clickableIcons={false}
+          mapTypeControl={false}
+          streetViewControl={false}
+          fullscreenControl={false}
+          style={{ position: "absolute", inset: 0 }}
+          onClick={(event: MapMouseEvent) => {
+            const point = event.detail.latLng;
+            if (point) pick(point, "spot");
+          }}
+        >
+          <MakatiOutline />
+          {value && !valueOutside && (
+            <AdvancedMarker
+              ref={marker}
+              position={value}
+              draggable
+              title="Report location. Drag to adjust."
+              // Centred on the point, like the crosshair it is.
+              anchorLeft="-50%"
+              anchorTop="-50%"
+              onDragEnd={(event) => {
+                const point = event.latLng;
+                if (!point) return;
+                // Refused: Google has already moved the marker, so put it back.
+                if (!pick({ lat: point.lat(), lng: point.lng() }, "spot") && marker.current) {
+                  marker.current.position = value;
+                }
+              }}
+            >
+              {/* A crosshair rather than the status square used on the board: this pin
+                  is being placed, not reported on, and should not read as a report. */}
+              <span
+                aria-hidden="true"
+                style={{
+                  display: "block",
+                  width: 22,
+                  height: 22,
+                  border: "3px solid var(--color-accent)",
+                  background: "color-mix(in srgb, var(--color-accent) 25%, transparent)",
+                  boxShadow: "var(--shadow-md)",
+                }}
+              />
+            </AdvancedMarker>
+          )}
+        </Map>
+
+        {/* Top left is the one corner Google leaves empty with these controls off; its
+            logo, which must stay visible, is bottom left. */}
+        <div className="pointer-events-none absolute top-2 left-2 right-2 z-[1] flex flex-col items-start gap-2">
+          <Button
+            type="button"
+            className="pointer-events-auto bg-surface shadow-md"
+            disabled={!map}
+            onClick={() => {
+              const center = map?.getCenter();
+              if (center) pick({ lat: center.lat(), lng: center.lng() }, "spot");
+            }}
+          >
+            Place pin at map center
+          </Button>
+          {message && (
+            <p
+              role="alert"
+              data-testid="map-picker-refusal"
+              className="pointer-events-auto !m-0 max-w-xs border border-accent bg-surface p-2 text-[13px] leading-snug shadow-md"
+            >
+              {message}
+            </p>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Google's place search, limited to Makati's box. A result still goes through the
+// polygon check in `onPick`'s caller, since the box takes in slivers of Taguig and
+// Manila. Built on PlaceAutocompleteElement because the older Autocomplete widget is
+// closed to Google Cloud projects created after March 2025.
+function PlaceSearch({ onPick }: { onPick: (point: Point) => void }) {
+  const places = useMapsLibrary("places");
+  const host = useRef<HTMLDivElement>(null);
+  const [failed, setFailed] = useState(false);
+
+  // The element is built once; this keeps its listener calling the current handler.
+  const latest = useRef(onPick);
+  useEffect(() => {
+    latest.current = onPick;
+  });
+
+  useEffect(() => {
+    const container = host.current;
+    if (!places || !container) return;
+
+    const element = new places.PlaceAutocompleteElement({
+      locationRestriction: SEARCH_BOUNDS,
+      includedRegionCodes: ["ph"],
+      placeholder: "Street, building, or landmark…",
+      description: "Suggestions are limited to Makati.",
+    });
+    element.setAttribute("aria-label", "Search for a place in Makati");
+    element.style.width = "100%";
+
+    async function onSelect(event: google.maps.places.PlacePredictionSelectEvent) {
+      try {
+        const place = event.placePrediction.toPlace();
+        await place.fetchFields({ fields: ["location"] });
+        const location = place.location;
+        if (location) latest.current({ lat: location.lat(), lng: location.lng() });
+      } catch {
+        setFailed(true);
+      }
+    }
+    // Usually the key lacks the Places API (New); the map still works without it.
+    function onError() {
+      setFailed(true);
+    }
+
+    element.addEventListener("gmp-select", onSelect);
+    element.addEventListener("gmp-error", onError);
+    container.replaceChildren(element);
+
+    return () => {
+      element.removeEventListener("gmp-select", onSelect);
+      element.removeEventListener("gmp-error", onError);
+      element.remove();
+    };
+  }, [places]);
+
+  return (
+    <div className="shrink-0 flex flex-col gap-1 border-b-2 border-divider bg-surface p-2">
+      <span className="font-mono text-[9.5px] font-semibold uppercase tracking-wider text-muted">
+        Search Makati
+      </span>
+      <div ref={host} data-testid="map-picker-search" className={failed ? "hidden" : "min-h-10"} />
+      {failed && (
+        <p role="status" className="!m-0 text-muted text-[12px]">
+          Place search is unavailable. Tap the map to place the pin.
+        </p>
+      )}
     </div>
   );
 }

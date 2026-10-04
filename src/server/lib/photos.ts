@@ -46,7 +46,12 @@ export async function savePhoto({ file, reportId, uploadedBy, kind }: PhotoInput
   );
 }
 
-// Turns a stored object key into a URL the frontend can render.
-export function photoUrl(storagePath: string) {
+// Turns a stored object key into a URL the frontend can render. Pass the row's
+// purged_at as well and a photo whose file the retention purge removed gets null,
+// so the page can say the photo is gone instead of showing a broken image.
+export function photoUrl(storagePath: string): string;
+export function photoUrl(storagePath: string, purgedAt: string | null | undefined): string | null;
+export function photoUrl(storagePath: string, purgedAt?: string | null) {
+  if (purgedAt) return null;
   return db.storage.from(PHOTO_BUCKET).getPublicUrl(storagePath).data.publicUrl;
 }

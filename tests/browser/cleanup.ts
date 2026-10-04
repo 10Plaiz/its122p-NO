@@ -3,8 +3,8 @@
 // runs it on its own.
 //
 // Safety contract:
-// - Runs only when verified: the .env secret key works, and every fixture account
-//   exists in that project, which marks it as the fixture-seeded test project.
+// - Requires an explicit cleanup hostname for an approved disposable target.
+//   A working key and fixture accounts alone do not authorize deletion.
 //   Otherwise it prints why and deletes nothing. It never fails the test run.
 // - Deletes only rows that are both fixture-owned and carry a test marker from
 //   helpers.ts. [FIXTURE] reports, real reports, and demo-seed data never match.
@@ -22,16 +22,22 @@ export default async function cleanupTestData(): Promise<void> {
     const removed = await cleanup();
     if (removed) {
       console.log(`Test-data cleanup: ${removed.reports} report(s), ${removed.remarks} remark(s) removed.`);
+      if (removed.rated > 0) {
+        console.log(`Kept ${removed.rated} rated test report(s): ratings can never be deleted (20261003000500_feedback.sql).`);
+      }
     }
   } catch (error) {
     console.warn(`Test-data cleanup failed: ${(error as Error).message}`);
   }
 }
 
-async function cleanup(): Promise<{ reports: number; remarks: number } | null> {
+async function cleanup(): Promise<{ reports: number; remarks: number; rated: number } | null> {
   const url = process.env.SUPABASE_URL;
   const key = process.env.SUPABASE_SECRET_KEY;
   if (!url || !key) return skip("SUPABASE_URL and SUPABASE_SECRET_KEY are not set in .env.");
+  if (process.env.KAMOTI_TEST_CLEANUP_TARGET !== new URL(url).hostname) {
+    return skip("records are retained; no matching disposable cleanup target was authorized.");
+  }
 
   const db = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
 
@@ -44,14 +50,20 @@ async function cleanup(): Promise<{ reports: number; remarks: number } | null> {
 
   const reports = await db
     .from("reports")
-    .select("id, report_photos(storage_path)")
+    .select("id, report_photos(storage_path), report_feedback(id)")
     .in("citizen_id", fixtureIds)
     .like("title", `${TEST_TITLE_PREFIX}%`);
   if (reports.error) throw new Error(reports.error.message);
 
-  if (reports.data.length > 0) {
+  // A rating is immutable: service_role may insert and read report_feedback but not
+  // delete from it, so a rated report (and its photos and history) stays. Granting
+  // delete just for tests would undo FB-1's guarantee.
+  const removable = reports.data.filter((report) => (report.report_feedback ?? []).length === 0);
+  const rated = reports.data.length - removable.length;
+
+  if (removable.length > 0) {
     // Storage is not covered by the foreign keys, so the files go first.
-    const paths = reports.data.flatMap((report) =>
+    const paths = removable.flatMap((report) =>
       (report.report_photos ?? [])
         .map((photo: { storage_path?: string | null }) => photo.storage_path)
         .filter(Boolean) as string[],
@@ -61,8 +73,18 @@ async function cleanup(): Promise<{ reports: number; remarks: number } | null> {
       if (storage.error) throw new Error(storage.error.message);
     }
 
-    // Photos, updates, notifications, and inspections cascade with the report.
-    const deleted = await db.from("reports").delete().in("id", reports.data.map((report) => report.id as string));
+    // The app never deletes rows (DM-1), and since 20261003000100_no_delete.sql every
+    // key into reports is ON DELETE RESTRICT, so nothing cascades any more. This
+    // teardown is the documented exception: it only ever runs against the disposable
+    // fixture project, so it removes the children first and the reports last.
+    // A table added later that points at reports must be added to this list.
+    const reportIds = removable.map((report) => report.id as string);
+    for (const table of ["notifications", "report_inspections", "report_updates", "report_photos"]) {
+      const children = await db.from(table).delete().in("report_id", reportIds);
+      if (children.error) throw new Error(`${table}: ${children.error.message}`);
+    }
+
+    const deleted = await db.from("reports").delete().in("id", reportIds);
     if (deleted.error) throw new Error(deleted.error.message);
   }
 
@@ -75,7 +97,7 @@ async function cleanup(): Promise<{ reports: number; remarks: number } | null> {
     .select("id");
   if (remarks.error) throw new Error(remarks.error.message);
 
-  return { reports: reports.data.length, remarks: remarks.data?.length ?? 0 };
+  return { reports: removable.length, remarks: remarks.data?.length ?? 0, rated };
 }
 
 function skip(reason: string): null {

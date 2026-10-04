@@ -30,7 +30,9 @@ The system defines four user roles:
 
 ## 2. Report Lifecycle State Machine
 
-A report moves through five discrete states. The service module [`src/server/services/reports.service.ts`](../src/server/services/reports.service.ts) controls all state transitions.
+A report has six statuses. [`reports.workflow.ts`](../src/server/services/reports.workflow.ts)
+checks legal transitions. Closure request and review use the transaction functions
+in the SQL migrations. Assignment alone does not change the status.
 
 ```mermaid
 stateDiagram-v2
@@ -38,8 +40,11 @@ stateDiagram-v2
     Pending --> Cancelled : Citizen cancels report
     Pending --> UnderReview : Staff reviews report
     UnderReview --> InProgress : Staff begins repair
-    InProgress --> Resolved : Staff resolves report
+    UnderReview --> Rejected : Administrator approves Staff rejection request
+    InProgress --> Resolved : Administrator approves Staff resolution request
+    InProgress --> Rejected : Administrator approves Staff rejection request
     Resolved --> [*]
+    Rejected --> [*]
     Cancelled --> [*]
 
     note right of Pending
@@ -50,7 +55,7 @@ stateDiagram-v2
 
     note right of UnderReview
         Public board shows report.
-        System removes citizen personal data.
+        View omits citizen identity and contact columns.
     end note
 
     note right of InProgress
@@ -59,7 +64,8 @@ stateDiagram-v2
     end note
 
     note right of Resolved
-        Staff uploads photo proof.
+        Staff uploaded repair proof before requesting closure.
+        A different Administrator approved the request.
         Citizen receives notification.
     end note
 ```
@@ -69,9 +75,10 @@ stateDiagram-v2
 | Report Status | Public Board Visibility | Role That Sets Status | Permitted User Actions |
 | :--- | :--- | :--- | :--- |
 | `pending` | Hidden | Citizen (on form submit) | The citizen can edit title, description, category, and location pin. The citizen can cancel the report. |
-| `under_review` | Visible (PII scrubbed) | Staff (via status advance) or Admin (via staff assignment) | Staff or Admin can record remarks. Admin can reassign staff. |
-| `in_progress` | Visible (PII scrubbed) | Assigned Staff or Admin | Staff can record remarks. Staff can upload repair photos. |
-| `resolved` | Visible (PII scrubbed) | Assigned Staff or Admin | Terminal state. System requires repair photo before this step. |
+| `under_review` | Visible without citizen identity | Assigned Staff or Administrator, with a comment | Staff or Administrator can record remarks. Administrator can reassign Staff. Assigned Staff can request rejection. |
+| `in_progress` | Visible without citizen identity | Assigned Staff or Admin, with a comment | Staff can record remarks. Staff can upload repair photos and request closure. |
+| `resolved` | Visible without citizen identity | Administrator approves the current resolution request from a different account | Terminal state. Assigned Staff must upload repair proof before requesting closure. |
+| `rejected` | Visible with its reason, without citizen identity | Administrator approves the current rejection request from a different account | Terminal state. The report remains available on the public board. |
 | `cancelled` | Hidden | Citizen owner only | Terminal state. System retains database row for audit integrity. |
 
 ---
@@ -90,7 +97,8 @@ flowchart TD
     
     CheckAuth -->|"No"| SignIn["Sign in page: /signin"]
     SignIn -->|"Select Register"| Register["Register page: /register"]
-    Register -->|"Submit valid form"| SignIn
+    Register -->|"Submit valid form"| ConfirmEmail["Enter emailed signup code"]
+    ConfirmEmail -->|"Valid code"| Proof["Upload residency proof"]
     
     BoardView --> SearchFilter["Filter by category, status, or keyword"]
     BoardView --> MapInteraction["Move map or click pin"]
@@ -107,7 +115,7 @@ flowchart TD
 2. Community Transparency Board:
    - The visitor navigates to [`BoardPage`](../src/web/pages/Board.tsx) at route `/board`.
    - The page requests `GET /api/public/reports`.
-   - The server scrubs all citizen personal identification from the response.
+   - The public view omits citizen identity and contact columns. Report text remains user-entered content.
    - The page stores filter parameters in the browser URL query string.
    - The visitor can pan the map or select report pins to preview details.
 
@@ -142,13 +150,15 @@ flowchart TD
 #### Step Walkthrough
 1. Authentication:
    - The user opens [`RegisterPage`](../src/web/pages/Register.tsx) at `/register`.
-   - The user enters name, email, password, and optional contact number.
+   - The user enters name parts, email, password, barangay, address, privacy consent, and optional contact number.
    - Public registration always assigns the `citizen` role.
-   - The user signs in on [`SignInPage`](../src/web/pages/SignIn.tsx) at `/signin`.
+   - A six-digit signup code confirms the email and signs the user in. An unconfirmed account cannot sign in with its password.
+   - The user uploads residency proof at `/register?step=proof`. Uploading unlocks reporting during Administrator review; rejection locks it again.
+   - Later sign-in and password recovery use [`SignInPage`](../src/web/pages/SignIn.tsx). Recovery requires an emailed recovery code, then ends old sessions.
 2. Report Submission Wizard:
    - The citizen opens [`NewReportPage`](../src/web/pages/NewReport.tsx) at `/report/new`.
-   - Step 1 (Where is it?): The user drops a pin on [`MapPicker.tsx`](../src/web/components/MapPicker.tsx). Nominatim reverse-geocodes the coordinates into an address.
-   - Step 2 (What is wrong?): The user enters a title (3 to 150 characters), category, and description (10 to 1000 characters).
+   - Step 1 (Where is it?): The user chooses a Google Maps pin or a Places result inside Makati on [`MapPicker.tsx`](../src/web/components/MapPicker.tsx). Nominatim reverse-geocodes the coordinates into an editable address. The API separately rejects outside pins.
+   - Step 2 (What is wrong?): The user enters a title (3 to 150 characters), category, main problem, optional second problem, and description (10 to 1000 characters).
    - Step 3 (Show us): The user attaches an optional photo (max 3 MB, JPG/PNG/WebP). The user reviews the summary and clicks submit.
 3. Personal Workspace and Report Tracking:
    - The citizen opens [`MyReportsPage`](../src/web/pages/MyReports.tsx) at `/my-reports`.
@@ -156,6 +166,8 @@ flowchart TD
    - The citizen opens [`ReportDetailPage`](../src/web/pages/ReportDetail.tsx) at `/reports/:id`.
    - While the report status is `pending`, the citizen can edit details inline.
    - The citizen monitors status updates on the chronological timeline.
+   - Once a report is resolved, its reporting Citizen can submit one feedback rating. Other Citizens and unresolved reports are refused.
+   - An unsent report draft stays in this tab, under the Citizen's account identifier. After an idle sign-out, the same Citizen can sign in and choose Restore draft. Attached files must be selected again.
 
 ---
 
@@ -174,6 +186,8 @@ flowchart TD
     StaffDetail --> AddNote["Save remark on report"]
     StaffDetail --> UploadPhoto["Upload photo proof of repair"]
     StaffDetail --> NextStep["Advance status to next legal state"]
+    StaffDetail --> Closure["Request resolution or rejection with a reason"]
+    Closure --> AdminReview["Administrator approves or returns the current request"]
     
     StaffDetail -->|"Select return link"| Queue
 ```
@@ -183,13 +197,14 @@ flowchart TD
    - The staff member signs in and lands on [`StaffQueuePage`](../src/web/pages/StaffQueue.tsx) at `/staff/queue`.
    - The API scopes `GET /api/reports` to reports assigned to this staff member.
    - The table sorts items oldest first.
-   - Each row displays an action button for the single next legal status step.
+   - Each row displays the relevant next action. A closure request waits for Administrator review without changing its current status.
 2. Report Execution:
    - The staff member opens [`StaffReportPage`](../src/web/pages/StaffReport.tsx) at `/staff/reports/:id`.
    - The staff member reads citizen contact information for field communication.
    - The staff member can add an operational remark via `POST /api/reports/:id/remarks`.
    - The staff member can upload a repair proof photo via `POST /api/reports/:id/photos`.
-   - The staff member advances report status via `PATCH /api/reports/:id/status`.
+   - The staff member advances to `under_review` or `in_progress` through `PATCH /api/reports/:id/status`, with a comment.
+   - The assigned Staff member requests resolution after uploading repair proof, or requests rejection with a reason. A different Administrator approves the current request or returns it for more work. A replaced or already reviewed request returns 409.
 
 ---
 
@@ -206,6 +221,8 @@ flowchart TD
     Dashboard --> NavReports["Reports page: /admin/reports"]
     NavReports --> OpenAssignDialog["Open assignment dialog"]
     OpenAssignDialog --> SubmitAssign["Assign staff member to report"]
+    NavReports --> ReviewClosure["Review Staff closure request"]
+    ReviewClosure --> Decision["Approve or return with a comment"]
     
     Dashboard --> NavUsers["Users page: /admin/users"]
     NavUsers --> CreateUser["Create new staff or admin user"]
@@ -227,11 +244,13 @@ flowchart TD
 2. Report Assignment:
    - The administrator opens [`AdminReportsPage`](../src/web/pages/AdminReports.tsx) at `/admin/reports`.
    - The administrator opens the assignment dialog on a report.
-   - The administrator selects an active staff member and submits `PATCH /api/reports/:id/assign`.
-   - The server assigns the staff member and moves `pending` reports to `under_review`.
+   - The administrator selects an active Staff member and submits `PATCH /api/reports/:id/assign` with a comment.
+   - The server records the assignment without changing the report status.
+   - Administrator closure review sends the displayed request timestamp. Approval requires an account different from the requester, even if the requester has since become an Administrator.
 3. User and Category Maintenance:
    - The administrator opens [`AdminUsersPage`](../src/web/pages/AdminUsers.tsx) at `/admin/users` to create staff or admin accounts.
    - The administrator can deactivate users without deleting historical reports.
+   - The Administrator reviews residency proof through a short-lived private URL. The API must save a proof-view audit entry before returning that URL. Profile changes and residency review save their audit records with the change.
    - The administrator opens [`AdminCategoriesPage`](../src/web/pages/AdminCategories.tsx) to add or retire categories.
 4. Audit Log Review:
    - The administrator opens [`AdminLogsPage`](../src/web/pages/AdminLogs.tsx) at `/admin/logs`.
@@ -245,13 +264,14 @@ This matrix links each journey step to the verified source files in the reposito
 
 | User Flow | Frontend UI File | Backend API Route | Service or DB Operation | Verification Rule |
 | :--- | :--- | :--- | :--- | :--- |
-| Public Board Browsing | [`Board.tsx`](../src/web/pages/Board.tsx) | `GET /api/public/reports` | [`src/server/routes/public.routes.ts`](../src/server/routes/public.routes.ts) | Returns only reviewed reports. Does not include citizen personal data. |
-| Citizen Submission | [`NewReportPage`](../src/web/pages/NewReport.tsx) | `POST /api/reports` | [`src/server/routes/reports.routes.ts:L105`](../src/server/routes/reports.routes.ts#L105) | Validates title, description, category, and coordinates. Saves optional initial photo. |
-| Citizen Report Edit | [`ReportDetailPage`](../src/web/pages/ReportDetail.tsx) | `PATCH /api/reports/:id` | [`src/server/routes/reports.routes.ts:L155`](../src/server/routes/reports.routes.ts#L155) | Server accepts edit only if status is `pending` and caller is report owner. |
-| Citizen Cancellation | [`MyReportsPage`](../src/web/pages/MyReports.tsx) | `POST /api/reports/:id/cancel` | [`src/server/routes/reports.routes.ts:L164`](../src/server/routes/reports.routes.ts#L164) | Updates status to `cancelled`. Does not delete database record. |
-| Staff Queue Retrieval | [`StaffQueuePage`](../src/web/pages/StaffQueue.tsx) | `GET /api/reports` | [`src/server/routes/reports.routes.ts:L89`](../src/server/routes/reports.routes.ts#L89) | Scopes records to caller staff ID. Orders records oldest first. |
-| Status Transition | [`StaffReportPage`](../src/web/pages/StaffReport.tsx) | `PATCH /api/reports/:id/status` | [`src/server/services/reports.service.ts:L20`](../src/server/services/reports.service.ts#L20) | Enforces single legal forward step from `NEXT_STATUS` dictionary. |
-| Repair Photo Upload | [`StaffReportPage`](../src/web/pages/StaffReport.tsx) | `POST /api/reports/:id/photos` | [`src/server/routes/reports.routes.ts:L207`](../src/server/routes/reports.routes.ts#L207) | Classifies photo kind as `resolution` when uploaded by staff or admin. |
-| Staff Assignment | [`AdminReportsPage`](../src/web/pages/AdminReports.tsx) | `PATCH /api/reports/:id/assign` | [`src/server/routes/reports.routes.ts:L189`](../src/server/routes/reports.routes.ts#L189) | Restricts assignment to active staff profiles. Moves `pending` status to `under_review`. |
+| Public Board Browsing | [`Board.tsx`](../src/web/pages/Board.tsx) | `GET /api/public/reports` | [`public.routes.ts`](../src/server/routes/public.routes.ts) | Returns published reports without citizen identity and contact columns. |
+| Citizen Submission | [`NewReportPage`](../src/web/pages/NewReport.tsx) | `POST /api/reports` | [`reports.submission.routes.ts`](../src/server/routes/reports.submission.routes.ts) | Validates title, description, category, problem type, and coordinates. Saves optional initial photo. |
+| Citizen Report Edit | [`ReportDetailPage`](../src/web/pages/ReportDetail.tsx) | `PATCH /api/reports/:id` | [`reports.submission.routes.ts`](../src/server/routes/reports.submission.routes.ts) | Server accepts edit only if status is `pending` and caller is report owner. |
+| Citizen Cancellation | [`MyReportsPage`](../src/web/pages/MyReports.tsx) | `POST /api/reports/:id/cancel` | [`reports.submission.routes.ts`](../src/server/routes/reports.submission.routes.ts) | Updates status to `cancelled`. Does not delete database record. |
+| Staff Queue Retrieval | [`StaffQueuePage`](../src/web/pages/StaffQueue.tsx) | `GET /api/reports` | [`reports.routes.ts`](../src/server/routes/reports.routes.ts) | Scopes records to caller staff ID. The queue requests oldest-first ordering. |
+| Status Transition | [`StaffReportPage`](../src/web/pages/StaffReport.tsx) | `PATCH /api/reports/:id/status` | [`reports.workflow.ts`](../src/server/services/reports.workflow.ts) | Enforces a legal forward step with a comment. Direct transitions stop at `in_progress`; closure requires review. |
+| Closure Review | [`VerificationPanel`](../src/web/components/VerificationPanel.tsx) | `POST /api/reports/:id/closure-review` | [`reports.workflow.ts`](../src/server/services/reports.workflow.ts) and SQL migrations | Binds review to the displayed request timestamp, rejects self-approval, and commits closure/history/audit/notices together. |
+| Repair Photo Upload | [`StaffReportPage`](../src/web/pages/StaffReport.tsx) | `POST /api/reports/:id/photos` | [`reports.routes.ts`](../src/server/routes/reports.routes.ts) | Classifies photo kind as `resolution` when uploaded by staff or admin. |
+| Staff Assignment | [`AdminReportsPage`](../src/web/pages/AdminReports.tsx) | `PATCH /api/reports/:id/assign` | [`reports.routes.ts`](../src/server/routes/reports.routes.ts) | Requires an active Staff profile and a comment. Assignment preserves the report status. |
 | User Provisioning | [`AdminUsersPage`](../src/web/pages/AdminUsers.tsx) | `POST /api/admin/users` | [`src/server/routes/admin.routes.ts`](../src/server/routes/admin.routes.ts) | Admin creates user with staff or admin role and sets initial password. |
 | Category Retirement | [`AdminCategoriesPage`](../src/web/pages/AdminCategories.tsx) | `DELETE /api/categories/:id` | [`src/server/routes/categories.routes.ts`](../src/server/routes/categories.routes.ts) | Sets `is_active = false`. Keeps category linked on existing reports. |

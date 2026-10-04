@@ -1,31 +1,86 @@
 import { test, expect } from "@playwright/test";
-import { captureEvidence, FIXTURE_PASSWORD, signIn, signOut, TEST_REMARK, USERS } from "./helpers.js";
+import {
+  apiToken,
+  bearer,
+  captureEvidence,
+  FIXTURE_PASSWORD,
+  MAKATI_POINT,
+  signIn,
+  signOut,
+  TEST_REMARK,
+  TEST_TITLE_PREFIX,
+  USERS,
+} from "./helpers.js";
+
+// A 1x1 PNG, enough for a proof-of-repair upload.
+const PROOF_PNG = Buffer.from(
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
+  "base64",
+);
 
 test.describe("Staff functional workflows (FUNC-02, FUNC-03, FUNC-06, FUNC-07)", () => {
-  test("FUNC-02: A resolved report's history shows every status step", async ({ page }) => {
-    // Advancing a fixture report would change shared data for good, so the evidence
-    // is a report that has already travelled the whole workflow.
+  test("FUNC-02, SW-4: staff request resolution, an administrator verifies it, and the history shows every step", async ({ page, request }) => {
+    // Set-up through the API on a [TEST] report this run owns (cleanup.ts removes
+    // it): a citizen files it, an administrator assigns staff 1 and moves it to in
+    // progress, and staff 1 uploads proof of repair. The two steps this test is
+    // about, the request and the verification, are done in the browser.
+    const citizen = await apiToken(request, USERS.citizen1);
+    const admin = await apiToken(request, USERS.admin);
+    const staff = await apiToken(request, USERS.staff1);
+
+    const categories = (await (await request.get("/api/categories")).json()).categories as { id: number; is_active: boolean }[];
+    const category = categories.find((c) => c.is_active)!;
+    const groups = (await (await request.get("/api/reports/meta/problem-types", { headers: bearer(citizen) })).json()).groups as {
+      category_id: number;
+      problem_types: { id: number }[];
+    }[];
+    const problem = groups.find((g) => g.category_id === category.id)!.problem_types[0]!;
+    const title = `${TEST_TITLE_PREFIX} Resolution request and verification`;
+    const created = await request.post("/api/reports", {
+      headers: bearer(citizen),
+      data: { title, description: "Automated check of the request and verification flow.", category_id: category.id, primary_problem_id: problem.id, ...MAKATI_POINT },
+    });
+    expect(created.status()).toBe(201);
+    const reportId = ((await created.json()) as { report: { id: string } }).report.id;
+
+    const staffList = (await (await request.get("/api/staff", { headers: bearer(admin) })).json()).staff as { id: string; email: string }[];
+    const staffId = staffList.find((s) => s.email === USERS.staff1)!.id;
+    for (const [path, data] of [
+      [`/api/reports/${reportId}/assign`, { staff_id: staffId, details: "Nearest crew." }],
+      [`/api/reports/${reportId}/status`, { status: "under_review", details: "Checked the photos." }],
+      [`/api/reports/${reportId}/status`, { status: "in_progress", details: "Crew dispatched." }],
+    ] as const) {
+      expect((await request.patch(path, { headers: bearer(admin), data })).ok(), path).toBe(true);
+    }
+    const upload = await request.post(`/api/reports/${reportId}/photos`, {
+      headers: bearer(staff),
+      multipart: { photo: { name: "proof.png", mimeType: "image/png", buffer: PROOF_PNG } },
+    });
+    expect(upload.status()).toBe(201);
+
+    // Staff 1 asks for verification in the workbench.
     await page.context().clearCookies();
+    await signIn(page, USERS.staff1, FIXTURE_PASSWORD);
+    await page.goto(`/staff/reports/${reportId}`);
+    await page.fill("#closure-details", "Patched the pothole and compacted the asphalt.");
+    await page.getByRole("button", { name: "Request resolution" }).click();
+    await expect(page.getByText("Waiting for verification")).toBeVisible();
+    await expect(page.getByText("Awaiting verification", { exact: true })).toBeVisible();
+    await signOut(page);
+
+    // The administrator approves it.
     await signIn(page, USERS.admin, FIXTURE_PASSWORD);
-
-    await page.goto("/admin/reports");
-    await page.waitForLoadState("networkidle");
-    await page.selectOption("#status", "resolved");
-    await page.waitForLoadState("networkidle");
-
-    const firstRow = page.locator("table tbody tr").first();
-    await expect(firstRow).toContainText("Resolved");
-    await firstRow.locator("td a").first().click();
-    await page.waitForLoadState("networkidle");
+    await page.goto(`/staff/reports/${reportId}`);
+    await expect(page.getByRole("heading", { name: "Verify resolution" })).toBeVisible();
+    await page.fill("#verify-comment", "Photo shows the repair. Approved.");
+    await page.getByRole("button", { name: "Approve and close as resolved" }).click();
 
     const history = page.locator("section:has(h6:text-is('History'))");
-    await expect(history).toContainText("Pending → Under review");
+    await expect(history).toContainText("Pending → Under review", { timeout: 15000 });
     await expect(history).toContainText("Under review → In progress");
+    await expect(history).toContainText("Resolution requested");
     await expect(history).toContainText("In progress → Resolved");
-    // Photos load after the page; wait so the screenshot does not show empty frames.
-    await page.waitForFunction(() =>
-      Array.from(document.querySelectorAll("main img:not(.leaflet-tile):not(.leaflet-marker-icon)")).every((img) => (img as HTMLImageElement).complete && (img as HTMLImageElement).naturalWidth > 0),
-    );
+    await expect(page.getByText("Resolved", { exact: true }).first()).toBeVisible();
     await captureEvidence(page, "FUNC-02-status-progression.png");
   });
 

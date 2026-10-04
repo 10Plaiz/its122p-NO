@@ -4,7 +4,7 @@ Route: `/report/new`, `/my-reports`, `/reports/:id`
 Persona: Citizen (`fixture-citizen-1@kamoti.invalid`)
 
 ## Sub-features
-- **Step 1 (Location):** Leaflet interactive map picker with marker placement, coordinate extraction, and reverse geocoding via Nominatim. Supports pointer placement, keyboard map panning via arrow keys, and "Place pin at map center" button.
+- **Step 1 (Location):** Google Maps pin picker limited to Makati (pins outside the city are refused with a reason), Makati place search, and reverse geocoding via Nominatim. Supports pointer placement, keyboard map panning via arrow keys, "Place pin at map center", and "Use my location". Without `VITE_GOOGLE_MAPS_API_KEY` the map shows "Map unavailable" and "Use my location" still places the pin.
 - **Location Permission Denial Guidance:** Clicking "Use my location" with denied permission displays browser site settings instructions (`[role="alert"]`). Tapping the map dismisses the banner automatically (`KR-14`).
 - **Step 2 (Issue Details):** Category selection, title input (3 to 150 characters), and detailed description textarea (10 to 1000 characters).
 - **Disabled Until Valid Form Rule:** Continue button is disabled until current step fields are valid. Step 1 requires coordinates. Step 2 requires category, valid title, and valid description.
@@ -37,10 +37,11 @@ test("Citizen Wizard: 3-step submission and pre-flight verification", async ({ p
   const continueBtn = page.locator("button:has-text('Continue')");
   await expect(continueBtn).toBeDisabled();
 
-  // Tap map to drop pin and enable Continue
-  const map = page.locator(".leaflet-container");
-  await map.click({ position: { x: 150, y: 150 } });
-  await page.waitForTimeout(500);
+  // Place the pin from a device location inside Makati (works with or without a
+  // Maps key); see placePinByLocation in tests/browser/helpers.ts.
+  await page.context().grantPermissions(["geolocation"]);
+  await page.context().setGeolocation({ latitude: 14.5547, longitude: 121.0244 });
+  await page.getByRole("button", { name: "Use my location" }).click();
   await expect(continueBtn).toBeEnabled();
   await continueBtn.click();
 
@@ -89,6 +90,6 @@ test("Citizen Workspace: Mobile cards and cancellation modal", async ({ page }) 
 ## Gotchas
 - **Wizard Button Label:** The step advancement button is labeled "Continue", not "Next".
 - **Step Button Locking:** Step navigation buttons in the wizard header cannot jump past incomplete steps. Forward steps remain disabled until valid.
-- **Geolocation Denial Clear:** The location error alert banner automatically clears when the user clicks anywhere on the Leaflet map container.
+- **Geolocation Denial Clear:** The location error message clears once a pin is placed on the map ("Place pin at map center" or a tap inside Makati).
 - **Unchanged State on Report Edit:** Editing a report title or description keeps the Save changes button disabled until the user modifies at least one character.
 - **Photo Lightbox Scroll Lock:** Opening the photo lightbox sets `overflow: hidden` on the document body. Pressing Escape restores document scrolling and returns keyboard focus.

@@ -2,94 +2,53 @@ import { Router } from "express";
 import { z } from "zod";
 import { db } from "../config/supabase.js";
 import { badRequest, forbidden, orThrow } from "../lib/errors.js";
-import { parse } from "../lib/validate.js";
+import { BARANGAYS, parse } from "../lib/validate.js";
 import { photoUpload, photoUrl, savePhoto } from "../lib/photos.js";
 import { endOfDay, pageFields, searchFields, searchFilter, sortColumn } from "../lib/query.js";
-import { currentUser, requireAuth, requireRole } from "../middleware/auth.js";
-import {
-  REPORT_FIELDS,
-  STAFF_STATUSES,
-  STATUSES,
-  addRemark,
-  assertCanEdit,
-  assertCanUpdate,
-  assertCanView,
-  assertCategorySelectable,
-  assignStaff,
-  cancelReport,
-  changeStatus,
-  editReport,
-  findReport,
-  notifyNewReport,
-  type Report,
-} from "../services/reports.service.js";
+import { currentUser, requireAuth, requireResidency } from "../middleware/auth.js";
+import { findReport, present, type Report } from "../services/reports.common.js";
+import { REPORT_ROW_FIELDS } from "../services/reports.rows.js";
+import { assertCanUpdate, assertCanView, scopeReportQuery } from "../services/reports.access.js";
+import { STATUSES } from "../services/reports.workflow.js";
+import submissionRoutes from "./reports.submission.routes.js";
+import workflowRoutes from "./reports.workflow.routes.js";
+
+// Schemas live next to the routes that use them; re-exported so tests and callers
+// can keep importing them from here.
+export { createSchema, editSchema } from "./reports.submission.routes.js";
+export { remarkSchema, statusSchema } from "./reports.workflow.routes.js";
 
 const router = Router();
-router.use(requireAuth);
-
-// Replaces stored object keys with URLs the frontend can put in an <img src>.
-function present(report: Report) {
-  return {
-    ...report,
-    photos: (report.photos ?? []).map((photo) => ({ ...photo, url: photoUrl(photo.storage_path) })),
-  };
-}
-
-// Multipart form fields arrive as strings, so numbers are coerced here.
-export const createSchema = z.object({
-  title: z.string().trim().min(3).max(150),
-  description: z
-    .string()
-    .trim()
-    .min(10, "Describe the problem in at least 10 characters.")
-    .max(1000, "Keep the description under 1000 characters."),
-  category_id: z.coerce.number().int().positive(),
-  latitude: z.coerce.number().min(-90).max(90),
-  longitude: z.coerce.number().min(-180).max(180),
-  address_text: z.string().trim().max(255).nullable().optional(),
-});
+// UA-8: a citizen locked to the proof upload reaches none of this.
+router.use(requireAuth, requireResidency);
 
 const listSchema = z.object({
   ...searchFields,
   ...pageFields(20, 50),
   status: z.enum(STATUSES).optional(),
   category_id: z.coerce.number().int().positive().optional(),
-});
-
-// A citizen may correct any of these while the report is still pending.
-export const editSchema = createSchema.partial().refine(
-  (changes) => Object.keys(changes).length > 0,
-  "Send at least one field to change.",
-);
-
-export const statusSchema = z.object({
-  status: z.enum(STAFF_STATUSES),
-  details: z.string().trim().max(500).optional(),
-});
-
-export const remarkSchema = z.object({
-  details: z.string().trim().min(1, "Enter remark details.").max(500, "Keep remarks under 500 characters."),
+  // SW-1: the barangay the pin is in (set by the database from the pin).
+  barangay: z.enum(BARANGAYS).optional(),
 });
 
 // GET /api/reports — one handler, scoped by role.
 // Citizens see their own, staff see what is assigned to them, admins see all.
 router.get("/", async (req, res) => {
-  const { status, category_id, q, from, to, sort, page, per_page } = parse(listSchema, req.query);
+  const { status, category_id, barangay, q, from, to, sort, page, per_page } = parse(listSchema, req.query);
   const order = sortColumn(sort);
 
   let query = db
     .from("reports")
-    .select(REPORT_FIELDS, { count: "exact" })
+    .select(REPORT_ROW_FIELDS, { count: "exact" })
     .order(order.column, { ascending: order.ascending })
     .range((page - 1) * per_page, page * per_page - 1);
 
   // The role scope is applied first and never from user input, so a search or filter
   // can only ever narrow what this caller was already allowed to see.
-  const user = currentUser(req);
-  if (user.role === "citizen") query = query.eq("citizen_id", user.id);
-  if (user.role === "staff") query = query.eq("assigned_staff_id", user.id);
+  query = scopeReportQuery(query, currentUser(req));
   if (status) query = query.eq("status", status);
   if (category_id) query = query.eq("category_id", category_id);
+  if (barangay) query = query.eq("barangay", barangay);
   if (from) query = query.gte("submitted_at", from);
   if (to) query = query.lte("submitted_at", endOfDay(to));
 
@@ -100,35 +59,6 @@ router.get("/", async (req, res) => {
   const reports = orThrow(result, "Reports could not be loaded.");
 
   res.json({ reports: (reports as unknown as Report[]).map(present), page, per_page, total: result.count ?? 0 });
-});
-
-// POST /api/reports — citizens file a report, optionally with one photo.
-router.post("/", requireRole("citizen"), photoUpload.single("photo"), async (req, res) => {
-  const input = parse(createSchema, req.body);
-  await assertCategorySelectable(input.category_id);
-
-  const created = orThrow(
-    await db
-      .from("reports")
-      .insert({ ...input, citizen_id: currentUser(req).id })
-      .select("id")
-      .single(),
-    "Your report could not be submitted.",
-  );
-
-  if (req.file) {
-    await savePhoto({
-      file: req.file,
-      reportId: created.id,
-      uploadedBy: currentUser(req).id,
-      kind: "initial",
-    });
-  }
-
-  const report = await findReport(created.id);
-  await notifyNewReport(report);
-
-  res.status(201).json({ report: present(report) });
 });
 
 router.get("/:id", async (req, res) => {
@@ -151,62 +81,6 @@ router.get("/:id/updates", async (req, res) => {
   );
 
   res.json({ updates });
-});
-
-// PATCH /api/reports/:id — the citizen corrects their own pending report.
-router.patch("/:id", requireRole("citizen"), async (req, res) => {
-  const changes = parse(editSchema, req.body);
-  const report = await findReport(req.params.id);
-  assertCanEdit(report, currentUser(req));
-
-  // Only when the edit actually moves the report to another category. A report already
-  // filed under one that has since been retired keeps it untouched.
-  if (changes.category_id !== undefined) await assertCategorySelectable(changes.category_id);
-
-  res.json({ report: present(await editReport({ report, user: currentUser(req), changes })) });
-});
-
-// POST /api/reports/:id/cancel — withdraw a pending report. The row is kept.
-router.post("/:id/cancel", requireRole("citizen"), async (req, res) => {
-  const { details } = parse(z.object({ details: z.string().trim().max(500).optional() }), req.body ?? {});
-  const report = await findReport(req.params.id);
-  assertCanEdit(report, currentUser(req));
-
-  res.json({ report: present(await cancelReport({ report, user: currentUser(req), details })) });
-});
-
-// PATCH /api/reports/:id/status — assigned staff or an admin moves it forward.
-router.patch("/:id/status", requireRole("admin", "staff"), async (req, res) => {
-  const input = parse(statusSchema, req.body);
-  const report = await findReport(req.params.id);
-  assertCanUpdate(report, currentUser(req));
-
-  const updated = await changeStatus({
-    report,
-    user: currentUser(req),
-    newStatus: input.status,
-    details: input.details,
-  });
-
-  res.json({ report: present(updated) });
-});
-
-// PATCH /api/reports/:id/assign — admins only, per the proposal.
-router.patch("/:id/assign", requireRole("admin"), async (req, res) => {
-  const { staff_id } = parse(z.object({ staff_id: z.uuid() }), req.body);
-  const report = await findReport(req.params.id);
-
-  res.json({ report: present(await assignStaff({ report, user: currentUser(req), staffId: staff_id })) });
-});
-
-// POST /api/reports/:id/remarks — a note on the report without changing status.
-router.post("/:id/remarks", requireRole("admin", "staff"), async (req, res) => {
-  const { details } = parse(remarkSchema, req.body);
-  const report = await findReport(req.params.id);
-  assertCanUpdate(report, currentUser(req));
-
-  await addRemark({ report, user: currentUser(req), details });
-  res.status(201).json({ ok: true });
 });
 
 // POST /api/reports/:id/photos — the citizen adds evidence, staff add proof of repair.
@@ -234,5 +108,10 @@ router.post("/:id/photos", photoUpload.single("photo"), async (req, res) => {
 
   res.status(201).json({ photo: { ...photo, url: photoUrl(photo.storage_path) } });
 });
+
+// Citizen actions (file, edit, cancel) and staff/admin actions (status, assign,
+// remarks). Their paths and methods never overlap the routes above.
+router.use(submissionRoutes);
+router.use(workflowRoutes);
 
 export default router;

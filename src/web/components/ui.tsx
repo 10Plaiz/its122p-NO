@@ -1,5 +1,5 @@
 import { cloneElement, isValidElement, useState } from "react";
-import type { ButtonHTMLAttributes, FocusEvent, InputHTMLAttributes, ReactNode, SelectHTMLAttributes, TextareaHTMLAttributes } from "react";
+import type { ComponentProps, FocusEvent, InputHTMLAttributes, ReactNode, SelectHTMLAttributes, TextareaHTMLAttributes } from "react";
 import { STATUS_LABEL } from "../lib/types.js";
 import type { ReportStatus } from "../lib/types.js";
 
@@ -12,7 +12,7 @@ export function Button({
   block,
   className = "",
   ...props
-}: ButtonHTMLAttributes<HTMLButtonElement> & {
+}: ComponentProps<"button"> & {
   variant?: "primary" | "secondary" | "ghost";
   block?: boolean;
 }) {
@@ -150,11 +150,100 @@ export function Alert({ title, children }: { title: string; children?: ReactNode
   );
 }
 
-export function StatusBadge({ status }: { status: ReportStatus }) {
-  // Mono palette: only the active status carries the accent, per the system's rule
-  // that red is used sparingly.
+// Small glyphs that travel with a status word. Decorative: the word next to them
+// carries the meaning, so they are hidden from screen readers.
+function BadgeIcon({ kind }: { kind: "check" | "clock" | "alert" | "cross" }) {
+  return (
+    <svg
+      aria-hidden="true"
+      focusable="false"
+      width="12"
+      height="12"
+      viewBox="0 0 12 12"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.75"
+      strokeLinecap="square"
+      className="shrink-0"
+    >
+      {kind === "check" && <path d="M2 6.5 4.75 9 10 3" />}
+      {kind === "cross" && <path d="M3 3l6 6M9 3 3 9" />}
+      {kind === "clock" && (
+        <>
+          <circle cx="6" cy="6" r="4.5" />
+          <path d="M6 3.5V6l1.75 1.25" />
+        </>
+      )}
+      {kind === "alert" && (
+        <>
+          <path d="M6 1.5 11 10.5H1Z" />
+          <path d="M6 5v2.25M6 8.75v.01" />
+        </>
+      )}
+    </svg>
+  );
+}
+
+const SUCCESS_TAG = "tag gap-1 border border-success-700 bg-success-100 text-success-800";
+const WARNING_TAG = "tag gap-1 border border-warning-700 bg-warning-100 text-warning-800";
+
+// Mono palette for open work: only the active status carries the accent, per the
+// system's rule that red is used sparingly. A finished report is green with a check
+// (SW-5), and an in-progress report whose resolution is waiting for an
+// administrator says so in amber. Colour is never the only signal: each tone has
+// its own word and icon.
+export function StatusBadge({
+  status,
+  awaitingVerification = false,
+}: {
+  status: ReportStatus;
+  /** True while a closure request waits for an administrator (under review or in progress). */
+  awaitingVerification?: boolean;
+}) {
+  if ((status === "in_progress" || status === "under_review") && awaitingVerification) {
+    return (
+      <span className={WARNING_TAG}>
+        <BadgeIcon kind="clock" />
+        Awaiting verification
+      </span>
+    );
+  }
+  if (status === "resolved") {
+    return (
+      <span className={SUCCESS_TAG}>
+        <BadgeIcon kind="check" />
+        {STATUS_LABEL[status]}
+      </span>
+    );
+  }
+  // SW-7: closed without a repair. Neutral, not red: red is the accent for active
+  // work and for errors, and a rejection is a decision, not a failure.
+  if (status === "rejected") {
+    return (
+      <span className="tag tag-neutral gap-1 border border-neutral-700">
+        <BadgeIcon kind="cross" />
+        {STATUS_LABEL[status]}
+      </span>
+    );
+  }
   const tone = status === "in_progress" ? "tag-accent" : "tag-outline";
   return <span className={`tag ${tone}`}>{STATUS_LABEL[status]}</span>;
+}
+
+// "Delayed" when a report has sat at its stage past the threshold (SW-6). Renders
+// nothing when it is on time, so a list only draws attention to the late ones.
+export function DelayBadge({ delay }: { delay: { delayed: boolean; days: number } | null | undefined }) {
+  if (!delay?.delayed) return null;
+  return (
+    <span className={WARNING_TAG}>
+      <BadgeIcon kind="alert" />
+      Delayed &middot; {formatDays(delay.days)}
+    </span>
+  );
+}
+
+export function formatDays(days: number) {
+  return `${days} ${days === 1 ? "day" : "days"}`;
 }
 
 export function Card({ children, className = "" }: { children: ReactNode; className?: string }) {
@@ -261,6 +350,21 @@ export function PhotoFrame({
         decoding="async"
         className={`block w-full object-cover bg-neutral-200 ${imageClassName}`.trim()}
       />
+    </span>
+  );
+}
+
+// Stands in for a photo whose file was removed after the retention period (DM-2).
+// Same frame as PhotoFrame, so the grid keeps its shape; plain text, so it is not
+// mistaken for something to open.
+export function RemovedPhoto({ label, imageClassName = "h-32" }: { label: string; imageClassName?: string }) {
+  return (
+    <span className="block border-2 border-divider bg-surface p-1.5">
+      <span
+        className={`flex items-center justify-center bg-neutral-200 p-3 text-center text-[12px] text-text ${imageClassName}`.trim()}
+      >
+        {label}: photo removed after the 90-day retention period.
+      </span>
     </span>
   );
 }

@@ -1,4 +1,6 @@
+import { Suspense } from "react";
 import { NavLink, Outlet } from "react-router-dom";
+import { Loading } from "./ui.js";
 
 // Persistent secondary sub-navigation tabs for the administrative suite.
 // Grounded in the Modernist design system with zero border radius, industrial contrast,
@@ -35,7 +37,10 @@ export function AdminLayout() {
           </NavLink>
         ))}
       </nav>
-      <Outlet />
+      {/* Keeps the admin tabs on screen while a lazily loaded page arrives. */}
+      <Suspense fallback={<Loading label="Loading the page" />}>
+        <Outlet />
+      </Suspense>
     </div>
   );
 }

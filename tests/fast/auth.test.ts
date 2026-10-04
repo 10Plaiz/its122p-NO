@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import type { NextFunction, Request, Response } from "express";
 import { ApiError as ServerApiError } from "../../src/server/lib/errors.js";
 
@@ -49,7 +49,7 @@ if (typeof globalThis.CustomEvent === "undefined") {
 
 const { db } = await import("../../src/server/config/supabase.js");
 const { requireAuth, requireRole } = await import("../../src/server/middleware/auth.js");
-const { api, ApiError: ClientApiError } = await import("../../src/web/lib/api.js");
+const { api, ApiError: ClientApiError, refreshDelay } = await import("../../src/web/lib/api.js");
 
 function createMockReq(headers: Record<string, string> = {}, user?: unknown): Request {
   return {
@@ -263,6 +263,114 @@ describe("AUTH-03 session expiration event and token clearance", () => {
     }
 
     expect(dispatchedEvents).toHaveLength(0);
+  });
+});
+
+describe("AUTH-04 an expired access token is refreshed and the request retried once (UA-9)", () => {
+  const originalFetch = globalThis.fetch;
+  type Sent = { url: string; authorization?: string; body?: unknown };
+  let sent: Sent[] = [];
+
+  function json(status: number, body: unknown): globalThis.Response {
+    return new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
+  }
+
+  // Answers each URL from its own queue and records what was sent.
+  function mockFetch(answers: Record<string, Array<() => globalThis.Response>>) {
+    globalThis.fetch = (async (input: string, init?: RequestInit) => {
+      const headers = (init?.headers ?? {}) as Record<string, string>;
+      sent.push({ url: input, authorization: headers.Authorization, body: init?.body ? JSON.parse(String(init.body)) : undefined });
+      const next = answers[input]?.shift();
+      if (!next) throw new Error(`Unexpected request to ${input}`);
+      return next();
+    }) as unknown as typeof fetch;
+  }
+
+  const fresh = {
+    user: { id: "u1", name: "Ana", email: "ana@example.com", role: "citizen" },
+    access_token: "access-2",
+    refresh_token: "refresh-2",
+    expires_at: 1_900_000_000,
+  };
+  const expired = () => json(401, { error: "Your session has expired. Sign in again." });
+
+  beforeEach(() => {
+    sent = [];
+    dispatchedEvents.length = 0;
+    storage["kamoti.token"] = "access-1";
+    storage["kamoti.refresh"] = "refresh-1";
+    storage["kamoti.expires"] = "1800000000";
+  });
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+    for (const key of ["kamoti.token", "kamoti.refresh", "kamoti.expires"]) delete storage[key];
+  });
+
+  test("refreshes, stores the new session, and retries with the new token", async () => {
+    mockFetch({
+      "/api/reports": [expired, () => json(200, { items: [] })],
+      "/api/auth/refresh": [() => json(200, fresh)],
+    });
+
+    expect(await api.get<{ items: unknown[] }>("/reports")).toEqual({ items: [] });
+    expect(sent.map((request) => request.url)).toEqual(["/api/reports", "/api/auth/refresh", "/api/reports"]);
+    expect(sent[1]?.body).toEqual({ refresh_token: "refresh-1" });
+    expect(sent[2]?.authorization).toBe("Bearer access-2");
+    expect(storage["kamoti.token"]).toBe("access-2");
+    expect(storage["kamoti.refresh"]).toBe("refresh-2");
+    expect(storage["kamoti.expires"]).toBe("1900000000");
+    expect(dispatchedEvents.map((event) => event.type)).toEqual(["kamoti:session-refreshed"]);
+  });
+
+  test("a refused refresh clears the session and ends it once", async () => {
+    mockFetch({ "/api/reports": [expired], "/api/auth/refresh": [expired] });
+
+    await expect(api.get("/reports")).rejects.toBeInstanceOf(ClientApiError);
+    expect(storage["kamoti.token"]).toBeUndefined();
+    expect(storage["kamoti.refresh"]).toBeUndefined();
+    expect(dispatchedEvents.map((event) => event.type)).toEqual(["kamoti:auth-expired"]);
+  });
+
+  test("retries only once: a second 401 ends the session without another refresh", async () => {
+    mockFetch({ "/api/reports": [expired, expired], "/api/auth/refresh": [() => json(200, fresh)] });
+
+    await expect(api.get("/reports")).rejects.toBeInstanceOf(ClientApiError);
+    expect(sent.filter((request) => request.url === "/api/auth/refresh")).toHaveLength(1);
+    expect(dispatchedEvents.map((event) => event.type)).toEqual(["kamoti:session-refreshed", "kamoti:auth-expired"]);
+  });
+
+  test("requests that fail together share one refresh", async () => {
+    mockFetch({
+      "/api/reports": [expired, () => json(200, { n: 1 })],
+      "/api/notifications": [expired, () => json(200, { n: 2 })],
+      "/api/auth/refresh": [() => json(200, fresh)],
+    });
+
+    expect(await Promise.all([api.get("/reports"), api.get("/notifications")])).toEqual([{ n: 1 }, { n: 2 }]);
+    expect(sent.filter((request) => request.url === "/api/auth/refresh")).toHaveLength(1);
+  });
+
+  test("a throttled refresh keeps the session for the next try", async () => {
+    mockFetch({ "/api/reports": [expired], "/api/auth/refresh": [() => json(429, { error: "Too many attempts." })] });
+
+    await expect(api.get("/reports")).rejects.toBeInstanceOf(ClientApiError);
+    expect(storage["kamoti.refresh"]).toBe("refresh-1");
+  });
+
+  test("never refreshes for the routes that take no session", async () => {
+    mockFetch({ "/api/auth/verify-email": [expired] });
+
+    await expect(api.post("/auth/verify-email", { email: "a@b.co", token: "123456" })).rejects.toBeInstanceOf(ClientApiError);
+    expect(sent.map((request) => request.url)).toEqual(["/api/auth/verify-email"]);
+    expect(dispatchedEvents).toHaveLength(0);
+  });
+
+  test("schedules the refresh a minute before expiry, never in the past", () => {
+    const now = 1_000_000_000_000;
+    expect(refreshDelay(now / 1000 + 3600, now)).toBe(3600_000 - 60_000);
+    expect(refreshDelay(now / 1000 + 30, now)).toBe(0);
+    expect(refreshDelay(now / 1000 + 10 ** 9, now)).toBe(2 ** 31 - 1);
   });
 });
 

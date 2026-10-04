@@ -1,6 +1,21 @@
+process.env.SUPABASE_URL ??= "https://test.supabase.co";
+process.env.SUPABASE_PUBLISHABLE_KEY ??= "test-publishable-key";
+process.env.SUPABASE_SECRET_KEY ??= "test-secret-key";
+
 import { describe, expect, test } from "bun:test";
 import { z } from "zod";
-import { pageFields, searchFields, searchFilter, sortColumn } from "../../src/server/lib/query.js";
+import {
+  EXPORT_CHUNK,
+  EXPORT_LIMIT,
+  exportRanges,
+  pageFields,
+  searchFields,
+  searchFilter,
+  sortColumn,
+} from "../../src/server/lib/query.js";
+
+// The export routes import the Supabase client, which reads the env above.
+const { reportExportSchema, logExportSchema } = await import("../../src/server/routes/exports.routes.js");
 
 // Section B cases. This stack reaches PostgreSQL through PostgREST, so the query
 // text a search term could bend is the PostgREST filter grammar rather than raw
@@ -127,5 +142,68 @@ describe("SQLI-05 pagination parameter enforcement", () => {
   test("rejects SQL injection payloads in page parameter", () => {
     expect(schema.safeParse({ page: "1; DROP TABLE reports;" }).success).toBe(false);
     expect(schema.safeParse({ per_page: "20 OR 1=1" }).success).toBe(false);
+  });
+});
+
+describe("SQLI-06 the report export accepts the list's filters and nothing else", () => {
+  test("accepts the same filters as GET /api/reports, with CSV as the default format", () => {
+    const result = reportExportSchema.safeParse({
+      status: "pending",
+      category_id: "3",
+      q: "pothole",
+      from: "2026-09-01",
+      to: "2026-09-30",
+      sort: "oldest",
+    });
+    expect(result.success).toBe(true);
+    expect(result.data).toMatchObject({ status: "pending", category_id: 3, sort: "oldest", format: "csv" });
+  });
+
+  test("defaults to newest first, like the list", () => {
+    expect(reportExportSchema.parse({}).sort).toBe("newest");
+  });
+
+  const BAD_QUERIES: [string, Record<string, unknown>][] = [
+    ["an unknown status", { status: "deleted" }],
+    ["a status with a filter appended", { status: "pending,citizen_id.neq.x" }],
+    ["an unapproved sort column", { sort: "citizen_id" }],
+    ["a non-numeric category", { category_id: "1 OR 1=1" }],
+    ["a non-ISO date", { from: "2026-09-01' --" }],
+    ["an unknown format", { format: "xlsx" }],
+  ];
+
+  for (const [note, query] of BAD_QUERIES) {
+    test(`rejects ${note}`, () => {
+      expect(reportExportSchema.safeParse(query).success).toBe(false);
+    });
+  }
+
+  test("the log export takes only a format", () => {
+    expect(logExportSchema.parse({}).format).toBe("csv");
+    expect(logExportSchema.safeParse({ format: "pdf" }).success).toBe(true);
+    expect(logExportSchema.safeParse({ format: "html" }).success).toBe(false);
+  });
+});
+
+describe("SQLI-07 an export reads in chunks and stops at its cap", () => {
+  test("reads nothing for an empty result", () => {
+    expect(exportRanges(0)).toEqual([]);
+    expect(exportRanges(-5)).toEqual([]);
+  });
+
+  test("covers every row in chunks no larger than the Data API returns", () => {
+    expect(exportRanges(1)).toEqual([[0, 0]]);
+    expect(exportRanges(2500)).toEqual([
+      [0, 999],
+      [1000, 1999],
+      [2000, 2499],
+    ]);
+    for (const [from, to] of exportRanges(4321)) expect(to - from + 1).toBeLessThanOrEqual(EXPORT_CHUNK);
+  });
+
+  test(`never reads past ${EXPORT_LIMIT} rows, however many match`, () => {
+    const ranges = exportRanges(1_000_000);
+    expect(ranges.at(-1)).toEqual([EXPORT_LIMIT - 1000, EXPORT_LIMIT - 1]);
+    expect(ranges).toHaveLength(EXPORT_LIMIT / EXPORT_CHUNK);
   });
 });

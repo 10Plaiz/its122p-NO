@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { captureEvidence, FIXTURE_PASSWORD, signIn, TEST_TITLE_PREFIX, USERS } from "./helpers.js";
+import { captureEvidence, FIXTURE_PASSWORD, mapAvailable, placePinByLocation, signIn, TEST_TITLE_PREFIX, USERS } from "./helpers.js";
 
 test.describe("Citizen functional workflows (FUNC-01, FUNC-04, FUNC-05)", () => {
   test.beforeEach(async ({ page }) => {
@@ -23,17 +23,22 @@ test.describe("Citizen functional workflows (FUNC-01, FUNC-04, FUNC-05)", () => 
   test("A keyboard user can place and adjust the report pin", async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 812 });
     await page.goto("/report/new");
+    test.skip(!(await mapAvailable(page)), "Needs the Google map (VITE_GOOGLE_MAPS_API_KEY).");
     const continueButton = page.getByRole("button", { name: "Continue" });
     const placePin = page.getByRole("button", { name: "Place pin at map center" });
     await expect(continueButton).toBeDisabled();
+    // The button waits for the map to finish loading.
+    await expect(placePin).toBeEnabled({ timeout: 15000 });
     await placePin.focus();
     await expect(placePin).toBeFocused();
     await page.keyboard.press("Enter");
     await expect(continueButton).toBeEnabled();
     const firstCoordinates = await page.getByTestId("selected-coordinates").innerText();
 
-    await page.locator(".leaflet-container").focus();
+    // Google's map takes keyboard focus on its region, and the arrow keys pan it.
+    await page.getByRole("region", { name: "Map" }).focus();
     await page.keyboard.press("ArrowRight");
+    await page.waitForTimeout(500);
     await placePin.focus();
     await page.keyboard.press("Space");
     const nextCoordinates = await page.getByTestId("selected-coordinates").innerText();
@@ -46,18 +51,18 @@ test.describe("Citizen functional workflows (FUNC-01, FUNC-04, FUNC-05)", () => 
     await page.goto("/report/new");
     await page.waitForLoadState("networkidle");
 
-    // Tap on the map to set a point
-    const map = page.locator(".leaflet-container");
-    await map.click({ position: { x: 150, y: 150 } });
-    await page.waitForTimeout(500);
+    // The device's location sets the pin, inside Makati (MP-2).
+    await placePinByLocation(page);
 
     // Proceed to Step 2
     await page.click('button:has-text("Continue")');
     await expect(page.locator("h2")).toContainText("What is wrong?");
 
-    // Fill form
+    // Fill form. RS-2/RS-4: the main problem list follows the category.
     const categorySelect = page.locator("#category");
     await categorySelect.selectOption({ index: 1 });
+    await expect(page.locator("#primary-problem option")).not.toHaveCount(1);
+    await page.locator("#primary-problem").selectOption({ index: 1 });
 
     const title = `${TEST_TITLE_PREFIX} Phase 4 automated verification report`;
     const updatedTitle = `${title} (Updated)`;
@@ -106,6 +111,9 @@ test.describe("Citizen functional workflows (FUNC-01, FUNC-04, FUNC-05)", () => 
     await cancelBtn.click();
 
     await expect(page.locator("body")).toContainText("Withdraw this report?");
+    // SW-2: a withdrawal always says why; Yes, cancel waits for the reason.
+    await expect(page.locator('button:has-text("Yes, cancel")')).toBeDisabled();
+    await page.fill("#cancel-details", "Reported twice by mistake.");
     await captureEvidence(page, "FUNC-05a-cancel-confirm.png");
 
     await page.click('button:has-text("Yes, cancel")');
@@ -118,16 +126,16 @@ test.describe("Citizen functional workflows (FUNC-01, FUNC-04, FUNC-05)", () => 
     await page.waitForLoadState("networkidle");
 
     // 1. Select location in Step 1
-    const map = page.locator(".leaflet-container");
-    await map.click({ position: { x: 150, y: 150 } });
-    await page.waitForTimeout(500);
+    await placePinByLocation(page);
 
     await page.click('button:has-text("Continue")');
     await expect(page.locator("h2")).toContainText("What is wrong?");
 
-    // 2. Fill category, title, description in Step 2
+    // 2. Fill category, main problem, title, description in Step 2
     const categorySelect = page.locator("#category");
     await categorySelect.selectOption({ index: 1 });
+    await expect(page.locator("#primary-problem option")).not.toHaveCount(1);
+    await page.locator("#primary-problem").selectOption({ index: 1 });
     await page.fill("#title", "[UIUX-02] Road damage pre-flight verification");
     await page.fill(
       "#description",
@@ -252,15 +260,22 @@ test.describe("Citizen functional workflows (FUNC-01, FUNC-04, FUNC-05)", () => 
 
     await captureEvidence(page, "KR-14-geo-denial-guidance.png");
 
-    // 2. Click map to drop pin and verify error banner clears
-    const map = page.locator(".leaflet-container");
-    await map.click({ position: { x: 120, y: 120 } });
-    await expect(page.locator('button:has-text("Use my location")')).toBeEnabled();
-    await expect(alertBanner).toBeHidden();
+    // The rest places the pin on the Google map itself.
+    test.skip(!(await mapAvailable(page)), "Needs the Google map (VITE_GOOGLE_MAPS_API_KEY).");
 
-    // 3. Enter a custom address then move pin to verify address lifecycle
+    // 2. Drop a pin on the map and verify the guidance clears
+    const placePin = page.getByRole("button", { name: "Place pin at map center" });
+    await expect(placePin).toBeEnabled({ timeout: 15000 });
+    await placePin.click();
+    await expect(page.locator('button:has-text("Use my location")')).toBeEnabled();
+    await expect(page.getByText("Location access disabled.")).toBeHidden();
+
+    // 3. Enter a custom address, then move the pin, and the address stays (KR-17)
     await page.fill("#address", "Test Landmark A");
-    await map.click({ position: { x: 200, y: 200 } });
+    await page.getByRole("region", { name: "Map" }).focus();
+    await page.keyboard.press("ArrowDown");
+    await page.waitForTimeout(500);
+    await placePin.click();
     // Hand-entered address remains untouched
     await expect(page.locator("#address")).toHaveValue("Test Landmark A");
   });

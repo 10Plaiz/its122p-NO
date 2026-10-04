@@ -58,30 +58,37 @@ Afonso (2017) notes that centralized web apps drastically lower the transaction 
 
 ### Citizen-Facing Features
 * Account registration and login
-* Submit infrastructure reports (category, description, photo, map location)
-* Track status of submitted reports (Pending -> Under Review -> In Progress -> Resolved)
+* Edit their own name, mobile number, barangay, and street on My account; a new number loses its verified mark, and a new address goes back to an administrator for review
+* Submit infrastructure reports (category, description, photo, map location inside Makati City)
+* Track status of submitted reports (Pending -> Under Review -> In Progress -> Resolved), or Rejected with the reason when a report cannot be fixed
 * View public transparency board of all community reports
+* Comment on their own reports at any status; the assigned staff member and the administrators are notified (up to 10 comments an hour)
+* Rate a resolved report from 1 to 5 with an optional comment, which reaches the staff member who did the work
 * Receive notifications on status updates
 
 ### Staff-Facing Features
 * View assigned or available reports/requests
 * Update the status of reports as work progresses
 * Add remarks, resolution notes, or completion photos
+* Request that a report be closed as resolved (with proof of repair) or rejected (with a reason, from Under Review or In Progress); an administrator verifies the request
 * Manage transactions related to processing a report (e.g., inspection logs, work orders)
+* See the reporter's rating on resolved reports and their own average rating
 
 ### Administrator-Facing Features
-* Manage user accounts (citizens and staff)
+* Manage user accounts (citizens and staff), including each staff member's specializations (categories) and areas (barangays)
 * Manage infrastructure categories (roads, streetlights, drainage, signs, etc.)
 * Manage and oversee all submitted records/reports
-* Assign staff to reports
-* Generate analytics and summary reports (volume by category, resolution time, status distribution)
-* View system-wide activity logs
+* Assign staff to reports, with staff who handle the report's category and cover its barangay listed first (the barangay comes from the report's pin)
+* Verify staff requests to close a report as resolved or rejected, approving or returning each with a comment
+* Generate analytics and summary reports (volume by category, resolution time, status distribution, average citizen rating)
+* View system-wide activity logs in plain words, filtered by action, role, report, and date, and export them
+* Choose which columns each report table shows (for example problems, days in stage, reporter residency, rating) and export what is shown to CSV or PDF
 
 ### Shared Features
-* Map-based geotagging of reports
+* Map-based geotagging of reports, limited to Makati City's boundary: a pin outside the city is refused in the browser, by the API, and by a database check
 * Photo upload/attachment support
 * Notification system for status changes
-* Public transparency board (view-only, no login required)
+* Public transparency board (view-only, no login required); rejected reports stay on it with their reason; each report shows its barangay, and the board can be filtered by barangay
 
 ---
 
@@ -136,8 +143,8 @@ flowchart LR
   personal details.
 - Report status changes are recorded in report history and create in-app
   notifications for the submitting citizen.
-- A map provider will be chosen when the map interface is implemented. Email
-  notifications remain optional.
+- Maps use Google Maps, limited to Makati City. Email notifications remain
+  optional.
 
 ---
 
@@ -213,7 +220,9 @@ erDiagram
 | :--- | :--- |
 | profiles | Role and contact details linked to Supabase Auth accounts |
 | categories | Infrastructure issue types |
-| reports | Submissions, locations, assignments, and current status |
+| reports | Submissions, locations (with the barangay derived from the pin), assignments, and current status |
+| barangays | Makati's 23 barangays and their boundaries, used to place each report |
+| staff_specializations, staff_areas | The categories each staff member handles and the barangays they cover |
 | report_photos | Photo metadata and Supabase Storage paths |
 | report_updates | Report history, status changes, assignments, and remarks |
 | report_inspections | Staff assessments, findings, and severity for a report |
@@ -239,7 +248,7 @@ show which parts have been completed.
 | Database | Supabase PostgreSQL |
 | Authentication and authorization | Supabase Auth issues tokens; the Express API verifies tokens and enforces roles |
 | Photo handling | Multer parses uploads; Supabase Storage holds files |
-| Maps | Leaflet with OpenStreetMap or Google Maps, to be decided during frontend work |
+| Maps | Google Maps (Maps JavaScript API and Places API (New)); Makati boundary from OpenStreetMap; addresses from OpenStreetMap Nominatim |
 | Notifications | In-app notifications; email is optional |
 | Hosting | One Vercel project for the built web app and Node.js API functions |
 | Version control | Git and GitHub |

@@ -1,0 +1,155 @@
+# Phase 2 plan: finish the improvements
+
+Written 2026-10-03 after reviewing commits `d27fd46..888e112`, [HANDOFF.md](HANDOFF.md), [COMMITS.md](COMMITS.md), [ISSUES.md](ISSUES.md), and `docs/updates/handoffs/S1–S7.md`. Untracked note, like HANDOFF.md.
+
+## 0. Starting state (verified)
+- `improve/integration` = `888e112`, same as `origin/improve/integration`. Pushed by the user.
+- The four COMMITS.md commits are in. Code matches the backup tag `backup/s1-session-2026-10-03` exactly; the only extra file is `handoffs/S1.md`.
+- Checks on `888e112`: `bun run typecheck` pass · `bun test` 425 pass / 0 fail · `bun run build` pass (old chunk-size warning).
+- Untracked: `COMMITS.md` (done), `HANDOFF.md`, `ISSUES.md`. The S1 worktree still holds an uncommitted duplicate of S1b/S1c.
+
+## 1. Conflict audit
+| Tier | Conflict | Action |
+| :--- | :--- | :--- |
+| 1 Runtime | `src/web/pages/NewReport.tsx:11` imports `reverseGeocode` from `lib/leaflet.ts`. The B3 note says to delete `leaflet.ts`, which would break the new-report form. | C3: move `reverseGeocode` to `lib/geocode.ts` first. |
+| 1 Runtime | The pushed branch reads S1a columns in `requireAuth`. A Vercel preview of `improve/integration` on the shared database breaks every sign-in until migration `…000200` is applied. | User: do not open or share previews before KI-01. |
+| 1 Runtime | Fixture seed fails on out-of-Makati pins (KI-04). | C2 (D1). |
+| 2 Drift | API, FRONTEND, ARCHITECTURE, and LOCAL_DEV docs predate S1–S7. | C10. |
+| 2 Drift | Browser tests, demo seed, and security tests use old flows. | C8. |
+| 3 Stale | HANDOFF.md said S1b/S1c were uncommitted; COMMITS.md described commits already made. | Fixed: HANDOFF updated, COMMITS.md deleted (C0). |
+
+## 2. Rules (from HANDOFF.md §1)
+- Local only: no push, no PR, no deploy, no `supabase db push`/`link` on the shared project. Local `supabase start` is fine.
+- Work one checkpoint at a time in the main checkout, with no parallel agents. Pause for approval after each checkpoint.
+- Leave work uncommitted. Write that checkpoint's commit groups into COMMITS.md, with each group passing checks on its own.
+- Never `git add -A`. The stack stays React + Vite + Express + Supabase. The Next.js skill's conventions do not apply here.
+- Scope: each checkpoint that adds or changes a feature also updates `docs/Final_Project.md` (features, roles, data model) and `docs/updates/IMPROVEMENT_REQUIREMENTS.md`.
+- COMMITS.md: delete it and write a new one at the end of every checkpoint.
+- UI work follows the web-engineering rules: labels, inline errors, `aria-live`, focus-visible, `Intl` dates, and no colour-only status.
+
+## 3. Checkpoints (in order; ⚑ marks the critical path)
+| # | Checkpoint | Reqs / items | Issues | Weight |
+| :--- | :--- | :--- | :--- | :--- |
+| C0 ✅ | Housekeeping | — | — | XS |
+| C1 ✅ | Report data foundation | REPORT_FIELDS, `cancelReport` | KI-09 | S |
+| C2 ✅ | Server Makati check and pins | MP-2, B2 | KI-04 | S |
+| C3 ✅ | Google Maps on report pages; remove Leaflet | MP-1, SW-5, B3 | KI-09 | M |
+| C4 ✅ | `rejected` status | SW-7, B1 | KI-09 | L |
+| C5 ✅ | Report page wiring and citizen comments | FB-1, RS-6, SW-3/6, B4 | KI-09 | M |
+| C6 ✅ | Tables, admin users, logs | TB, SW-1, B5, B6, B9 | KI-09 | L |
+| C7 ✅ | Area routing by barangay | SW-1, B7 | KI-09 | L |
+| C7b ✅ | Leftovers | DM-2 purge UI, B10 | KI-09 | S |
+| C8 ✅ | Tests and seeds | B12 | KI-05–08 | L |
+| C9 ✅ | Citizen self-edit, polish, cheap hardening | UA-13, UA-10/11 | KI-10, 13, 16, 18, 20, 21 | M |
+| C10 | Documentation | UA-1, UA-10, B13 | KI-22 | M |
+| C11 | Review and merge | — | — | M |
+
+Why this order: C1 adds the fields that C4–C6 read. C2 must land before C8, because test pins move. C4 changes the status set that C5 badges, C6 columns, and C8 tests use.
+
+## 4. Proposed changes per checkpoint
+### C0 Housekeeping ✅ (2026-10-03)
+- Deleted COMMITS.md and the backup tag. Discarded the S1 worktree copy after confirming all 48 files matched `888e112`. `ISSUES.md` stays untracked; it is an optional group in COMMITS.md.
+- Recorded the decisions in IMPROVEMENT_REQUIREMENTS: new UA-13 and RS-6, SW-1 area required, and 4 new decision rows.
+
+### C1 Report data foundation ✅ (2026-10-03)
+- REPORT_FIELDS gained the workflow columns, the problem joins, and `photos.purged_at`. `present()` gives purged photos `url: null`. `problemIdsOf()` replaces two lookups, and `GET /:id/problems` is removed.
+- `cancelReport` stamps `status_changed_at`. ReportDetail reads the problems from the report. `RemovedPhoto` shows on both report pages (B8 done).
+- `/workflow` stays for StaffReport (requester/verifier names and delay). Checked on local Supabase in C2.
+
+### C2 Server Makati check ✅ (2026-10-03)
+- `createSchema` and `editSchema` end with `refineInsideMakati`. The web `pinError()` disables Continue/Save for a device location or draft outside Makati; the reason also shows when the map cannot load.
+- Pins moved to Makati in tests and the fixture. The fixture reports are now in `scripts/fixture/reports.ts`. Tests cover the fixture and demo pins.
+- Local run: fixture OK; bbox constraint validated. API: Bataan/Pembo 400, Ayala 201, moving the pin out 400, title-only edit 200. Browser: 7/7.
+- Left for C8: fixture reports have no main problem; `security.ts` posts no `primary_problem_id`. The local stack now runs from the main checkout.
+
+### C3 Google Maps on the report pages ✅ (2026-10-03)
+- ReportDetail and StaffReport use `LocationMap`. `StatusPin` is shared with the board; resolved pins are `--color-success-700` with a check.
+- Leaflet packages, `lib/leaflet.ts`, and its CSS are removed (`reverseGeocode` was already in `maps.ts`). `tests/leaflet.test.ts` became `tests/geocode.test.ts`.
+- Local run with the user's key: 8/8 browser checks, no console errors. Dialogs clear the map (`.gm-style` is z-index 0). The main chunk is about 492 kB, so the build warning is gone.
+- Left for C8: `tests/browser/citizen.browser.ts` and the verify-kamoti feature notes still target `.leaflet-container`.
+
+### C4 `rejected` status ✅ (2026-10-03)
+- Migrations `…000700` (enum value) and `…000710` (`public_reports.rejection_reason`, filled only for rejected reports). Both applied locally.
+- Server: `CLOSURE_OUTCOMES` gains `rejected`. `CLOSURE_FROM` allows rejection from under review or in progress with no proof photo. Guarded updates use `.in(status)`. The citizen's notice carries the reason.
+- Web: neutral Rejected badge and pin (cross). StaffReport "Request rejection" and the waiting note. VerificationPanel adapts. The citizen sees "Why it was rejected" and a closed date. The board card, filter, and stats include it. Dashboard "Open" counts open statuses.
+- Local run: 22/22 end-to-end checks (API guards, staff request, admin approve, citizen, board, public API, stats).
+- Decisions: shown publicly with the reason; requestable from under review or in progress.
+
+### C5 Report page wiring and citizen comments ✅ (2026-10-03)
+- RS-6: `POST /:id/remarks` also takes the owning citizen at any status. It notifies the assigned staff member and every active admin, is limited to 10 an hour per citizen (`limits.citizenComment`, per account), and is logged as `report.comment_added`.
+- ReportDetail: `FeedbackForm` (owner, resolved), "Add a comment", readable history (`historyLabel`), and the "Awaiting verification" badge (`closurePendingOf`).
+- StaffReport: `FeedbackSummary` on resolved reports and `historyLabel`. StaffQueue "Your rating"; AdminDashboard "Citizen rating".
+- Tests: `tests/fast/comments.test.ts` runs the real route in an app with a stand-in database (18 tests).
+- Local run: 21/21 checks, covering the rating, comment, notifications, 403 for another citizen, the staff summary and averages, and the waiting badge.
+- Main chunk is back to about 503 kB (KI-21, planned for C9).
+
+### C6 Tables, admin users, logs ✅ (2026-10-03)
+- Code pushed in `b239258` (the user's commit). The follow-up (Clear filters, caption fix, tests, docs) is in `COMMITS_C6.md`.
+- B6: optional report columns (Problems, Assigned on, Days in stage, Reporter residency, Phone verified, Rating). The status cell shows Awaiting verification and Delayed. The date column is now "Closed" (resolved or rejected). The rating join is in `services/reports.rows.ts`, for list and export only.
+- B9: `lib/log-filters.ts` (action, role, reference, from/to) is shared by `/admin/logs` and `/exports/logs`. The screen shows `activityLabel()`.
+- B5: "Specializations" disclosure on staff rows; `api.put()`; PATCH alias removed. No DataTable move (no requirement).
+- Local run: 18/18 API checks, 18/18 unit tests, and the browser check (two header checks failed on capitalisation only).
+
+### C7 Area routing by barangay ✅ (2026-10-04)
+- Migration `…000800`: `barangays` (23 OSM polygons, full detail, built-in `polygon`) and `barangay_at()` (the containing barangay, else the nearest within about 500 m). A trigger sets `reports.barangay` on insert and when the pin moves, with a backfill. `staff_areas` mirrors `staff_specializations`. `public_reports.barangay` is added at the end of the view.
+- Server: `barangay` filter on the list, export, and board; GET/PUT `/staff/:id/areas`; `rankStaff` orders both matches, then category, then area, then the rest.
+- Web: `AreaEditor` beside `SpecializationEditor` under "Routing" on Users; the assign dialog groups and subtitle; the barangay on report pages and board cards; `BarangayFilter` on the board (in the URL), All reports, and the staff queue; an optional Barangay column.
+- Decisions: shown on the board with a filter; filter and column on the tables.
+- Local run: 18/18 API and browser checks; 9 unit tests (the ranking mutation is caught).
+
+### C7b Leftovers ✅ (2026-10-04)
+- DM-2: `PhotoRetention` on the admin dashboard checks expired photos, then removes them after an inline confirmation. Local run 8/8: the dry run keeps the file; removal deletes the file, keeps the row with `purged_at`, and the report page says so.
+- B10 dropped on purpose (no behaviour change; it would mix into the C7 files). No cron (needs deploy settings).
+
+### C8 Tests and seeds ✅ (2026-10-04)
+- Fixture: main problem and `assigned_at`. Demo seed: verified citizens, name parts, and a closure record from history (`workflow-columns.ts`); checked by a rolled-back insert of each status.
+- Browser suite on local Supabase: 41 passed, 1 skipped (was 28/6/1). New `accounts.browser.ts` (7 tests, Mailpit). FUNC-02 drives the request-and-verify flow itself. Pins come from a faked device location.
+- Security suite: 37/37 including IMP-01 to IMP-09; fixture state restored.
+- Runs must set `EVIDENCE_DIR`: the default writes into the committed `tests/evidence/` (a first run overwrote 27 files; restored from git).
+
+### C9 Citizen self-edit, polish, cheap hardening ✅ (2026-10-04)
+- UA-13: My account (`/account`) and `PATCH /api/auth/me`. A new number clears its verified mark (old and new number go to the log). A new address goes back to review. An account verified with no proof file is asked for one.
+- KI-13: logout takes the refresh token. KI-16: a clear "code used up" message. KI-18: greyed home button. KI-20: `pdfText()`. KI-21: lazy admin and staff pages (main chunk about 440 kB).
+- Checks: 517 unit tests; security 39/39 (IMP-10, IMP-11); browser spot check 13/15 (two failed on script faults, both re-checked).
+- Gap: the full browser suite was not re-run after C9 (stopped by the user).
+
+### C10 Documentation (B13, KI-22)
+- Apply each handoff's "Doc changes" list to `docs/API.md`, `FRONTEND.md`, `ARCHITECTURE.md`, `DEVELOPER_JOURNEYS` (state machine with `rejected`), and `LOCAL_DEV.md` (local Supabase, Mailpit, maps key).
+- UA-1: one roles and permissions table. UA-10: security review write-up.
+- Update the statuses in `IMPROVEMENT_REQUIREMENTS.md`. Then delete `docs/updates/handoffs/` and `PARALLEL_PLAN.md`.
+
+### C11 Review and merge
+- `/code-review high` and `/security-review` on `improve/integration`. Fix the findings and report them.
+- Run `/verify-kamoti` on local Supabase for the evidence.
+- On the user's "okay": a local `git merge --no-ff improve/integration` into `main`. Then the worktree cleanup in HANDOFF.md §11.
+
+## 5. User-only track (runs alongside; blocks deploy, not local work)
+| Item | Blocks | Note |
+| :--- | :--- | :--- |
+| KI-01 migrations `…000100–000600`, then `…000700` from C4 | Deploy | Dry run on local first; fix pins, then `validate constraint`. |
+| KI-02 SMTP, Confirm email, OTP length 6, templates | Registration on the hosted project | Until then registration answers 503 on purpose. |
+| KI-03 Google Maps key and restrictions | Maps on the deployed site | Browser tests without a key see the fallback. |
+
+## 6. Decisions (answered 2026-10-03)
+| ID | Decision |
+| :--- | :--- |
+| D1 | C2 fixes the pins; every pin must be in Makati. |
+| D2 | Citizens comment on their own reports at any status (RS-6). Ratings stay resolved-only. A rejected report shows "Closed" (`verified_at`). |
+| D3 | Area routing is built (C7) as ranked suggestions. |
+| D4 | UA-13 citizen self-edit is in scope (C9). |
+| D5 | Work stays uncommitted. COMMITS.md is deleted and rewritten each checkpoint. Scope docs are updated with each feature. |
+
+## 7. Verification plan (every checkpoint)
+- Run `bun run typecheck`, `bun test`, and `bun run build`. While iterating, run a single file with the placeholder env from HANDOFF §9.
+- For DB checkpoints (C2, C4, C8): run `bunx supabase start` and `bunx supabase db reset` locally, then check that all migrations apply. Then run `bun run fixture`.
+- For UI checkpoints (C3, C4, C5, C6, C9): use `/verify-kamoti` on localhost for the touched pages. Check keyboard paths and the `aria-live` messages.
+- C8 onward: `bun run test:browser` and `bun run test:security` against local Supabase only.
+- Each report back covers what changed, review findings, check results, and anything left out.
+
+## 8. Compliance audit
+| Rule | Status |
+| :--- | :--- |
+| Under 200 lines; one owner per fact | Yes. Breadcrumb detail stays in `handoffs/S*.md` until C10 deletes them. |
+| Exact diffs | Anchors and file:line are given here. Exact search/replace text is written at each checkpoint after reading the code (planning reads interfaces only). |
+| Owners | Single executor (this session) with user approval; the migration owner has §5. Teammates take items through ISSUES.md IDs. |
+| Trade-offs | Order (§3 note), B7 limitation (D3), P3 items documented rather than built (C9), and no Next.js patterns (stack rule). |

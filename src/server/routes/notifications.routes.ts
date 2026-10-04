@@ -1,10 +1,11 @@
 import { Router } from "express";
 import { db } from "../config/supabase.js";
 import { notFound, orThrow } from "../lib/errors.js";
-import { currentUser, requireAuth } from "../middleware/auth.js";
+import { currentUser, requireAuth, requireResidency } from "../middleware/auth.js";
 
 const router = Router();
-router.use(requireAuth);
+// UA-8: a citizen locked to the proof upload reaches none of this.
+router.use(requireAuth, requireResidency);
 
 router.get("/", async (req, res) => {
   const result = await db

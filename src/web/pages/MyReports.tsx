@@ -1,5 +1,17 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
+import { CancelDialog } from "../components/CancelDialog.js";
+import {
+  ColumnMenu,
+  DataTable,
+  ExportMenu,
+  NumberedPagination,
+  TableToolbar,
+  ToolbarItem,
+  exportReports,
+  reportColumn,
+  useColumnVisibility,
+} from "../components/data-table/index.js";
 import {
   Alert,
   Button,
@@ -8,19 +20,18 @@ import {
   Field,
   Input,
   Loading,
-  Pagination,
   Select,
   StatusBadge,
-  Textarea,
   formatDate,
 } from "../components/ui.js";
-import { useToast } from "../components/Toast.js";
-import { api } from "../lib/api.js";
-import { useAction, useApi } from "../lib/useApi.js";
+import { describeFilters } from "../lib/export.js";
+import type { Column } from "../lib/table-types.js";
+import { useApi } from "../lib/useApi.js";
 import { STATUSES, STATUS_LABEL } from "../lib/types.js";
-import type { Paged, Report } from "../lib/types.js";
+import type { Paged, Report, ReportStatus } from "../lib/types.js";
 
 const PER_PAGE = 20;
+const TABLE_ID = "my-reports";
 
 // Wireframe 1h, with 1i as its empty state. The server scopes GET /api/reports to
 // the caller, so this asks for no citizen id of its own.
@@ -30,60 +41,112 @@ export function MyReportsPage() {
   const [page, setPage] = useState(1);
   const [cancellingReport, setCancellingReport] = useState<Report | null>(null);
 
-  const query = useMemo(
-    () => ({ q: search.trim(), status, page, per_page: PER_PAGE }),
-    [search, status, page],
-  );
+  const filters = useMemo(() => ({ q: search.trim(), status }), [search, status]);
+  const query = useMemo(() => ({ ...filters, page, per_page: PER_PAGE }), [filters, page]);
 
   const { data, error, loading, reload } = useApi<Paged<"reports", Report>>("/reports", query);
   const reports = data?.reports ?? [];
   const filtered = search.trim() !== "" || status !== "";
 
+  const columns = useMemo<Column<Report>[]>(
+    () => [
+      reportColumn.reference,
+      reportColumn.title((report) => `/reports/${report.id}`),
+      reportColumn.category,
+      reportColumn.status,
+      reportColumn.problems,
+      reportColumn.barangay,
+      reportColumn.location,
+      reportColumn.filed,
+      reportColumn.completed,
+      reportColumn.rating,
+      {
+        id: "actions",
+        header: "Actions",
+        srOnlyHeader: true,
+        required: true,
+        cell: (report) =>
+          report.status === "pending" && (
+            <Button type="button" onClick={() => setCancellingReport(report)}>
+              Cancel report
+            </Button>
+          ),
+      },
+    ],
+    [],
+  );
+  const { visible, setShown, reset } = useColumnVisibility(TABLE_ID, columns);
+
+  function onExport(format: "csv" | "pdf") {
+    return exportReports({
+      format,
+      query: filters,
+      columns,
+      visible,
+      title: "My reports",
+      name: "my-reports",
+      filters: describeFilters([
+        ["Search", filters.q ? `“${filters.q}”` : null],
+        ["Status", status ? STATUS_LABEL[status as ReportStatus] : null],
+      ]),
+    });
+  }
+
   return (
     <div className="flex flex-col gap-6">
-      <header className="flex flex-wrap items-end justify-between gap-3">
-        <div className="flex flex-col gap-1">
-          <h2>My reports</h2>
-          <p className="text-muted text-[13px]">Everything you have filed, and where it stands.</p>
+      <TableToolbar
+        title="My reports"
+        description="Everything you have filed, and where it stands."
+        action={
+          <Link to="/report/new" className="btn btn-primary">
+            Report an issue
+          </Link>
+        }
+      >
+        <ToolbarItem wide>
+          <Field label="Search" htmlFor="q">
+            <Input
+              id="q"
+              name="q"
+              type="search"
+              maxLength={100}
+              autoComplete="off"
+              placeholder="Title or description…"
+              value={search}
+              onChange={(event) => {
+                setSearch(event.target.value);
+                setPage(1);
+              }}
+            />
+          </Field>
+        </ToolbarItem>
+
+        <ToolbarItem>
+          <Field label="Status" htmlFor="status">
+            <Select
+              id="status"
+              value={status}
+              onChange={(event) => {
+                setStatus(event.target.value);
+                setPage(1);
+              }}
+            >
+              <option value="">Any status</option>
+              {STATUSES.map((key) => (
+                <option key={key} value={key}>
+                  {STATUS_LABEL[key]}
+                </option>
+              ))}
+            </Select>
+          </Field>
+        </ToolbarItem>
+
+        {/* The column menu only changes the table, which phones do not show. */}
+        <div className="hidden md:block">
+          <ColumnMenu columns={columns} visible={visible} onToggle={setShown} onReset={reset} />
         </div>
-        <Link to="/report/new" className="btn btn-primary">
-          Report an issue
-        </Link>
-      </header>
-
-      <div className="grid gap-3 md:grid-cols-3">
-        <Field label="Search" htmlFor="q">
-          <Input
-            id="q"
-            type="search"
-            maxLength={100}
-            placeholder="Search your reports"
-            value={search}
-            onChange={(event) => {
-              setSearch(event.target.value);
-              setPage(1);
-            }}
-          />
-        </Field>
-
-        <Field label="Status" htmlFor="status">
-          <Select
-            id="status"
-            value={status}
-            onChange={(event) => {
-              setStatus(event.target.value);
-              setPage(1);
-            }}
-          >
-            <option value="">Any status</option>
-            {STATUSES.map((key) => (
-              <option key={key} value={key}>
-                {STATUS_LABEL[key]}
-              </option>
-            ))}
-          </Select>
-        </Field>
-      </div>
+        <ExportMenu onExport={onExport} disabled={!data || data.total === 0} />
+      </TableToolbar>
 
       {error && <Alert title="Could not load your reports">{error.message}</Alert>}
       {loading && <Loading label="Loading your reports" />}
@@ -128,49 +191,15 @@ export function MyReportsPage() {
       {reports.length > 0 && (
         <>
           {/* Desktop table on viewports 768px and up (>=md) */}
-          <div className="hidden md:block overflow-x-auto">
-            <table className="table w-full">
-              <caption className="sr-only">
-                Reports you have filed, {data?.total ?? 0} in total.
-              </caption>
-              <thead>
-                <tr>
-                  <th scope="col">Reference</th>
-                  <th scope="col">Title</th>
-                  <th scope="col">Category</th>
-                  <th scope="col">Status</th>
-                  <th scope="col">Filed</th>
-                  <th scope="col">
-                    <span className="sr-only">Actions</span>
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {reports.map((report) => (
-                  <tr key={report.id}>
-                    <td className="font-mono text-[11px] whitespace-nowrap">{report.reference_code}</td>
-                    <td className="max-w-[32ch] min-w-[16ch]">
-                      <Link to={`/reports/${report.id}`} className="block truncate" title={report.title}>
-                        {report.title}
-                      </Link>
-                    </td>
-                    <td className="text-[13px] whitespace-nowrap">{report.category?.name ?? "Uncategorised"}</td>
-                    <td>
-                      <StatusBadge status={report.status} />
-                    </td>
-                    <td className="font-mono text-[11px] whitespace-nowrap">{formatDate(report.submitted_at)}</td>
-                    <td>
-                      {report.status === "pending" && (
-                        <Button type="button" onClick={() => setCancellingReport(report)}>
-                          Cancel report
-                        </Button>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <DataTable
+            id={TABLE_ID}
+            className="hidden md:block"
+            columns={columns}
+            visible={visible}
+            rows={reports}
+            rowKey={(report) => report.id}
+            caption={`Reports you have filed, ${data?.total ?? 0} in total.`}
+          />
 
           {/* Mobile task cards on viewports under 768px (<md) */}
           <div className="flex flex-col gap-3 md:hidden">
@@ -194,6 +223,12 @@ export function MyReportsPage() {
                     </span>
                     <span>&middot;</span>
                     <span>Filed {formatDate(report.submitted_at)}</span>
+                    {report.resolved_at && (
+                      <>
+                        <span>&middot;</span>
+                        <span>Completed {formatDate(report.resolved_at)}</span>
+                      </>
+                    )}
                   </div>
                 </div>
 
@@ -228,99 +263,15 @@ export function MyReportsPage() {
         />
       )}
 
-      {data && <Pagination page={data.page} perPage={data.per_page} total={data.total} onPage={setPage} />}
-    </div>
-  );
-}
-
-// Dedicated confirmation dialog when withdrawing a pending report.
-function CancelDialog({
-  report,
-  onClose,
-  onDone,
-}: {
-  report: Report;
-  onClose: () => void;
-  onDone: () => void;
-}) {
-  const toast = useToast();
-  const [details, setDetails] = useState("");
-  const { run, pending, error } = useAction((body?: { details?: string }) =>
-    api.post<{ report: Report }>(`/reports/${report.id}/cancel`, body),
-  );
-
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape" && !pending) {
-        onClose();
-      }
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [onClose, pending]);
-
-  return (
-    <div className="dialog-backdrop z-[1100]" role="presentation" onClick={onClose}>
-      <div
-        className="dialog"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="cancel-dialog-title"
-        onClick={(event) => event.stopPropagation()}
-      >
-        <h4 id="cancel-dialog-title" className="dialog-title">
-          Withdraw this report?
-        </h4>
-
-        <div className="dialog-body flex flex-col gap-3">
-          <p className="text-[13px] text-muted">
-            Are you sure you want to withdraw <strong>{report.title}</strong> ({report.reference_code})?
-          </p>
-          <p className="text-[12px] text-muted">
-            The report will be marked as cancelled. Its history will be preserved, but municipal staff will no longer act on it.
-          </p>
-
-          <Field
-            label="Reason"
-            htmlFor="cancel-details"
-            hint="Optional. Municipal staff will see this note in the report history."
-            count={details.length}
-            max={500}
-          >
-            <Textarea
-              id="cancel-details"
-              rows={3}
-              maxLength={500}
-              placeholder="e.g. Issue was already resolved or submitted by mistake"
-              value={details}
-              onChange={(event) => setDetails(event.target.value)}
-              disabled={pending}
-            />
-          </Field>
-
-          {error && <Alert title="Could not cancel report">{error.message}</Alert>}
-        </div>
-
-        <div className="dialog-actions flex gap-3">
-          <Button
-            type="button"
-            variant="primary"
-            disabled={pending}
-            onClick={async () => {
-              const cancelled = await run({ details: details.trim() || undefined });
-              if (cancelled) {
-                toast("Report cancelled. Its history is kept.");
-                onDone();
-              }
-            }}
-          >
-            {pending ? "Cancelling…" : "Yes, cancel"}
-          </Button>
-          <Button type="button" onClick={onClose} disabled={pending}>
-            Keep it
-          </Button>
-        </div>
-      </div>
+      {data && (
+        <NumberedPagination
+          page={data.page}
+          perPage={data.per_page}
+          total={data.total}
+          onPage={setPage}
+          label="My reports pages"
+        />
+      )}
     </div>
   );
 }

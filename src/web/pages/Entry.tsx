@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { useApi } from "../lib/useApi.js";
 import { useAuth } from "../lib/auth.js";
+import { PROOF_STEP_PATH, residencyLocked } from "../lib/residency.js";
 import type { PublicStats } from "../lib/types.js";
 
 const STEPS = [
@@ -17,6 +18,9 @@ export function EntryPage() {
 
   // A signed-out visitor cannot file a report, so send them to sign in first.
   const reportHref = user?.role === "citizen" ? "/report/new" : "/signin";
+  // UA-8: a citizen locked to the proof upload sees the button greyed, like the
+  // menu, with the reason and the way out beside it (KI-18).
+  const locked = residencyLocked(user);
 
   return (
     <div className="flex flex-col gap-10">
@@ -33,13 +37,27 @@ export function EntryPage() {
         </p>
 
         <div className="flex flex-wrap gap-3 pt-2">
-          <Link to={reportHref} className="btn btn-primary">
-            Report an issue
-          </Link>
+          {locked ? (
+            <a role="link" aria-disabled="true" aria-describedby="report-locked" className="btn btn-primary opacity-50 cursor-not-allowed">
+              Report an issue
+            </a>
+          ) : (
+            <Link to={reportHref} className="btn btn-primary">
+              Report an issue
+            </Link>
+          )}
           <Link to="/board" className="btn btn-secondary">
             Browse the public board
           </Link>
         </div>
+        {locked && (
+          <p id="report-locked" className="text-[13px] !m-0">
+            Send your proof of residency first.{" "}
+            <Link to={PROOF_STEP_PATH} className="underline">
+              Upload it now
+            </Link>
+          </p>
+        )}
       </section>
 
       <hr className="hr" />

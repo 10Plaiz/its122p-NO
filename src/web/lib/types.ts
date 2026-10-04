@@ -2,12 +2,12 @@
 // frontend has one place to look; when a route's response changes, change it here.
 // Sources are named per block so a mismatch is traceable.
 
-export const STATUSES = ["pending", "under_review", "in_progress", "resolved", "cancelled"] as const;
+export const STATUSES = ["pending", "under_review", "in_progress", "resolved", "cancelled", "rejected"] as const;
 export type ReportStatus = (typeof STATUSES)[number];
 
 // The only statuses the public board can show — see PUBLIC_STATUSES in
 // src/server/services/reports.service.ts.
-export const PUBLIC_STATUSES = ["under_review", "in_progress", "resolved"] as const;
+export const PUBLIC_STATUSES = ["under_review", "in_progress", "resolved", "rejected"] as const;
 
 export const ROLES = ["citizen", "staff", "admin"] as const;
 export type Role = (typeof ROLES)[number];
@@ -22,6 +22,7 @@ export const STATUS_LABEL: Record<ReportStatus, string> = {
   in_progress: "In progress",
   resolved: "Resolved",
   cancelled: "Cancelled",
+  rejected: "Rejected",
 };
 
 // Roles follow the same rule as statuses above. `admin` reads as "Administrator"
@@ -33,26 +34,80 @@ export const ROLE_LABEL: Record<Role, string> = {
   admin: "Administrator",
 };
 
-// Mirrors NEXT_STATUS in src/server/services/reports.service.ts: one step at a time,
+// Mirrors NEXT_STATUS in src/server/services/reports.workflow.ts: one step at a time,
 // no skipping and no going back. The server enforces this in changeStatus(); the UI
 // reads it only so it can offer the single legal step rather than a list to choose
-// from. A status with no next step is a dead end.
+// from. "in_progress" has no manual step: staff request resolution and an
+// administrator closes the report by verifying it. Otherwise null is a dead end.
 export const NEXT_STATUS: Record<ReportStatus, ReportStatus | null> = {
   pending: "under_review",
   under_review: "in_progress",
-  in_progress: "resolved",
+  in_progress: null,
   resolved: null,
   cancelled: null,
+  rejected: null,
 };
 
 // The verb for taking that step, used on the button that takes it.
 export const NEXT_STATUS_LABEL: Record<ReportStatus, string | null> = {
   pending: "Start review",
   under_review: "Begin work",
-  in_progress: "Mark resolved",
+  in_progress: null,
   resolved: null,
   cancelled: null,
+  rejected: null,
 };
+
+// Mirrors STAFF_STATUSES in src/server/services/reports.workflow.ts: what staff and
+// admins can set by hand through PATCH /status.
+export const STAFF_STATUSES = ["under_review", "in_progress"] as const;
+
+// Mirrors CLOSURE_OUTCOMES: the work is done (SW-4), or the report cannot be fixed
+// (SW-7). Rejection can be asked from under review or in progress (CLOSURE_FROM).
+export const CLOSURE_OUTCOMES = ["resolved", "rejected"] as const;
+export type ClosureOutcome = (typeof CLOSURE_OUTCOMES)[number];
+export const REJECTABLE_STATUSES: readonly ReportStatus[] = ["under_review", "in_progress"];
+
+// Mirrors OPEN_STATUSES: reports that still need work.
+export const OPEN_STATUSES = ["pending", "under_review", "in_progress"] as const;
+
+// Mirrors DELAY_THRESHOLD_DAYS and VERIFICATION_DELAY_DAYS: days a report may sit
+// at a stage before it shows as delayed. The server computes the flag; these are
+// for screens that explain it.
+export const DELAY_THRESHOLD_DAYS: Partial<Record<ReportStatus, number>> = {
+  pending: 3,
+  under_review: 5,
+  in_progress: 14,
+};
+export const VERIFICATION_DELAY_DAYS = 3;
+
+// History entry kinds from report_updates.update_type, as a reader would say them.
+export const UPDATE_TYPE_LABEL: Record<string, string> = {
+  status_change: "Status changed",
+  assignment: "Assigned",
+  remark: "Remark",
+  photo: "Photo added",
+  edit: "Report edited",
+  closure_request: "Resolution requested",
+  verification: "Verification decision",
+};
+
+export function updateTypeLabel(type: string) {
+  return UPDATE_TYPE_LABEL[type] ?? type.replace(/[._]/g, " ");
+}
+
+// A history entry's heading when it is not a status change. A remark written by
+// the reporter is their comment (RS-6); staff and admin remarks stay "Remark".
+export function historyLabel(update: { update_type: string; author: { role: Role } | null }) {
+  if (update.update_type === "remark" && update.author?.role === "citizen") return "Comment from the reporter";
+  return updateTypeLabel(update.update_type);
+}
+
+// A closure request (resolution or rejection) waits for an administrator until it
+// is approved; returning it clears it. Mirrors closurePending on the server.
+export function closurePendingOf(report: { closure_requested_at: string | null; verified_at: string | null }) {
+  return Boolean(report.closure_requested_at) && !report.verified_at;
+}
 
 export type Profile = {
   id: string;
@@ -62,6 +117,16 @@ export type Profile = {
   contact_number?: string | null;
   is_active?: boolean;
   created_at?: string;
+  // UA-6, UA-8 (src/server/lib/accounts-profile.ts, ACCOUNT_FIELDS).
+  phone_verified_at?: string | null;
+  barangay?: string | null;
+  address_line?: string | null;
+  residency_status?: "pending" | "verified" | "rejected" | null;
+  residency_note?: string | null;
+  has_residency_proof?: boolean;
+  // Admin users list only (ADMIN_USER_FIELDS).
+  residency_reviewed_at?: string | null;
+  reviewer?: { id: string; name: string } | null;
 };
 
 export type Photo = {
@@ -69,11 +134,15 @@ export type Photo = {
   kind: "initial" | "resolution";
   storage_path: string;
   created_at: string;
-  url: string;
+  // Set when the file was removed after the 90-day retention period (DM-2); the
+  // URL is then null and the page says so instead of showing a broken image.
+  purged_at: string | null;
+  url: string | null;
 };
 
 // The public board's view exposes only these two photo columns, plus the built URL.
-export type PublicPhoto = Pick<Photo, "kind" | "storage_path" | "url">;
+// Only cancelled reports lose their files, and the board never shows those.
+export type PublicPhoto = Pick<Photo, "kind" | "storage_path"> & { url: string };
 
 export type Category = {
   id: number;
@@ -96,10 +165,23 @@ export type Report = {
   submitted_at: string;
   updated_at: string;
   resolved_at: string | null;
+  // SW-1: set by the database from the pin; null only for a pin outside Makati.
+  barangay: string | null;
+  // Workflow dates (SW-6) and closure state (SW-4). See ReportWorkflow for the
+  // requester and verifier names and the computed delay.
+  assigned_at: string | null;
+  status_changed_at: string;
+  closure_requested_at: string | null;
+  closure_outcome: ClosureOutcome | null;
+  closure_reason: string | null;
+  verified_at: string | null;
   category: Pick<Category, "id" | "name"> | null;
+  // RS-4. Both null on reports filed before problem types existed.
+  primary_problem: { id: number; name: string } | null;
+  secondary_problem: { id: number; name: string } | null;
   // Staff need a way to reach the reporter, so contact columns are joined in here.
   // The public board reads a different view that has none of them.
-  citizen: Pick<Profile, "id" | "name" | "email" | "contact_number"> | null;
+  citizen: Pick<Profile, "id" | "name" | "email" | "contact_number" | "phone_verified_at" | "residency_status"> | null;
   assigned_staff: Pick<Profile, "id" | "name" | "email"> | null;
   photos: Photo[];
 };
@@ -118,7 +200,10 @@ export type PublicReport = {
   status: ReportStatus;
   submitted_at: string;
   resolved_at: string | null;
+  barangay: string | null;
   photos: PublicPhoto[];
+  // SW-7: the approved reason, shown publicly; null unless the report was rejected.
+  rejection_reason: string | null;
 };
 
 // src/server/routes/reports.routes.ts — GET /:id/updates
@@ -130,6 +215,45 @@ export type ReportUpdate = {
   details: string | null;
   created_at: string;
   author: Pick<Profile, "id" | "name" | "role"> | null;
+};
+
+// src/server/services/reports.workflow.ts — presentWorkflow(), from
+// GET /api/reports/:id/workflow. Adds to Report's workflow columns the names of who
+// requested and verified a closure, and the computed delay.
+export type DelayStage = ReportStatus | "awaiting_verification";
+
+export type ReportWorkflow = {
+  submitted_at: string;
+  assigned_at: string | null;
+  status_since: string;
+  completed_at: string | null;
+  delay: {
+    stage: DelayStage;
+    since: string;
+    days: number;
+    threshold_days: number | null;
+    delayed: boolean;
+    days_over: number;
+  };
+  closure: {
+    pending: boolean;
+    requested_at: string;
+    requested_by: Pick<Profile, "id" | "name"> | null;
+    outcome: ClosureOutcome | null;
+    reason: string | null;
+  } | null;
+  verified_at: string | null;
+  verified_by: Pick<Profile, "id" | "name"> | null;
+};
+
+// src/server/routes/staff.routes.ts — GET /api/staff
+export type StaffOption = Pick<Profile, "id" | "name" | "email"> & {
+  specializations: Pick<Category, "id" | "name">[];
+  // SW-1: the barangays this staff member covers.
+  areas: string[];
+  open_load: number;
+  is_specialist: boolean;
+  in_area: boolean;
 };
 
 export type Notification = {

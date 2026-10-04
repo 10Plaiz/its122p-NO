@@ -71,17 +71,24 @@ test.describe("Authentication workflows (AUTH-04 through AUTH-11)", () => {
     await expect(submit).toBeDisabled();
 
     // An untouched field shows no error; one the person has left does, on the control.
-    const name = page.locator("#name");
-    await name.fill("A");
-    await name.blur();
-    await expect(name).toHaveAttribute("aria-invalid", "true");
-    await expect(page.locator(`#${await name.getAttribute("aria-describedby")}`)).toContainText("Enter your full name.");
+    // The name is split into parts (UA-7).
+    const first = page.locator("#first-name");
+    await first.fill("J");
+    await first.fill("");
+    await first.blur();
+    await expect(first).toHaveAttribute("aria-invalid", "true");
+    await expect(page.locator(`#${await first.getAttribute("aria-describedby")}`)).toContainText("Enter the first name.");
     await expect(page.locator("#email")).not.toHaveAttribute("aria-invalid", "true");
 
-    await name.fill("Juan Dela Cruz");
+    await first.fill("Juan");
+    await page.fill("#last-name", "Dela Cruz");
     await page.fill("#email", "juan@kamoti.invalid");
-    await page.fill("#password", "long-enough-password");
-    await expect(name).not.toHaveAttribute("aria-invalid", "true");
+    await page.selectOption("#barangay", "Poblacion");
+    await page.fill("#address", "12 Sample Street");
+    // UA-4: letters, a number, and a special character.
+    await page.fill("#password", "Long-enough-pass1");
+    await page.check("#consent");
+    await expect(first).not.toHaveAttribute("aria-invalid", "true");
     // Enabled once valid. Not clicked: that would create a real account.
     await expect(submit).toBeEnabled();
   });

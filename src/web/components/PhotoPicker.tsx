@@ -48,6 +48,12 @@ type PhotoPickerProps = {
   error?: string;
   value: File | null;
   onChange: (file: File | null) => void;
+  /** Defaults are for report photos; the residency proof (UA-8) also takes PDFs. */
+  accept?: readonly string[];
+  chooseLabel?: string;
+  limits?: string;
+  /** Read alongside the error, e.g. what counts as a valid proof. */
+  hint?: string;
 };
 
 // A real <input type="file"> is still the control. It is only visually hidden, never
@@ -55,7 +61,18 @@ type PhotoPickerProps = {
 // drop zone is a <label> pointing at it, which is what makes click, Enter and Space
 // all open the picker without a single key handler of our own. Dragging is an extra
 // way in, never the only one.
-export function PhotoPicker({ id, label, purpose, error, value, onChange }: PhotoPickerProps) {
+export function PhotoPicker({
+  id,
+  label,
+  purpose,
+  error,
+  value,
+  onChange,
+  accept = ALLOWED_TYPES,
+  chooseLabel = "Choose a photo",
+  limits = "JPG, PNG, WebP · up to 3 MB",
+  hint,
+}: PhotoPickerProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
   const [preview, setPreview] = useState<string | null>(null);
@@ -63,7 +80,8 @@ export function PhotoPicker({ id, label, purpose, error, value, onChange }: Phot
   // Each object URL pins its file in memory until it is revoked, so the preview is
   // built in an effect and torn down with the file that produced it.
   useEffect(() => {
-    if (!value) {
+    // A PDF has no picture to show; its name and size stand in for it.
+    if (!value || !value.type.startsWith("image/")) {
       setPreview(null);
       return;
     }
@@ -92,7 +110,7 @@ export function PhotoPicker({ id, label, purpose, error, value, onChange }: Phot
     : "border-divider bg-surface hover:border-accent hover:bg-accent-100";
 
   return (
-    <Field label={label} htmlFor={id} error={error}>
+    <Field label={label} htmlFor={id} error={error} hint={hint}>
       {/* Nested one level deeper on purpose: ds.css styles `.field > label` as a
           caption, which would flatten the drop zone if it were a direct child. */}
       <div
@@ -112,9 +130,9 @@ export function PhotoPicker({ id, label, purpose, error, value, onChange }: Phot
           id={id}
           name={id}
           type="file"
-          accept={ALLOWED_TYPES.join(",")}
+          accept={accept.join(",")}
           aria-invalid={error ? true : undefined}
-          aria-describedby={error ? fieldNoteId(id) : undefined}
+          aria-describedby={error || hint ? fieldNoteId(id) : undefined}
           className="sr-only peer"
           onChange={(event) => choose(event.target.files?.[0] ?? null)}
         />
@@ -152,16 +170,16 @@ export function PhotoPicker({ id, label, purpose, error, value, onChange }: Phot
             className={`flex cursor-pointer touch-manipulation flex-col items-center gap-2 border-2 border-dashed p-6 text-center transition-[background-color,border-color] duration-150 peer-focus-visible:outline-2 peer-focus-visible:outline-accent peer-focus-visible:outline-offset-2 motion-reduce:transition-none ${frame}`}
           >
             <span className="text-[13px]">{purpose}</span>
-            <span className="btn btn-secondary">Choose a photo</span>
+            <span className="btn btn-secondary">{chooseLabel}</span>
             <span className="text-muted font-mono text-[10px] uppercase tracking-wider">
-              or drag one here &middot; JPG, PNG, WebP &middot; up&nbsp;to&nbsp;3&nbsp;MB
+              or drag one here &middot; {limits}
             </span>
           </label>
         )}
 
         {/* The choice happens outside the normal flow of the form, so it is announced. */}
         <span aria-live="polite" className="sr-only">
-          {value ? `${value.name} selected, ${formatFileSize(value.size)}` : "No photo selected"}
+          {value ? `${value.name} selected, ${formatFileSize(value.size)}` : "No file selected"}
         </span>
       </div>
     </Field>
