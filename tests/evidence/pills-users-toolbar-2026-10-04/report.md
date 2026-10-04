@@ -113,9 +113,7 @@ bunx playwright test --config tests/evidence/pills-users-toolbar-2026-10-04/play
 - [Public board with report pills and rightmost search](board-pills-desktop.png)
 - [Admin Users on desktop](users-desktop.png)
 - [Admin Users and routing on mobile](users-routing-mobile.png)
-- [Failed deactivation on desktop](deactivation-failure.png)
 - [Centered failed-deactivation dialog at 320 px](deactivation-failure-mobile.png)
-- [Simulated phone-verification failure](simulated-phone-failure.png)
 - [Staff report pills on mobile](staff-pills-mobile.png)
 
 The public-board screenshot intentionally shows the map-load fallback because

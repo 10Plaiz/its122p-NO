@@ -72,6 +72,13 @@ with no outline, tab stop, or hover change. Categories and roles remain tags.
 Search is the last control on the right, in DOM and visual order. Controls wrap
 on smaller screens; the public board follows the same ordering in its grid.
 
+`FilterOption` renders native dropdown choices with a shared count format,
+such as `Pending (12)`. Counts include the other active filters and every result
+page. They retain zero-result choices so filters remain predictable. Missing
+counts stay unlabeled while `FilterCountsFeedback` announces loading or offers
+Retry counts after failure. Sort choices have no counts because they reorder
+the same results. Keep the existing square select styling and visible labels.
+
 Use a relative scroll container for wide tables so absolutely positioned
 accessible labels stay inside it on narrow screens.
 
