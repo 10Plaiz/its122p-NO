@@ -330,6 +330,9 @@ test("User load failures offer retry and never claim an empty result", async ({ 
   await expect(page.getByRole("table", { name: "User accounts" })).toBeVisible();
   await expect(page.getByRole("alert")).toHaveCount(0);
   mode = "empty";
+  // Local filters reuse the loaded list. Reload to exercise an empty API response.
+  await page.reload();
+  await expect(page.getByRole("heading", { name: "No user accounts yet" })).toBeVisible();
   await page.locator("#role-filter").selectOption("citizen");
   await expect(page.getByRole("heading", { name: "No accounts match your filters" })).toBeVisible();
   await page.getByRole("button", { name: "Clear filters", exact: true }).click();
