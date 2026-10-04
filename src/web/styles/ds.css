@@ -191,6 +191,34 @@ textarea.input { min-height: 90px; resize: vertical; }
 }
 .table tbody tr:hover { background: color-mix(in srgb, var(--color-text) 4%, transparent); }
 
+.account-table td { vertical-align: top; }
+.account-table .account-identity { width: 32%; }
+.account-confirmation {
+  position: fixed; inset: 0; margin: auto; height: fit-content;
+  width: min(440px, calc(100% - var(--space-4) * 2));
+  border: 0; color: var(--color-text);
+}
+.account-confirmation::backdrop { background: var(--color-overlay); }
+@media (max-width: 767px) {
+  .account-table, .account-table tbody { display: block; }
+  .account-table thead {
+    position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+    overflow: hidden; clip-path: inset(50%); white-space: nowrap;
+  }
+  .account-table tbody { display: grid; gap: var(--space-4); }
+  .account-table tbody tr {
+    display: grid; gap: var(--space-3); padding: var(--space-4);
+    border: 1px solid var(--color-divider);
+  }
+  .account-table td { display: block; padding: 0; border: 0; min-width: 0; }
+  .account-table .account-identity { width: auto; }
+  .account-table td[data-label]::before {
+    content: attr(data-label); display: block; margin-bottom: var(--space-1);
+    color: var(--color-muted); font-size: 11px; font-weight: 600;
+  }
+  .account-table tbody .account-routing-row { padding: 0; border: 0; }
+}
+
 /* — dialog — */
 .dialog-backdrop {
   position: fixed; inset: 0; display: grid; place-items: center;
