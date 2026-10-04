@@ -10,7 +10,7 @@ Persona: Citizen (`fixture-citizen-1@kamoti.invalid`)
 - **Disabled Until Valid Form Rule:** Continue button is disabled until current step fields are valid. Step 1 requires coordinates. Step 2 requires category, valid title, and valid description.
 - **Step Button Locking:** Forward steps are locked and disabled until previous steps are completed. The current active step carries `aria-current="step"` and remains enabled (`KR-20`).
 - **Step 3 (Pre-flight Review):** File uploader (JPEG/PNG/WebP under 3MB) and review card (`[data-testid="preflight-summary"]`) displaying title, location, full description, and photo attachment status.
-- **My Reports Workspace (`/my-reports`):** Responsive desktop table and mobile cards (`.md:hidden .card`) with zero horizontal overflow (`UIUX-05`).
+- **My Reports Workspace (`/my-reports`):** Responsive desktop table and mobile cards (`.md:hidden .card`) with zero horizontal overflow (`UIUX-05`). The initial status is Pending. Status options count all permitted result pages with the current search applied. Clear filters shows every status. Successful cancellation reloads both the list and its counts; failed counting offers Retry counts while leaving the list usable.
 - **Report Cancellation Modal:** Dedicated dialog (`[role="dialog"]`) with optional reason textarea (`#cancel-details`), dismissible via "Keep it" button or keyboard Escape key.
 - **Photo Lightbox Modal:** Full-screen modal accessible on report details. Focus is trapped, body scroll is locked, and dialog closes via Close button or Escape key.
 - **Pending Report Editing (`/reports/:id`):** Inline title and description editor. The Save changes button is disabled while form input is unchanged, invalid, or pending.

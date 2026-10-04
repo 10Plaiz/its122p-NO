@@ -42,20 +42,12 @@ Key settings, server configuration, API code, and account records were not chang
 
 ## Evidence
 
-- [Baseline first loads](before.json) showed reports while Google rejected the
-  key, demonstrating that the authorization error alone did not always blank
-  the board.
-- [Baseline filtering and remount](before-remount.json) recorded no board
-  heading or cards on either port after SDK failure.
-- [Native failure after the correction](after.json) recorded the board heading,
-  50 cards, and a map fallback after filtering and reopening on both ports.
-  Port 5174 had no uncaught page errors. Port 5175 recorded a nonfatal SDK
-  `setAttribute` error; the board remained visible.
+- [Baseline filtering and remount](before-remount-5174.png) showed a blank board
+  after SDK failure on the configured UI origin.
+- [After the correction](after-5174.png) showed the report list and map fallback.
 - [Final native check on 5174](final-native.json) waits for the visible board
   after filtering and reopening. It recorded the heading, 50 cards, one map
   fallback, and no uncaught page errors under Google's real key rejection.
-- [Before on 5174](before-remount-5174.png)
-- [After on 5174](after-5174.png)
 
 Two focused browser regression tests passed. They cover Google's authentication
 callback, blocked script loading, report visibility, filtering, reopening the
