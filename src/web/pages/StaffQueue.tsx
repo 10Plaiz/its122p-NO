@@ -11,9 +11,12 @@ import {
   reportColumn,
   useColumnVisibility,
 } from "../components/data-table/index.js";
-import { Alert, Card, EmptyState, Field, Input, Loading, Select, StatusBadge, formatDate } from "../components/ui.js";
+import { Alert, Button, Card, EmptyState, Field, Input, Loading, Select, StatusBadge, formatDate } from "../components/ui.js";
 import { RatingAverage } from "../components/FeedbackSummary.js";
 import { BarangayFilter } from "../components/BarangayFilter.js";
+import { FilterCountsFeedback, FilterOption } from "../components/FilterOption.js";
+import { countFilterOptions } from "../lib/filter-counts.js";
+import { reportFilterValues, useFilterRows } from "../lib/useFilterRows.js";
 import { describeFilters } from "../lib/export.js";
 import type { Column } from "../lib/table-types.js";
 import { useApi } from "../lib/useApi.js";
@@ -27,7 +30,7 @@ const TABLE_ID = "staff-queue";
 // call; the server scopes it to assigned_staff_id, so this asks for no id of its own.
 export function StaffQueuePage() {
   const [search, setSearch] = useState("");
-  const [status, setStatus] = useState("");
+  const [status, setStatus] = useState("under_review");
   const [barangay, setBarangay] = useState("");
   const [page, setPage] = useState(1);
 
@@ -36,8 +39,18 @@ export function StaffQueuePage() {
   const query = useMemo(() => ({ ...filters, page, per_page: PER_PAGE }), [filters, page]);
 
   const { data, error, loading } = useApi<Paged<"reports", Report>>("/reports", query);
+  const countQuery = useMemo(() => ({ q: search.trim() }), [search]);
+  const countRows = useFilterRows<"reports", Report>({ path: "/reports", collection: "reports", query: countQuery, perPage: 50, valuesOf: reportFilterValues });
+  const counts = useMemo(() => countFilterOptions(countRows.rows, { status, barangay }), [countRows.rows, status, barangay]);
   const reports = data?.reports ?? [];
-  const filtered = search.trim() !== "" || status !== "";
+  const filtered = search.trim() !== "" || status !== "" || barangay !== "";
+
+  function clearFilters() {
+    setSearch("");
+    setStatus("");
+    setBarangay("");
+    setPage(1);
+  }
 
   // A queue is a worklist, so it reads as one: oldest at the top, one row each,
   // and the row's action allows opening and inspecting the report.
@@ -117,11 +130,9 @@ export function StaffQueuePage() {
                 setPage(1);
               }}
             >
-              <option value="">Any status</option>
+              <FilterOption value="" label="Any status" counts={counts.status} />
               {STATUSES.map((key) => (
-                <option key={key} value={key}>
-                  {STATUS_LABEL[key]}
-                </option>
+                <FilterOption key={key} value={key} label={STATUS_LABEL[key]} counts={counts.status} />
               ))}
             </Select>
           </Field>
@@ -130,6 +141,7 @@ export function StaffQueuePage() {
         <ToolbarItem>
           <BarangayFilter
             value={barangay}
+            counts={counts.barangay}
             onChange={(value) => {
               setBarangay(value);
               setPage(1);
@@ -144,14 +156,19 @@ export function StaffQueuePage() {
         <ExportMenu onExport={onExport} disabled={!data || data.total === 0} />
       </TableToolbar>
 
+      <FilterCountsFeedback loading={countRows.loading} error={countRows.error} onRetry={countRows.reload} />
+
       {error && <Alert title="Could not load your queue">{error.message}</Alert>}
       {loading && <Loading label="Loading your queue" />}
 
       {/* 1n: says why it is empty, not just that it is. */}
-      {!loading && reports.length === 0 && (
+      {!loading && !error && reports.length === 0 && (
         <EmptyState title={filtered ? "Nothing matches those filters" : "Nothing is assigned to you yet"}>
           {filtered
-            ? "Try a different word, or clear the status filter."
+            ? <div className="flex flex-col items-start gap-3">
+              <p>Try a different word, or clear the filters to see every status.</p>
+              <Button type="button" onClick={clearFilters}>Clear filters</Button>
+            </div>
             : "An administrator assigns reports to staff. When one comes to you, it will appear here and the citizen will be told it is under review."}
         </EmptyState>
       )}

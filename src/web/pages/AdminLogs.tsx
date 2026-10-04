@@ -14,6 +14,9 @@ import { capNotice, describeFilters, exportTable } from "../lib/export.js";
 import type { Column, ExportFormat, ExportResult } from "../lib/table-types.js";
 import { ACTIVITY_LABEL, activityLabel } from "../lib/activity-labels.js";
 import { useApi } from "../lib/useApi.js";
+import { FilterCountsFeedback, FilterOption } from "../components/FilterOption.js";
+import { countFilterOptions } from "../lib/filter-counts.js";
+import { logFilterValues, useFilterRows } from "../lib/useFilterRows.js";
 import { ROLES, ROLE_LABEL, type ActivityLog, type Paged, type Role } from "../lib/types.js";
 
 const PER_PAGE = 50;
@@ -117,6 +120,9 @@ export function AdminLogsPage() {
   const filtered = Object.values(filters).some((value) => value !== "");
 
   const { data, error, loading } = useApi<Paged<"logs", ActivityLog>>("/admin/logs", query);
+  const countQuery = useMemo(() => ({ reference: reference.trim(), from, to }), [reference, from, to]);
+  const countRows = useFilterRows<"logs", ActivityLog>({ path: "/admin/logs", collection: "logs", query: countQuery, perPage: 100, valuesOf: logFilterValues });
+  const counts = useMemo(() => countFilterOptions(countRows.rows, { action, role }), [countRows.rows, action, role]);
   const { visible, setShown, reset } = useColumnVisibility(TABLE_ID, COLUMNS);
   const logs = data?.logs ?? [];
 
@@ -185,11 +191,9 @@ export function AdminLogsPage() {
         <ToolbarItem wide>
           <Field label="Action" htmlFor="log-action">
             <Select id="log-action" value={action} onChange={(event) => change(setAction)(event.target.value)}>
-              <option value="">Any action</option>
+              <FilterOption value="" label="Any action" counts={counts.action} />
               {ACTION_OPTIONS.map(([code, label]) => (
-                <option key={code} value={code}>
-                  {label}
-                </option>
+                <FilterOption key={code} value={code} label={label} counts={counts.action} />
               ))}
             </Select>
           </Field>
@@ -210,11 +214,9 @@ export function AdminLogsPage() {
         <ToolbarItem>
           <Field label="Role" htmlFor="log-role">
             <Select id="log-role" value={role} onChange={(event) => change(setRole)(event.target.value)}>
-              <option value="">Any role</option>
+              <FilterOption value="" label="Any role" counts={counts.role} />
               {ROLES.map((key) => (
-                <option key={key} value={key}>
-                  {ROLE_LABEL[key]}
-                </option>
+                <FilterOption key={key} value={key} label={ROLE_LABEL[key]} counts={counts.role} />
               ))}
             </Select>
           </Field>
@@ -224,16 +226,18 @@ export function AdminLogsPage() {
         <ExportMenu onExport={onExport} disabled={!data || data.total === 0} />
       </TableToolbar>
 
+      <FilterCountsFeedback loading={countRows.loading} error={countRows.error} onRetry={countRows.reload} />
+
       {error && <Alert title="Could not load the activity log">{error.message}</Alert>}
       {loading && <Loading label="Loading the activity log" />}
 
-      {!loading && logs.length === 0 && !filtered && (
+      {!loading && !error && logs.length === 0 && !filtered && (
         <EmptyState title="Nothing has been recorded yet">
           Actions appear here as staff and administrators work on reports.
         </EmptyState>
       )}
 
-      {!loading && logs.length === 0 && filtered && (
+      {!loading && !error && logs.length === 0 && filtered && (
         <EmptyState title="No entries match those filters">
           <p className="!m-0">Widen the dates, choose another action, or clear the report reference.</p>
           <Button type="button" className="mt-3" onClick={clearFilters}>
