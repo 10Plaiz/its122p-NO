@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { Component, useMemo } from "react";
 import type { ReactNode } from "react";
 import {
   APILoadingStatus,
@@ -9,6 +9,9 @@ import {
   useApiLoadingStatus,
 } from "@vis.gl/react-google-maps";
 import { MAKATI_PATHS, googleMapsApiKey, readToken } from "../lib/maps.js";
+import { useMapsAuthFailure } from "../lib/maps-auth.js";
+
+const AUTH_FAILURE_MESSAGE = "Google Maps refused this site's key. An administrator needs to check the key's restrictions.";
 
 // The shell every Google map in the app sits in: it loads the Maps script only on
 // screens that show a map, and stands in with a plain message when there is no key
@@ -28,18 +31,48 @@ export function MapFrame({ children, unavailable }: { children: ReactNode; unava
   return (
     // Every map passes the same options, so the script loads once however many
     // frames a screen has.
-    <APIProvider apiKey={apiKey} region="PH" language="en">
-      <LoadGate unavailable={unavailable}>{children}</LoadGate>
-    </APIProvider>
+    <MapFailureBoundary unavailable={unavailable}>
+      <APIProvider apiKey={apiKey} region="PH" language="en">
+        <LoadGate unavailable={unavailable}>{children}</LoadGate>
+      </APIProvider>
+    </MapFailureBoundary>
+  );
+}
+
+class MapFailureBoundary extends Component<
+  { children: ReactNode; unavailable?: ReactNode },
+  { failed: boolean }
+> {
+  state = { failed: false };
+
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+
+  render() {
+    if (this.state.failed) {
+      return <MapFailureFallback unavailable={this.props.unavailable} />;
+    }
+    return this.props.children;
+  }
+}
+
+function MapFailureFallback({ unavailable }: { unavailable?: ReactNode }) {
+  const authFailed = useMapsAuthFailure();
+  return (
+    <MapUnavailable message={authFailed ? AUTH_FAILURE_MESSAGE : "The map could not be displayed. You can still use the rest of this page."}>
+      {unavailable}
+    </MapUnavailable>
   );
 }
 
 function LoadGate({ children, unavailable }: { children: ReactNode; unavailable?: ReactNode }) {
   const status = useApiLoadingStatus();
+  const authFailed = useMapsAuthFailure();
 
-  if (status === APILoadingStatus.AUTH_FAILURE) {
+  if (authFailed || status === APILoadingStatus.AUTH_FAILURE) {
     return (
-      <MapUnavailable message="Google Maps refused this site's key. An administrator needs to check the key's restrictions.">
+      <MapUnavailable message={AUTH_FAILURE_MESSAGE}>
         {unavailable}
       </MapUnavailable>
     );
@@ -76,7 +109,7 @@ function MapUnavailable({ message, children }: { message: string; children?: Rea
 // `fallback` is the token's own value, for the moment before the stylesheet applies.
 export function MakatiOutline({
   token = "--color-neutral-700",
-  fallback = "#605d5d",
+  fallback = "#415053",
 }: {
   token?: string;
   fallback?: string;

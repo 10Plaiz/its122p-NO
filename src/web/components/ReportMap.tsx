@@ -52,6 +52,8 @@ function FitToReports({
   useEffect(() => {
     if (!map) return;
     const container = map.getDiv();
+    // A map created after Google rejects the key can lack its DOM container.
+    if (!container) return;
 
     function tryFit() {
       if (!map || fitted.current === fitKey) return;
