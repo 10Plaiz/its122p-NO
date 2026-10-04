@@ -1,0 +1,42 @@
+[
+  {
+    "date": "2026-10-04",
+    "scope": "app",
+    "operation": "audit and approved palette refinement",
+    "genre": "modern-minimal",
+    "theme": "custom deep teal with semantic status colors",
+    "anchor": "#0d6374",
+    "designSystem": "design.md",
+    "tokens": "src/web/styles/tokens.css",
+    "structure": "existing Modernist application layouts",
+    "scores": {
+      "philosophy": 4,
+      "hierarchy": 4,
+      "execution": 4,
+      "specificity": 5,
+      "restraint": 4,
+      "variety": 3
+    },
+    "evidence": "tests/evidence/hallmark-design-system-2026-10-04/report.md"
+  },
+  {
+    "date": "2026-10-04",
+    "scope": "app",
+    "operation": "Admin Users and list-toolbar refinement",
+    "genre": "modern-minimal",
+    "theme": "approved deep teal and semantic status colors",
+    "anchor": "#0d6374",
+    "designSystem": "design.md",
+    "tokens": "src/web/styles/tokens.css",
+    "structure": "shared list toolbars, compact desktop accounts, stacked mobile rows",
+    "scores": {
+      "philosophy": 4,
+      "hierarchy": 4,
+      "execution": 4,
+      "specificity": 5,
+      "restraint": 4,
+      "variety": 3
+    },
+    "evidence": "tests/evidence/pills-users-toolbar-2026-10-04/report.md"
+  }
+]

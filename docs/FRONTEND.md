@@ -53,6 +53,13 @@ When a user directly accesses a protected report-detail URL for a report they ar
 
 ## Shared browser behavior
 
+The [design system](../design.md) owns the shared visual contract. Routine
+actions and selection use deep teal. Blue identifies information, green
+identifies success, and amber identifies warnings. Red is reserved for errors
+and destructive actions. Status badges and map pins use the same mapping.
+The canonical tokens are in `src/web/styles/tokens.css`; reusable components
+are in the components cascade layer in `src/web/styles/ds.css`.
+
 - `src/web/lib/auth.tsx` restores a stored session with `/auth/me`, listens for
   the `kamoti:auth-expired` event dispatched on 401 or deactivation 403 API
   responses to clear local session state, and selects the role home after
@@ -73,6 +80,14 @@ When a user directly accesses a protected report-detail URL for a report they ar
   failures use an alert and preserve a usable route back when one exists.
 - The public board stores filters and paging in the URL so filtered views are
   shareable and browser navigation restores them.
+- Shared map frames listen to Google's `gm_authFailure` callback. A rejected key
+  shows Map unavailable while preserving report lists, forms, and location
+  details. The failed state survives route changes because the Maps SDK stays
+  loaded. Correct the key's website restrictions and reload to retry the map.
+- Report-map fitting checks that the map has a DOM container before measuring
+  it. Script load failures also use the shared map fallback. A boundary around
+  each map frame contains SDK errors during React rendering and cleanup so the
+  rest of the page remains usable.
 - The report form keeps reverse-geocoded addresses editable. Coordinates remain
   the report location when the third-party lookup is unavailable.
 - The report map supports pointer placement and a keyboard path: arrow keys move
@@ -80,6 +95,26 @@ When a user directly accesses a protected report-detail URL for a report they ar
 - Assignment dialogs move focus inside, contain Tab navigation, close with Escape,
   and return focus to the Assign control. Staff contact offers calling through
   `tel:` only.
+- Report, account, residency, phone-verification, and unread-notification states
+  share the noninteractive `StatusPill` component. Status pills use soft fills
+  and a capsule shape; role and category tags retain square corners.
+- List toolbars place search after filters and utility menus, at the right edge.
+  This is also their keyboard order. Controls wrap to full width on phones.
+- Admin Users groups account details into one column and stacks rows below
+  768 px. Name, email, mobile, and account-status filtering runs over the loaded
+  user list; role and residency use the existing server filters. Selecting Staff
+  or Administrator clears and disables the citizen-only residency filter.
+- An unsuccessful users request shows an alert with Try again. Empty results
+  explain the active filters and offer Clear filters. Loading does not show
+  outdated rows under newly selected filters.
+- Deactivation and reactivation require confirmation. The native dialog contains
+  keyboard focus, closes with Escape or Cancel, and restores focus on dismissal.
+  While saving, it stays open and prevents dismissal and duplicate submission.
+  A failed save retains the current account status and shows an error in the dialog.
+- New account is a form that supports Enter to submit. Fields and cancellation
+  are disabled while sending. Failed submission retains input; correcting a
+  rejected field clears its feedback, while other field errors remain visible.
+  Cancelling restores focus to New account.
 - Citizens who own a pending report can edit details and pin location inline on
   `/reports/:id` before staff handling begins. Saving updates the record and
   refreshes the timeline.

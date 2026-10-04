@@ -10,6 +10,7 @@ Use this page to find the document that owns the information you need.
 | [Local development](LOCAL_DEV.md) | Prerequisites, environment setup, local commands, safety, and synthetic fixtures |
 | [Verification skill](../.agents/skills/verify-kamoti/SKILL.md) | Local application driving recipes, persona credentials, evidence capture, and feature map |
 | [Frontend guide](FRONTEND.md) | Browser routes, route-level role access, page purposes, and important UI behavior |
+| [Design system](../design.md) | Shared palette, reserved red usage, typography, component ownership, and visual verification |
 | [Course guide](Guide.md) | Course-wide requirements, later stack clarification, and final deliverables |
 | [Phase 3 and Phase 4 instructions](Phase_Instructions.md) | Archived handouts: frontend and API, then testing and security submission requirements |
 | [Phase 4 test report](Phase4_Test_Report.md) | Test cases, evidence index, bug log, result metrics, and peer evaluation |
