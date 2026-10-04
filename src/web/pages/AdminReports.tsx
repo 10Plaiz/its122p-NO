@@ -104,8 +104,8 @@ export function AdminReportsPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <TableToolbar title="All reports" description="Every report in the system, and who is working on it.">
-        <ToolbarItem wide>
+      <TableToolbar title="All reports" description="Every report in the system, and who is working on it."
+        search={
           <Field label="Search" htmlFor="q">
             <Input
               id="q"
@@ -121,8 +121,8 @@ export function AdminReportsPage() {
               }}
             />
           </Field>
-        </ToolbarItem>
-
+        }
+      >
         <ToolbarItem>
           <Field label="Status" htmlFor="status">
             <Select
