@@ -89,7 +89,23 @@ are in the components cascade layer in `src/web/styles/ds.css`.
 - API field errors appear beside the corresponding form controls. Page-level
   failures use an alert and preserve a usable route back when one exists.
 - The public board stores filters and paging in the URL so filtered views are
-  shareable and browser navigation restores them.
+  shareable and browser navigation restores them. It opens at Under review;
+  an explicit `status=all` preserves a chosen Any status view on reload.
+- Admin Reports and My Reports open at Pending. The Staff queue opens at Under
+  review. Any status remains selectable, and Clear filters shows every status
+  rather than reinstating the initial selection.
+- Dropdown filters include result counts, such as `Pending (12)`. Each option
+  counts the rows that would match that choice and the other active filters.
+  Search and activity-log dates restrict these counts too. Sort controls only
+  reorder rows and do not have counts. Notification All/Unread filters already
+  show counts for the loaded inbox.
+- Report and activity counts use sequential pages from the existing read-only
+  list endpoints. Only filter values stay in memory. Changing a dropdown or
+  table page reuses those values; search/date changes refetch them after a
+  short debounce. Report cancellation and assignment refresh the count data.
+  Partial, duplicate, or changing page results are discarded. Loading and failed
+  counts retain usable filters without presenting a missing count as zero;
+  failed counting offers Retry counts separately from loading the list.
 - Shared map frames listen to Google's `gm_authFailure` callback. A rejected key
   shows Map unavailable while preserving report lists, forms, and location
   details. The failed state survives route changes because the Maps SDK stays
@@ -113,9 +129,10 @@ are in the components cascade layer in `src/web/styles/ds.css`.
 - List toolbars place search after filters and utility menus, at the right edge.
   This is also their keyboard order. Controls wrap to full width on phones.
 - Admin Users groups account details into one column and stacks rows below
-  768 px. Name, email, mobile, and account-status filtering runs over the loaded
-  user list; role and residency use the existing server filters. Selecting Staff
-  or Administrator clears and disables the citizen-only residency filter.
+  768 px. Search, account status, role, residency, and their counts use the
+  existing complete users response locally. Proof waiting for review counts
+  only pending accounts with an uploaded proof. Selecting Staff or Administrator
+  clears and disables residency; their role-option counts reflect that reset.
 - An unsuccessful users request shows an alert with Try again. Empty results
   explain the active filters and offer Clear filters. Loading does not show
   outdated rows under newly selected filters.

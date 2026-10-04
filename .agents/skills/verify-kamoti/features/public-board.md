@@ -5,7 +5,7 @@ Persona: Public Visitor / Citizen
 
 ## Sub-features
 - **Public Report Feed:** Chronological cards displaying reviewed public issues with status tags and thumbnail photos.
-- **Filter and Search Bar:** Category dropdown (`#category`), status toggle, and keyword search persisting parameters to URL query params.
+- **Filter and Search Bar:** Status, category, barangay, and search persist in URL parameters. The initial status is Under review. Each dropdown option counts every result page with the other filters applied. `status=all` preserves an explicit Any status selection on reload; Clear filters also uses that value. Loading or failed counts do not appear as zero, and Retry counts leaves the list usable.
 - **Interactive Map:** Google map of Makati with the city outline and one square pin per report, coloured by status (resolved: green with a check; rejected: dark with a cross), synchronized with the selected card.
 - **Mobile Segmented View:** Responsive toggle switching between Map view and List view on viewports under 1024px (`[data-testid="mobile-view-toggle"]`).
 - **Card Expansion:** Clicking a card button expands detailed notes, photo thumbnail, and highlights corresponding map marker.
@@ -13,7 +13,7 @@ Persona: Public Visitor / Citizen
 ## How to get to it (user POV)
 1. Navigate to `/` as an unauthenticated visitor.
 2. Click "Browse community board" or select "Community board" from the top navigation.
-3. The board displays published reports (`under_review`, `in_progress`, `resolved`). PII is scrubbed.
+3. The board initially displays `under_review`. Visitors can select `in_progress`, `resolved`, `rejected`, or Any status. Pending reports remain private and PII is scrubbed.
 
 ## Driving it with Playwright
 

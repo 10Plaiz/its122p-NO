@@ -90,24 +90,14 @@ bunx playwright test --config tests/evidence/hallmark-design-system-2026-10-04/p
 The local configuration uses the documented presentation admin and installed
 Chrome. It runs without database cleanup because these checks create no records.
 
-[observations.json](observations.json) records requested view names, actual URLs,
-headings, computed styles, screenshots, and console issues. Names describe the
-requested view; use the actual URL and headings to assess coverage.
-
 Representative screenshots:
 
 - [Entry page](entry-1280.png)
-- [Public board](board-1280.png)
-- [Staff report](staff-report-375.png)
-- [Admin dashboard](admin-dashboard-1280.png)
-- [Admin reports on mobile](admin-reports-375.png)
 - [Assignment dialog on mobile](assign-dialog-375.png)
 - [Destructive confirmation](retire-confirmation-1280.png)
 
-Baseline evidence is in the sibling `hallmark-audit-2026-10-04-live`,
-`hallmark-audit-2026-10-04-authenticated`, and `hallmark-audit-2026-10-04-personas`
-folders. The first sandboxed audit folder also records its network limitations
-and an outdated registration selector used by the driver.
+The [baseline Admin Reports screenshot](../hallmark-audit-2026-10-04-authenticated/admin-reports-1280.png)
+supports the PR's before-and-after comparison.
 
 ## Verification limits
 

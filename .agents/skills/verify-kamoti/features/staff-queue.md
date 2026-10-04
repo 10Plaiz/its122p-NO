@@ -4,7 +4,7 @@ Route: `/staff/queue` and `/staff/reports/:id`
 Persona: Staff Member (`fixture-staff-1@kamoti.invalid`)
 
 ## Sub-features
-- **Assigned Queue:** Work queue filtered strictly to reports assigned to the signed-in staff member, sorted oldest first.
+- **Assigned Queue:** Work queue filtered strictly to reports assigned to the signed-in staff member, sorted oldest first. The initial status is Under review. Status and barangay options count every matching page with the other filters applied. Clear filters shows every status; failed or incomplete counting offers Retry counts separately from loading the queue.
 - **Responsive Mobile Task Cards:** Stacked mobile cards on screens under 768px (`.md:hidden .card`) preventing horizontal scrollbars (`UIUX-04`).
 - **Inspect Action Affordance:** Clear table and card action links labeled "Inspect report" navigating to report details.
 - **Citizen Contact Link:** A direct `tel:` call link on the inspection view (`KR-23`). There is no SMS action.
