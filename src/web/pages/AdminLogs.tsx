@@ -165,21 +165,8 @@ export function AdminLogsPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <TableToolbar title="Activity log" description="Every recorded action, newest first.">
-        <ToolbarItem wide>
-          <Field label="Action" htmlFor="log-action">
-            <Select id="log-action" value={action} onChange={(event) => change(setAction)(event.target.value)}>
-              <option value="">Any action</option>
-              {ACTION_OPTIONS.map(([code, label]) => (
-                <option key={code} value={code}>
-                  {label}
-                </option>
-              ))}
-            </Select>
-          </Field>
-        </ToolbarItem>
-
-        <ToolbarItem>
+      <TableToolbar title="Activity log" description="Every recorded action, newest first."
+        search={
           <Field label="Report" htmlFor="log-reference">
             <Input
               id="log-reference"
@@ -192,6 +179,19 @@ export function AdminLogsPage() {
               value={reference}
               onChange={(event) => change(setReference)(event.target.value)}
             />
+          </Field>
+        }
+      >
+        <ToolbarItem wide>
+          <Field label="Action" htmlFor="log-action">
+            <Select id="log-action" value={action} onChange={(event) => change(setAction)(event.target.value)}>
+              <option value="">Any action</option>
+              {ACTION_OPTIONS.map(([code, label]) => (
+                <option key={code} value={code}>
+                  {label}
+                </option>
+              ))}
+            </Select>
           </Field>
         </ToolbarItem>
 

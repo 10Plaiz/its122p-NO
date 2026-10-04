@@ -89,8 +89,7 @@ export function StaffQueuePage() {
       <TableToolbar
         title="My queue"
         description="Reports assigned to you, oldest first. Open any report to inspect evidence, leave remarks, or advance its status."
-      >
-        <ToolbarItem wide>
+        search={
           <Field label="Search" htmlFor="q">
             <Input
               id="q"
@@ -106,8 +105,8 @@ export function StaffQueuePage() {
               }}
             />
           </Field>
-        </ToolbarItem>
-
+        }
+      >
         <ToolbarItem>
           <Field label="Status" htmlFor="status">
             <Select

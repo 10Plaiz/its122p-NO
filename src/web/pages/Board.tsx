@@ -169,20 +169,6 @@ export function BoardPage() {
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-        <Field label="Search" htmlFor="q">
-          <Input
-            id="q"
-            name="q"
-            type="search"
-            autoComplete="off"
-            spellCheck={false}
-            maxLength={100}
-            placeholder="Pothole, streetlight, barangay hall…"
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-          />
-        </Field>
-
         <Field label="Status" htmlFor="status">
           <Select
             id="status"
@@ -234,6 +220,21 @@ export function BoardPage() {
             ))}
           </Select>
         </Field>
+        <div className="sm:col-span-2 lg:col-span-1">
+          <Field label="Search" htmlFor="q">
+            <Input
+              id="q"
+              name="q"
+              type="search"
+              autoComplete="off"
+              spellCheck={false}
+              maxLength={100}
+              placeholder="Title or description…"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+            />
+          </Field>
+        </div>
       </div>
 
       {error && <Alert title="Could not load the board">{error.message}</Alert>}

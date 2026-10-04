@@ -1,20 +1,21 @@
 import type { ReactNode } from "react";
 
-// TB-3: the page title on the left; search, filters, the column menu and export
-// on the right. When the row runs out of room the controls wrap under the title
-// and stay right-aligned; on a phone each control takes the full width.
+// Filters and utilities precede search in both visual and keyboard order.
 export function TableToolbar({
   title,
   description,
   action,
+  search,
   children,
 }: {
   title: string;
   description?: ReactNode;
   /** The screen's own call to action ("Report an issue"), kept with the title, apart from the filters. */
   action?: ReactNode;
-  /** The controls, in reading order: search, filters, then ColumnMenu and ExportMenu. */
-  children: ReactNode;
+  /** The search field, always the last control on the right. */
+  search?: ReactNode;
+  /** Filters, then ColumnMenu and ExportMenu. */
+  children?: ReactNode;
 }) {
   return (
     <header className="flex flex-wrap items-end justify-between gap-x-8 gap-y-4">
@@ -30,13 +31,13 @@ export function TableToolbar({
         className="ml-auto flex w-full flex-wrap items-end gap-2 sm:w-auto sm:justify-end"
       >
         {children}
+        {search && <ToolbarItem wide>{search}</ToolbarItem>}
       </div>
     </header>
   );
 }
 
-// Sizes one control inside the toolbar. `.input` sets width: 100% from unlayered
-// ds.css, so the width has to live on a wrapper rather than on the control.
+// Sizes each control as one wrapping unit in the toolbar.
 export function ToolbarItem({ children, wide }: { children: ReactNode; wide?: boolean }) {
   return <div className={`w-full ${wide ? "sm:w-56" : "sm:w-40"}`}>{children}</div>;
 }
