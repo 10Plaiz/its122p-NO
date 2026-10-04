@@ -48,7 +48,7 @@ export function ResidencyProofStep({ variant = "locked" }: { variant?: "locked" 
   return (
     <div className="flex flex-col gap-5">
       {rejected ? (
-        <Alert title="Your last proof was not accepted">
+        <Alert title="Your last proof was not accepted" tone="warning">
           {user.residency_note ?? "An administrator could not confirm your address from it."} Upload a new proof to
           continue.
         </Alert>

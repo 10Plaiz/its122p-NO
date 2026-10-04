@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useToast } from "./Toast.js";
-import { Alert, Button, Field, Textarea, formatDate, useLeftFields } from "./ui.js";
+import { Alert, Button, Field, StatusPill, Textarea, formatDate, useLeftFields } from "./ui.js";
 import { api } from "../lib/api.js";
 import { RESIDENCY_LABEL, residencyStep } from "../lib/residency.js";
 import { useAction } from "../lib/useApi.js";
@@ -90,7 +90,9 @@ export function ResidencyReview({
         <div className="dialog-body flex flex-col gap-3 text-[13px]" onBlur={fields.onBlur}>
           <dl className="m-0 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
             <dt className="text-muted">Status</dt>
-            <dd className="m-0">{RESIDENCY_LABEL[step]}</dd>
+            <dd className="m-0">
+              <StatusPill tone={step === "verified" ? "success" : "warning"}>{RESIDENCY_LABEL[step]}</StatusPill>
+            </dd>
             <dt className="text-muted">Barangay</dt>
             <dd className="m-0">{user.barangay ?? "—"}</dd>
             <dt className="text-muted">Address</dt>
@@ -169,7 +171,7 @@ export function ResidencyReview({
             <>
               <Button
                 type="button"
-                variant="primary"
+                variant="danger"
                 disabled={review.pending || Boolean(noteError)}
                 onClick={() => decide("rejected")}
               >
@@ -187,7 +189,7 @@ export function ResidencyReview({
                 </Button>
               )}
               {user.has_residency_proof && step !== "rejected" && (
-                <Button type="button" disabled={review.pending} onClick={() => setRejecting(true)}>
+                <Button type="button" variant="danger-outline" disabled={review.pending} onClick={() => setRejecting(true)}>
                   Reject…
                 </Button>
               )}

@@ -12,6 +12,7 @@ import {
   PhotoFrame,
   RemovedPhoto,
   StatusBadge,
+  StatusPill,
   Textarea,
   formatDateTime,
   formatDays,
@@ -106,7 +107,7 @@ export function StaffReportPage() {
 
         <div className="flex items-center justify-between gap-3 flex-wrap pt-2">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="tag tag-outline text-[12px] font-semibold tracking-wide">
+            <span className="tag tag-neutral text-[12px] font-semibold tracking-wide">
               {report.category?.name ?? "Uncategorised"}
             </span>
             <StatusBadge status={report.status} awaitingVerification={closurePending} />
@@ -150,11 +151,11 @@ export function StaffReportPage() {
                   {/* UA-8, UA-6: staff weigh a report knowing whether its author's
                       address and number have been confirmed. */}
                   <p className="flex flex-wrap gap-1.5 !mt-1.5 !mb-0">
-                    <span className={report.citizen.residency_status === "verified" ? "tag tag-outline" : "tag tag-accent"}>
+                    <StatusPill tone={report.citizen.residency_status === "verified" ? "success" : "warning"}>
                       {authorResidencyLabel(report.citizen.residency_status)}
-                    </span>
+                    </StatusPill>
                     {report.citizen.contact_number && !report.citizen.phone_verified_at && (
-                      <span className="tag tag-outline">Number not verified</span>
+                      <StatusPill tone="warning">Number not verified</StatusPill>
                     )}
                   </p>
                 </div>
@@ -574,6 +575,7 @@ function RequestRejection({ report, ready, onDone }: { report: Report; ready: bo
 
       <Button
         type="button"
+        variant="danger-outline"
         disabled={pending || invalid || !ready}
         onClick={async () => {
           if (invalid) return;

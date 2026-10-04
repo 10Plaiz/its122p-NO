@@ -3,9 +3,7 @@ import type { ComponentProps, FocusEvent, InputHTMLAttributes, ReactNode, Select
 import { STATUS_LABEL } from "../lib/types.js";
 import type { ReportStatus } from "../lib/types.js";
 
-// Thin wrappers over the design system's classes in styles/ds.css. They exist to
-// carry the error and label wiring, not to restyle anything — every visual decision
-// stays in the stylesheet so the screens match the wireframes by construction.
+// Shared controls and labels consume the application contract in design.md.
 
 export function Button({
   variant = "secondary",
@@ -13,7 +11,7 @@ export function Button({
   className = "",
   ...props
 }: ComponentProps<"button"> & {
-  variant?: "primary" | "secondary" | "ghost";
+  variant?: "primary" | "secondary" | "ghost" | "danger" | "danger-outline";
   block?: boolean;
 }) {
   return <button className={`btn btn-${variant} ${block ? "btn-block" : ""} ${className}`.trim()} {...props} />;
@@ -81,7 +79,7 @@ export function Field({
             <span
               id={noteId}
               role={error ? "alert" : undefined}
-              className={error ? "text-[11px] text-accent-700" : "text-muted text-[11px]"}
+              className={error ? "text-[11px] text-danger" : "text-muted text-[11px]"}
             >
               {note}
             </span>
@@ -141,10 +139,17 @@ export function Select({ className = "", ...props }: SelectHTMLAttributes<HTMLSe
 }
 
 // The whole-form error: what the server rejected, above the submit button.
-export function Alert({ title, children }: { title: string; children?: ReactNode }) {
+export function Alert({ title, children, tone = "danger" }: {
+  title: string;
+  children?: ReactNode;
+  tone?: "danger" | "warning";
+}) {
+  const colors = tone === "warning"
+    ? "border-warning-700 bg-warning-100"
+    : "border-danger bg-danger-100";
   return (
-    <div role="alert" className="border border-accent p-3 flex flex-col gap-1">
-      <span className="font-mono text-[9.5px] font-semibold uppercase tracking-wider text-accent">{title}</span>
+    <div role="alert" className={`border p-3 flex flex-col gap-1 ${colors}`}>
+      <span className={`font-mono text-[9.5px] font-semibold uppercase tracking-wider ${tone === "warning" ? "text-warning" : "text-danger"}`}>{title}</span>
       {children && <span className="text-[13px] leading-snug">{children}</span>}
     </div>
   );
@@ -184,14 +189,27 @@ function BadgeIcon({ kind }: { kind: "check" | "clock" | "alert" | "cross" }) {
   );
 }
 
-const SUCCESS_TAG = "tag gap-1 border border-success-700 bg-success-100 text-success-800";
-const WARNING_TAG = "tag gap-1 border border-warning-700 bg-warning-100 text-warning-800";
+type PillTone = "neutral" | "accent" | "info" | "success" | "warning" | "danger";
 
-// Mono palette for open work: only the active status carries the accent, per the
-// system's rule that red is used sparingly. A finished report is green with a check
-// (SW-5), and an in-progress report whose resolution is waiting for an
-// administrator says so in amber. Colour is never the only signal: each tone has
-// its own word and icon.
+// Read-only state labels share one shape, independent of button styling.
+export function StatusPill({
+  children,
+  tone = "neutral",
+  icon,
+}: {
+  children: ReactNode;
+  tone?: PillTone;
+  icon?: "check" | "clock" | "alert" | "cross";
+}) {
+  return (
+    <span className={`status-pill status-pill-${tone}`}>
+      {icon && <BadgeIcon kind={icon} />}
+      {children}
+    </span>
+  );
+}
+
+// Status colors match the map pins. Written labels remain the primary signal.
 export function StatusBadge({
   status,
   awaitingVerification = false,
@@ -202,32 +220,28 @@ export function StatusBadge({
 }) {
   if ((status === "in_progress" || status === "under_review") && awaitingVerification) {
     return (
-      <span className={WARNING_TAG}>
-        <BadgeIcon kind="clock" />
+      <StatusPill tone="warning" icon="clock">
         Awaiting verification
-      </span>
+      </StatusPill>
     );
   }
   if (status === "resolved") {
     return (
-      <span className={SUCCESS_TAG}>
-        <BadgeIcon kind="check" />
+      <StatusPill tone="success" icon="check">
         {STATUS_LABEL[status]}
-      </span>
+      </StatusPill>
     );
   }
-  // SW-7: closed without a repair. Neutral, not red: red is the accent for active
-  // work and for errors, and a rejection is a decision, not a failure.
+  // SW-7: closed without a repair is a neutral decision.
   if (status === "rejected") {
     return (
-      <span className="tag tag-neutral gap-1 border border-neutral-700">
-        <BadgeIcon kind="cross" />
+      <StatusPill icon="cross">
         {STATUS_LABEL[status]}
-      </span>
+      </StatusPill>
     );
   }
-  const tone = status === "in_progress" ? "tag-accent" : "tag-outline";
-  return <span className={`tag ${tone}`}>{STATUS_LABEL[status]}</span>;
+  const tone = status === "in_progress" ? "accent" : status === "under_review" ? "info" : "neutral";
+  return <StatusPill tone={tone}>{STATUS_LABEL[status]}</StatusPill>;
 }
 
 // "Delayed" when a report has sat at its stage past the threshold (SW-6). Renders
@@ -235,10 +249,9 @@ export function StatusBadge({
 export function DelayBadge({ delay }: { delay: { delayed: boolean; days: number } | null | undefined }) {
   if (!delay?.delayed) return null;
   return (
-    <span className={WARNING_TAG}>
-      <BadgeIcon kind="alert" />
+    <StatusPill tone="warning" icon="alert">
       Delayed &middot; {formatDays(delay.days)}
-    </span>
+    </StatusPill>
   );
 }
 

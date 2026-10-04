@@ -17,7 +17,7 @@ import { BarangayFilter } from "../components/BarangayFilter.js";
 import { describeFilters } from "../lib/export.js";
 import type { Column } from "../lib/table-types.js";
 import { useApi } from "../lib/useApi.js";
-import { STATUSES, STATUS_LABEL } from "../lib/types.js";
+import { STATUSES, STATUS_LABEL, closurePendingOf } from "../lib/types.js";
 import type { Paged, Report, ReportStatus } from "../lib/types.js";
 
 const PER_PAGE = 20;
@@ -163,9 +163,9 @@ export function StaffQueuePage() {
           <div className="flex flex-col gap-3 md:hidden">
             {reports.map((report) => (
               <Card key={report.id} className="p-4 flex flex-col gap-2.5 border border-divider">
-                <div className="flex items-center justify-between gap-2">
+                <div className="flex flex-wrap items-center justify-between gap-2">
                   <span className="font-mono text-[11px] text-muted">{report.reference_code}</span>
-                  <StatusBadge status={report.status} />
+                  <StatusBadge status={report.status} awaitingVerification={closurePendingOf(report)} />
                 </div>
 
                 <div className="flex flex-col gap-1">
@@ -176,7 +176,7 @@ export function StaffQueuePage() {
                     {report.title}
                   </Link>
                   <div className="flex items-center gap-2 flex-wrap text-muted text-[11px]">
-                    <span className="tag tag-outline text-[10px] uppercase">
+                    <span className="tag tag-neutral text-[10px] uppercase">
                       {report.category?.name ?? "Uncategorised"}
                     </span>
                     <span>&middot;</span>

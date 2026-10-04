@@ -30,7 +30,7 @@ export function DataTable<Row>({
   const shown = columns.filter((column) => visible.has(column.id));
 
   return (
-    <div className={`overflow-x-auto ${className}`.trim()}>
+    <div className={`relative overflow-x-auto ${className}`.trim()}>
       <table className="table w-full" data-table={id}>
         <caption className="sr-only">{caption}</caption>
         <thead>

@@ -1,11 +1,5 @@
-/* Modernist component layer, copied from the wireframe design system under
-   "Wireframe Screens Project/_ds/", which stays the upstream source. Its readme.md
-   documents the rules these classes encode.
-
-   ONE deliberate change from upstream: the :root token block and the Google Fonts
-   import were lifted out into app.css, because Tailwind v4 needs the tokens inside
-   its @theme block to generate matching utilities. Re-exporting the design system
-   means re-applying that split. Everything below is verbatim. */
+/* KAMOTI's Modernist component layer. design.md owns the live system;
+   tokens.css supplies its shared palette, typography, and spacing. */
 
 
 body {
@@ -17,17 +11,12 @@ h1, h2, h3, h4 { font-family: var(--font-heading); font-weight: var(--font-headi
 
 .grayscale{filter:grayscale(1) contrast(1.08)}
 
-/* ══════════════════════════════════════════════════════════════════════════
-   Components — built with the tokens above. Plain CSS
-   on plain HTML: no JavaScript, no build step. Each class is documented in
-   readme.md and demonstrated in foundations/ and components/.
-   ══════════════════════════════════════════════════════════════════════ */
-
 *, *::before, *::after { box-sizing: border-box; }
 body { margin: 0; font-size: 15px; line-height: 1.55; font-weight: 400; }
 h1, h2, h3, h4, h5, h6 {
   font-family: var(--font-heading); font-weight: var(--font-heading-weight);
   line-height: 1.12; letter-spacing: -0.015em; margin: 0 0 var(--space-2);
+  font-style: normal; overflow-wrap: anywhere; min-width: 0;
 }
 h1 { font-size: 42px; }
 h2 { font-size: 32px; }
@@ -42,9 +31,9 @@ img { display: block; max-width: 100%; }
 figure { margin: 0; }
 figcaption {
   font-size: 11px; margin-top: var(--space-1);
-  color: color-mix(in srgb, var(--color-text) 55%, transparent);
+  color: var(--color-muted);
 }
-.text-muted { color: color-mix(in srgb, var(--color-text) 55%, transparent); }
+.text-muted { color: var(--color-muted); }
 :focus { outline: none; }
 :focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
 ::selection { background: color-mix(in srgb, var(--color-accent) 30%, transparent); }
@@ -71,6 +60,12 @@ figcaption {
 .btn-primary { background: var(--color-accent); color: var(--color-bg); }
 .btn-primary:hover { background: var(--color-accent-600); }
 .btn-primary:active { background: var(--color-accent-700); }
+.btn-danger { background: var(--color-danger); color: var(--color-bg); }
+.btn-danger:hover { background: var(--color-danger-600); }
+.btn-danger:active { background: var(--color-danger-700); }
+.btn-danger-outline { border-color: var(--color-danger); color: var(--color-danger); }
+.btn-danger-outline:hover { background: var(--color-danger-100); }
+.btn-danger-outline:active { background: var(--color-danger-100); color: var(--color-danger-700); }
 .btn-secondary { border-color: var(--color-divider); }
 .btn-secondary:hover { background: color-mix(in srgb, var(--color-text) 7%, transparent); }
 .btn-secondary:active { background: color-mix(in srgb, var(--color-text) 14%, transparent); }
@@ -83,7 +78,7 @@ figcaption {
 /* — forms — */
 .field > label {
   display: block; font-size: 12px; margin-bottom: 5px;
-  color: color-mix(in srgb, var(--color-text) 70%, transparent);
+  color: var(--color-muted);
 }
 .input {
   width: 100%; min-height: 36px; padding: 6px 10px; font: inherit;
@@ -93,6 +88,8 @@ figcaption {
 }
 .input:hover { border-color: color-mix(in srgb, var(--color-text) 45%, transparent); }
 .input:focus-visible { border-color: var(--color-accent); outline-offset: 0; }
+.input[aria-invalid='true'] { border-color: var(--color-danger); }
+.input::placeholder { color: var(--color-muted); opacity: 1; }
 textarea.input { min-height: 90px; resize: vertical; }
 .radio { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; font-size: 14px; }
 .radio input, .seg-opt input {
@@ -134,7 +131,7 @@ textarea.input { min-height: 90px; resize: vertical; }
 .card-body { margin: 0; font-size: 13px; opacity: 0.8; flex: 1; }
 .card-meta {
   display: flex; align-items: center; gap: 6px; font-size: 11px;
-  color: color-mix(in srgb, var(--color-text) 50%, transparent);
+  color: var(--color-muted);
 }
 .elev-sm { box-shadow: var(--shadow-sm); }
 .elev-md { box-shadow: var(--shadow-md); }
@@ -147,9 +144,22 @@ textarea.input { min-height: 90px; resize: vertical; }
   border-radius: calc(var(--radius-md) * 0.75);
 }
 .tag-accent { background: var(--color-accent-100); color: var(--color-accent-800); }
-.tag-accent-2 { background: var(--color-accent-2-100); color: var(--color-accent-2-800); }
 .tag-neutral { background: var(--color-neutral-100); color: var(--color-neutral-800); }
-.tag-outline { border: 1px solid var(--color-accent); color: var(--color-accent); }
+
+/* Read-only statuses stay visually distinct from rectangular controls. */
+.status-pill {
+  display: inline-flex; align-items: center; justify-content: center; gap: var(--space-1);
+  max-width: 100%; padding: var(--space-1) var(--space-3);
+  border: 0; border-radius: var(--radius-pill);
+  font-family: var(--font-body); font-size: 12px; font-weight: 600; line-height: 16px;
+  text-align: center; vertical-align: middle;
+}
+.status-pill-neutral { background: var(--color-neutral-300); color: var(--color-neutral-800); }
+.status-pill-accent { background: var(--color-accent-100); color: var(--color-accent-700); }
+.status-pill-info { background: var(--color-info-100); color: var(--color-info); }
+.status-pill-success { background: var(--color-success-100); color: var(--color-success); }
+.status-pill-warning { background: var(--color-warning-100); color: var(--color-warning); }
+.status-pill-danger { background: var(--color-danger-100); color: var(--color-danger); }
 
 /* — navigation — */
 .nav {
@@ -162,6 +172,7 @@ textarea.input { min-height: 90px; resize: vertical; }
   font-size: 18px; margin-right: auto;
 }
 .nav a { color: inherit; text-decoration: none; font-size: 14px; }
+.nav .nav-brand { font-size: 18px; }
 .nav a:hover, .nav a[aria-current='page'] { color: var(--color-accent); }
 /* UA-8: a link the person cannot use yet stays visible, dimmed, and inert. */
 .nav a[aria-disabled='true'] { opacity: 0.45; cursor: not-allowed; }
@@ -171,7 +182,7 @@ textarea.input { min-height: 90px; resize: vertical; }
 .table { width: 100%; border-collapse: collapse; font-size: 14px; }
 .table th {
   text-align: left; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase;
-  color: color-mix(in srgb, var(--color-text) 60%, transparent);
+  color: var(--color-muted);
   padding: var(--space-2); border-bottom: 2px solid var(--color-divider);
 }
 .table td {
@@ -195,6 +206,5 @@ textarea.input { min-height: 90px; resize: vertical; }
   font-family: var(--font-heading); font-weight: var(--font-heading-weight);
   font-size: 20px;
 }
-.dialog-body { font-size: 14px; opacity: 0.85; }
+.dialog-body { font-size: 14px; }
 .dialog-actions { display: flex; justify-content: flex-end; gap: var(--space-2); margin-top: var(--space-2); }
-

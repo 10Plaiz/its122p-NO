@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Alert, Button, Field, Input, Loading } from "../components/ui.js";
+import { Alert, Button, Field, Input, Loading, StatusPill } from "../components/ui.js";
 import { useToast } from "../components/Toast.js";
 import { api } from "../lib/api.js";
 import { useAction, useApi } from "../lib/useApi.js";
@@ -132,7 +132,11 @@ function CategoryRow({
         )}
       </td>
       <td className="font-mono text-[12px]">{count}</td>
-      <td className="text-[13px]">{category.is_active ? "Active" : "Retired"}</td>
+      <td className="text-[13px]">
+        <StatusPill tone={category.is_active ? "success" : "neutral"}>
+          {category.is_active ? "Active" : "Retired"}
+        </StatusPill>
+      </td>
       <td>
         <div className="flex gap-2 flex-wrap">
           {editing ? (
@@ -178,7 +182,7 @@ function CategoryRow({
                     <span className="text-[12px]">Retire this category?</span>
                     <Button
                       type="button"
-                      variant="primary"
+                      variant="danger"
                       disabled={retire.pending}
                       onClick={async () => {
                         const done = await retire.run();
@@ -196,7 +200,7 @@ function CategoryRow({
                     </Button>
                   </>
                 ) : (
-                  <Button type="button" onClick={() => setConfirmingRetire(true)}>
+                  <Button type="button" variant="danger-outline" onClick={() => setConfirmingRetire(true)}>
                     Retire
                   </Button>
                 )
@@ -216,7 +220,7 @@ function CategoryRow({
           )}
         </div>
         {(update.error ?? retire.error) && (
-          <span role="alert" className="text-[11px] text-accent-700">
+          <span role="alert" className="text-[11px] text-danger">
             {(update.error ?? retire.error)?.message}
           </span>
         )}

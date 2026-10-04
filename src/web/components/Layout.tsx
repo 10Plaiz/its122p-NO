@@ -1,6 +1,6 @@
 import { Suspense, useEffect, useState } from "react";
 import { Link as RouterLink, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
-import { Loading } from "./ui.js";
+import { Loading, StatusPill } from "./ui.js";
 import { useAuth } from "../lib/auth.js";
 import { PROOF_STEP_PATH, residencyLocked } from "../lib/residency.js";
 import { useApi } from "../lib/useApi.js";
@@ -48,9 +48,7 @@ function NotificationLink() {
     <NavLink to="/notifications">
       Notifications
       {unread > 0 && (
-        <span className="ml-1.5 bg-accent text-bg px-1.5 py-0.5 font-mono text-[10px] font-semibold">
-          {unread}
-        </span>
+        <span className="ml-1.5"><StatusPill tone="info">{unread}</StatusPill></span>
       )}
     </NavLink>
   );
@@ -122,7 +120,7 @@ export function Layout() {
 
       <main className="flex-1 w-full max-w-6xl mx-auto px-4 py-6 md:py-8">
         {locked && location.pathname !== "/register" && (
-          <div role="status" className="mb-6 flex flex-wrap items-center gap-x-3 gap-y-1 border border-accent p-3 text-[13px]">
+          <div role="status" className="mb-6 flex flex-wrap items-center gap-x-3 gap-y-1 border border-warning-700 bg-warning-100 p-3 text-[13px]">
             <span>Finish setting up your account to use KAMOTI.</span>
             <RouterLink to={PROOF_STEP_PATH}>Upload your proof of residency</RouterLink>
           </div>

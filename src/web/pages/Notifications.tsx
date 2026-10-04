@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { Alert, Button, EmptyState, Loading } from "../components/ui.js";
+import { Alert, Button, EmptyState, Loading, StatusPill } from "../components/ui.js";
 import { api } from "../lib/api.js";
 import { useAuth } from "../lib/auth.js";
 import { useAction, useApi } from "../lib/useApi.js";
@@ -110,7 +110,7 @@ export function NotificationsPage() {
 
       {filter === "unread" && unread === 0 && notifications.length > 0 && (
         <div className="card p-6 bg-surface border border-divider flex flex-col items-center justify-center text-center gap-3 py-10">
-          <div className="w-10 h-10 border-2 border-accent text-accent flex items-center justify-center font-bold text-lg">
+          <div className="w-10 h-10 border-2 border-success-700 text-success flex items-center justify-center font-bold text-lg">
             ✓
           </div>
           <div className="flex flex-col gap-1">
@@ -190,8 +190,8 @@ function NotificationCard({ notification, role, onMarkRead, isPending }: Notific
     <article
       className={`card p-5 sm:p-6 min-h-[96px] sm:min-h-[98px] transition-colors border ${
         notification.is_read
-          ? "border-divider bg-surface opacity-80 hover:opacity-100"
-          : "border-divider border-l-4 border-l-accent bg-surface shadow-xs"
+          ? "border-divider bg-surface"
+          : "border-info bg-surface"
       }`}
     >
       <div className="flex items-stretch justify-between gap-4 sm:gap-6 h-full">
@@ -199,16 +199,16 @@ function NotificationCard({ notification, role, onMarkRead, isPending }: Notific
         <div className="flex flex-col gap-2 flex-1 min-w-0 justify-center">
           <div className="flex items-center gap-2.5 flex-wrap">
             {!notification.is_read && (
-              <span className="tag tag-accent text-[11px] font-bold tracking-wide">
+              <StatusPill tone="info">
                 New
-              </span>
+              </StatusPill>
             )}
             <time
               dateTime={notification.created_at}
               className="inline-flex items-center gap-2 text-[12px] font-medium text-neutral-800 select-text"
             >
               <span>{dateStr}</span>
-              <span className="text-neutral-500 font-normal text-[11px]">{timeStr}</span>
+              <span className="text-muted font-normal text-[11px]">{timeStr}</span>
             </time>
           </div>
 

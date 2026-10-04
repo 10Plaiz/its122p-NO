@@ -83,7 +83,7 @@ export function CancelDialog({
         <div className="dialog-actions flex gap-3">
           <Button
             type="button"
-            variant="primary"
+            variant="danger"
             disabled={pending || Boolean(reasonError)}
             onClick={async () => {
               if (reasonError) return;
