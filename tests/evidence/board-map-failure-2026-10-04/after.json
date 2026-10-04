@@ -1,0 +1,55 @@
+[
+  {
+    "port": 5174,
+    "apiStatus": 200,
+    "boardHeading": 1,
+    "cards": 50,
+    "mapFallback": 1,
+    "pageErrors": [],
+    "mapsErrors": [
+      "Google Maps JavaScript API error: RefererNotAllowedMapError\nhttps://developers.google.com/maps/documentation/javascript/error-messages#referer-not-allowed-map-error\nYour site URL to be authorized: http://localhost:5174/board"
+    ],
+    "scripts": [
+      "http://localhost:5174/@vite/client",
+      "https://maps.googleapis.com/maps/api/js",
+      "https://maps.googleapis.com/maps-api-v3/api/js/66/7/main.js",
+      "https://maps.googleapis.com/maps-api-v3/api/js/66/7/common.js",
+      "https://maps.googleapis.com/maps-api-v3/api/js/66/7/map.js",
+      "https://maps.googleapis.com/maps-api-v3/api/js/66/7/util.js",
+      "https://maps.googleapis.com/maps-api-v3/api/js/66/7/geometry.js",
+      "https://maps.googleapis.com/maps-api-v3/api/js/66/7/poly.js",
+      "https://maps.googleapis.com/maps-api-v3/api/js/66/7/log.js",
+      "https://maps.googleapis.com/maps-api-v3/api/js/66/7/onion.js",
+      "https://maps.googleapis.com/maps-api-v3/api/js/66/7/marker.js",
+      "https://maps.googleapis.com/maps-api-v3/api/js/66/7/controls.js",
+      "http://localhost:5174/main.tsx"
+    ]
+  },
+  {
+    "port": 5175,
+    "apiStatus": 200,
+    "boardHeading": 1,
+    "cards": 50,
+    "mapFallback": 1,
+    "pageErrors": [
+      "Cannot read properties of undefined (reading 'setAttribute')"
+    ],
+    "mapsErrors": [
+      "Google Maps JavaScript API error: RefererNotAllowedMapError\nhttps://developers.google.com/maps/documentation/javascript/error-messages#referer-not-allowed-map-error\nYour site URL to be authorized: http://localhost:5175/board"
+    ],
+    "scripts": [
+      "http://localhost:5175/@vite/client",
+      "https://maps.googleapis.com/maps/api/js",
+      "https://maps.googleapis.com/maps-api-v3/api/js/66/7/main.js",
+      "https://maps.googleapis.com/maps-api-v3/api/js/66/7/common.js",
+      "https://maps.googleapis.com/maps-api-v3/api/js/66/7/map.js",
+      "https://maps.googleapis.com/maps-api-v3/api/js/66/7/util.js",
+      "https://maps.googleapis.com/maps-api-v3/api/js/66/7/geometry.js",
+      "https://maps.googleapis.com/maps-api-v3/api/js/66/7/poly.js",
+      "https://maps.googleapis.com/maps-api-v3/api/js/66/7/marker.js",
+      "https://maps.googleapis.com/maps-api-v3/api/js/66/7/log.js",
+      "https://maps.googleapis.com/maps-api-v3/api/js/66/7/onion.js",
+      "http://localhost:5175/main.tsx"
+    ]
+  }
+]

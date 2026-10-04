@@ -2,6 +2,28 @@
 
 This document defines the user interface and user experience audit for the KAMOTI platform. It integrates empirical route triage findings, identifies operational friction points, and defines a prioritized roadmap to improve system usability.
 
+## Current design-system audit, 2026-10-04
+
+A shared Modernist system already exists, but its original red accent combined
+routine actions, report progress, notifications, and errors. Small red labels and
+transparent muted text failed ordinary text contrast. Unlayered component CSS
+overrode page utilities, and absolutely positioned accessible labels escaped
+the admin tables' scroll containers on narrow screens.
+
+The approved palette uses deep teal for actions, blue for information, green for
+success, amber for warnings, and red for errors and destructive actions.
+[design.md](../design.md) owns the live design contract, and
+[tokens.css](../src/web/styles/tokens.css) owns the values.
+The [audit report and browser evidence](../tests/evidence/hallmark-design-system-2026-10-04/report.md)
+record findings, verification, and remaining limitations. The earlier route
+triage below is historical and does not establish current defect status.
+
+The follow-up [status-pill and Admin Users audit](../tests/evidence/pills-users-toolbar-2026-10-04/report.md)
+records the shared pill component, rightmost search convention, responsive users
+layout, activation confirmation, and UI failure-state checks. It distinguishes
+real read-only flows from intercepted mutation responses and lists the pages
+that could only receive source verification.
+
 ---
 
 ## 1. Context and Purpose
@@ -35,10 +57,11 @@ If the team does not resolve these interface defects, the following failures wil
 
 ## 2. Design System Foundation
 
-KAMOTI uses a Modernist design language defined in [`src/web/styles/app.css`](../src/web/styles/app.css) and [`src/web/styles/ds.css`](../src/web/styles/ds.css):
+KAMOTI uses a Modernist design language defined in [design.md](../design.md),
+[`tokens.css`](../src/web/styles/tokens.css), and [`ds.css`](../src/web/styles/ds.css):
 - **Typography:** Heavyweight Archivo headings paired with monospace metadata tags.
 - **Zero Radius:** Rectangular borders without rounded corners (`--radius-sm: 0px`, `--radius-md: 0px`, `--radius-lg: 0px`).
-- **Industrial Contrast:** Light neutral backgrounds (`#f3f2f2`, `#eae9e9`), dark charcoal text (`#201e1d`), 2px divider lines, and a safety-orange accent (`#ec3013`).
+- **Contrast:** Cool neutral backgrounds (`#f4f7f7`, `#e9efef`), dark text (`#1f292b`), visible divider lines, and a deep teal action accent (`#0d6374`). Error and destructive-action red (`#b42318`) is a separate semantic role.
 
 ### 2.1 Evaluator Perspective
 Evaluators assess four key areas during system demonstration:

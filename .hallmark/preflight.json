@@ -1,0 +1,22 @@
+{
+  "date": "2026-10-04",
+  "phase": "baseline audit",
+  "scope": "frontend design system",
+  "framework": "React, TypeScript, Vite, Tailwind v4",
+  "designLockExisted": false,
+  "baselineTokens": {
+    "file": "src/web/styles/app.css",
+    "background": { "line": 16, "value": "#f3f2f2" },
+    "surface": { "line": 17, "value": "#eae9e9" },
+    "text": { "line": 18, "value": "#201e1d" },
+    "accent": { "line": 19, "value": "#ec3013" },
+    "fonts": "Archivo 400, 600, 800",
+    "spacing": "4 px scale",
+    "radius": "0 px"
+  },
+  "componentStyles": "src/web/styles/ds.css",
+  "wireframeReference": "Wireframe Screens Project/_ds/modernist-b5da8c15-4911-4de7-be4d-17127ee9a4ee/readme.md",
+  "motion": "CSS transitions and a 150 ms toast entrance with reduced-motion support",
+  "currentTokens": "src/web/styles/tokens.css",
+  "currentDesignLock": "design.md"
+}
