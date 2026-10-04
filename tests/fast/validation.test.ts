@@ -8,7 +8,8 @@ import { ApiError } from "../../src/server/lib/errors.js";
 import {
   BARANGAYS as SERVER_BARANGAYS,
   PASSWORD_DIGIT_ERROR,
-  PASSWORD_LETTER_ERROR,
+  PASSWORD_LOWERCASE_ERROR,
+  PASSWORD_UPPERCASE_ERROR,
   PASSWORD_MAX_ERROR,
   PASSWORD_MIN_ERROR,
   PASSWORD_SPECIAL_ERROR,
@@ -102,18 +103,21 @@ describe("VAL-03 rejected input names the fields that were wrong", () => {
   });
 });
 
-// UA-4: 8 to 72 characters with a letter, a number, and a special character.
+// Owner-approved rule: 8 to 72 characters with lowercase, uppercase, digits, and symbols.
 const PASSWORD_INPUTS = [
-  { value: "abcdef1!", valid: true, note: "minimum length of 8 characters" },
-  { value: `a1!${"a".repeat(69)}`, valid: true, note: "maximum length of 72 characters" },
-  { value: "correct-horse-battery-staple-9", valid: true, note: "typical passphrase" },
-  { value: "Peñafl0r ok", valid: true, note: "an accented letter or a space counts as special" },
+  { value: "Abcdef1!", valid: true, note: "minimum length of 8 characters" },
+  { value: `A1!${"a".repeat(69)}`, valid: true, note: "maximum length of 72 characters" },
+  { value: "Correct-horse-battery-staple-9", valid: true, note: "typical passphrase" },
+  { value: "Peñafl0r!", valid: true, note: "an accented letter alongside an actual symbol" },
+  { value: "Peñafl0r ok", valid: false, expectedMessage: PASSWORD_SPECIAL_ERROR, note: "spaces and accents do not satisfy the symbol rule" },
+  { value: "abcdef1!", valid: false, expectedMessage: PASSWORD_UPPERCASE_ERROR, note: "no uppercase letter" },
+  { value: "ABCDEF1!", valid: false, expectedMessage: PASSWORD_LOWERCASE_ERROR, note: "no lowercase letter" },
   { value: "Abc1!", valid: false, expectedMessage: PASSWORD_MIN_ERROR, note: "5 characters is too short" },
   { value: "", valid: false, expectedMessage: PASSWORD_MIN_ERROR, note: "empty string is too short" },
-  { value: `a1!${"a".repeat(70)}`, valid: false, expectedMessage: PASSWORD_MAX_ERROR, note: "73 characters is too long" },
-  { value: "12345678!", valid: false, expectedMessage: PASSWORD_LETTER_ERROR, note: "no letter" },
-  { value: "abcdefgh!", valid: false, expectedMessage: PASSWORD_DIGIT_ERROR, note: "no number" },
-  { value: "abcdefg1", valid: false, expectedMessage: PASSWORD_SPECIAL_ERROR, note: "no special character" },
+  { value: `A1!${"a".repeat(70)}`, valid: false, expectedMessage: PASSWORD_MAX_ERROR, note: "73 characters is too long" },
+  { value: "12345678!", valid: false, expectedMessage: PASSWORD_LOWERCASE_ERROR, note: "no letter" },
+  { value: "Abcdefgh!", valid: false, expectedMessage: PASSWORD_DIGIT_ERROR, note: "no number" },
+  { value: "Abcdefg1", valid: false, expectedMessage: PASSWORD_SPECIAL_ERROR, note: "no special character" },
 ];
 
 // The real browser rule, so this compares the two sides rather than a copy.

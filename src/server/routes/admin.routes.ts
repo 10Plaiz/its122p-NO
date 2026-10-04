@@ -11,6 +11,7 @@ import { logActivity } from "../lib/activity.js";
 import { currentUser } from "../middleware/auth.js";
 import { ROLES } from "../types/auth.js";
 import { calculateAnalytics, type AnalyticsReportRow } from "../lib/analytics.js";
+import { changeAccount, createAccountProfile } from "../services/admin.accounts.js";
 import { applyLogFilters, logFilterFields, logSelect } from "../lib/log-filters.js";
 
 const router = Router();
@@ -91,11 +92,9 @@ router.post("/users", async (req, res) => {
   });
   if (error) throw accountError(error, "That account could not be created. Check the details and try again.");
 
-  const user = orThrow(
-    await db
-      .from("profiles")
-      .insert({
-        id: data.user.id,
+  const user = await createAccountProfile({
+    actorId: currentUser(req).id, userId: data.user.id, ip: req.ip,
+    input: {
         name: composeName(input),
         first_name: input.first_name,
         middle_name: input.middle_name ?? null,
@@ -104,16 +103,9 @@ router.post("/users", async (req, res) => {
         email: input.email,
         role: input.role,
         contact_number: input.contact_number ?? null,
-        // Residency is confirmed for citizens only; staff and admins are not residents being checked.
-        residency_status: input.role === "citizen" ? "pending" : null,
-      })
-      .select(ADMIN_USER_FIELDS)
-      .single(),
-    "The login was created but the profile could not be saved.",
-  );
-
-  await logActivity(req, "user.created", { entityType: "user", entityId: data.user.id, metadata: { role: input.role } });
-  res.status(201).json({ user: withProofFlag(user as unknown as { id: string; residency_proof_path?: string | null }) });
+    },
+  });
+  res.status(201).json({ user });
 });
 
 router.patch("/users/:id", async (req, res) => {
@@ -127,7 +119,7 @@ router.patch("/users/:id", async (req, res) => {
   const { first_name, middle_name, last_name, suffix, ...rest } = input;
   const changes: Record<string, unknown> = { ...rest };
   // A different number has not been verified by anyone (UA-6).
-  if (input.contact_number !== undefined) changes.phone_verified_at = null;
+  // The transactional write clears phone verification when a number is supplied.
   if (first_name !== undefined && last_name !== undefined) {
     Object.assign(changes, {
       first_name,
@@ -138,17 +130,9 @@ router.patch("/users/:id", async (req, res) => {
     });
   }
 
-  const { data: user } = await db
-    .from("profiles")
-    .update(changes)
-    .eq("id", req.params.id)
-    .select(ADMIN_USER_FIELDS)
-    .single();
-
-  if (!user) throw notFound("That user does not exist.");
-
-  await logActivity(req, "user.updated", { entityType: "user", entityId: req.params.id, metadata: changes });
-  res.json({ user: withProofFlag(user as unknown as { residency_proof_path?: string | null }) });
+  const user = await changeAccount({ actorId: currentUser(req).id, userId: req.params.id,
+    action: "user.updated", input: changes, ip: req.ip });
+  res.json({ user });
 });
 
 async function findUser(id: string) {
@@ -164,7 +148,7 @@ router.get("/users/:id/residency-proof", async (req, res) => {
   if (!user.residency_proof_path) throw notFound("This account has not uploaded a proof of residency.");
 
   const url = await signedProofUrl(user.residency_proof_path);
-  await logActivity(req, "residency.proof_viewed", { entityType: "user", entityId: user.id });
+  await logActivity(req, "residency.proof_viewed", { entityType: "user", entityId: user.id, required: true });
   res.json({ url, kind: proofKind(user.residency_proof_path), expires_in: PROOF_URL_SECONDS });
 });
 
@@ -178,40 +162,9 @@ router.patch("/users/:id/residency", async (req, res) => {
     throw badRequest("There is no proof to reject. This citizen has not uploaded one yet.");
   }
 
-  const note = input.decision === "rejected" ? input.note! : null;
-  const updated = orThrow(
-    await db
-      .from("profiles")
-      .update({
-        residency_status: input.decision,
-        residency_note: note,
-        residency_reviewed_by: currentUser(req).id,
-        residency_reviewed_at: new Date().toISOString(),
-      })
-      .eq("id", user.id)
-      .select(ADMIN_USER_FIELDS)
-      .single(),
-    "The review could not be saved.",
-  );
-
-  await logActivity(req, "residency.reviewed", {
-    entityType: "user",
-    entityId: user.id,
-    metadata: { decision: input.decision, note },
-  });
-
-  // The citizen learns the outcome in the app. A failed notice must not undo a
-  // saved review, so it is logged rather than thrown.
-  const { error: noticeFailed } = await db.from("notifications").insert({
-    user_id: user.id,
-    message:
-      input.decision === "verified"
-        ? "Your proof of residency was accepted. Your reports no longer show “Unverified resident”."
-        : `Your proof of residency was not accepted: ${note} Upload a new proof to continue using KAMOTI.`,
-  });
-  if (noticeFailed) console.error("Could not notify a citizen about their residency review:", noticeFailed.message);
-
-  res.json({ user: withProofFlag(updated as unknown as { residency_proof_path?: string | null }) });
+  const updated = await changeAccount({ actorId: currentUser(req).id, userId: user.id,
+    action: "residency.reviewed", input: { decision: input.decision, note: input.note ?? null }, ip: req.ip });
+  res.json({ user: updated });
 });
 
 // UA-6 fallback while there is no SMS budget: an administrator who has confirmed
@@ -221,18 +174,9 @@ router.patch("/users/:id/phone-verified", async (req, res) => {
   const user = await findUser(req.params.id);
   if (verified && !user.contact_number) throw badRequest("This account has no mobile number to verify.");
 
-  const updated = orThrow(
-    await db
-      .from("profiles")
-      .update({ phone_verified_at: verified ? new Date().toISOString() : null })
-      .eq("id", user.id)
-      .select(ADMIN_USER_FIELDS)
-      .single(),
-    "The mobile number could not be updated.",
-  );
-
-  await logActivity(req, verified ? "user.phone_verified" : "user.phone_unverified", { entityType: "user", entityId: user.id });
-  res.json({ user: withProofFlag(updated as unknown as { residency_proof_path?: string | null }) });
+  const updated = await changeAccount({ actorId: currentUser(req).id, userId: user.id,
+    action: verified ? "user.phone_verified" : "user.phone_unverified", input: {}, ip: req.ip });
+  res.json({ user: updated });
 });
 
 // ------------------------------------------------------------------ analytics

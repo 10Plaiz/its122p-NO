@@ -40,7 +40,7 @@ describe("ACC-02 administrators create accounts with the same rules (UA-4, UA-7)
 
   it("accepts a complete account and refuses a weak password", () => {
     expect(createUserSchema.safeParse(valid).success).toBe(true);
-    const weak = createUserSchema.safeParse({ ...valid, password: "password1" });
+    const weak = createUserSchema.safeParse({ ...valid, password: "Password1" });
     expect(weak.success).toBe(false);
     expect(weak.error?.issues[0]?.message).toBe("Include at least one special character, such as ! or #.");
   });

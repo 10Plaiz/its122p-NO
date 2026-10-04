@@ -1,11 +1,12 @@
 import { db } from "../config/supabase.js";
 import type { Request } from "express";
+import { throwIfFailed } from "./errors.js";
 
 // System-wide audit trail for the admin log screen. Report-specific history
-// lives in report_updates instead. Logging must never break the request that
-// triggered it, so failures are reported to the console and swallowed.
-type ActivityOptions = { entityType?: string; entityId?: string | number; metadata?: Record<string, unknown> };
-export async function logActivity(req: Request, action: string, { entityType, entityId, metadata }: ActivityOptions = {}) {
+// lives in report_updates instead. Private proof access requires a saved audit
+// row before the URL is returned. Transactional writes log inside their RPC.
+type ActivityOptions = { entityType?: string; entityId?: string | number; metadata?: Record<string, unknown>; required?: boolean };
+export async function logActivity(req: Request, action: string, { entityType, entityId, metadata, required = false }: ActivityOptions = {}) {
   const { error } = await db.from("activity_logs").insert({
     actor_id: req.user?.id ?? null,
     action,
@@ -15,7 +16,8 @@ export async function logActivity(req: Request, action: string, { entityType, en
     ip_address: req.ip ?? null,
   });
 
-  if (error) console.error(`Could not write activity log "${action}":`, error.message);
+  if (required) throwIfFailed({ error }, "The required audit record could not be saved. Access was not granted.");
+  else if (error) console.error(`Could not write activity log "${action}":`, error.message);
 }
 
 // Report actions in the system-wide log, so the admin log screen shows who moved,

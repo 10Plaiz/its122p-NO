@@ -59,6 +59,7 @@ export const closureRequestSchema = z.object({
 export const closureReviewSchema = z.object({
   decision: z.enum(["approve", "return"], { error: "Choose to approve or return the request." }),
   details: comment("Enter a comment explaining the decision."),
+  requested_at: z.iso.datetime({ offset: true, error: "Reload the report before deciding on this request." }),
 });
 
 // GET /api/reports/:id/workflow — dates, delay, and any closure request. Anyone
@@ -124,26 +125,19 @@ router.post("/:id/closure-request", requireRole("staff"), async (req, res) => {
   const { outcome, details } = parse(closureRequestSchema, req.body);
   const report = await findReport(req.params.id);
 
-  await requestClosure({ report, user: currentUser(req), outcome, details });
-
-  await logReportActivity(req, "report.closure_requested", report, { outcome });
+  await requestClosure({ report, user: currentUser(req), outcome, details, ip: req.ip });
   res.status(201).json({ workflow: presentWorkflow(report, await findWorkflow(report.id)) });
 });
 
 // POST /api/reports/:id/closure-review — an administrator approves the request,
 // which closes the report, or returns it to the staff member with a reason.
 router.post("/:id/closure-review", requireRole("admin"), async (req, res) => {
-  const { decision, details } = parse(closureReviewSchema, req.body);
+  const { decision, details, requested_at } = parse(closureReviewSchema, req.body);
   const report = await findReport(req.params.id);
 
-  const { report: updated, outcome } = await reviewClosure({ report, user: currentUser(req), decision, details });
-
-  await logReportActivity(
-    req,
-    decision === "approve" ? "report.closure_approved" : "report.closure_returned",
-    report,
-    decision === "approve" ? { outcome, to: updated.status } : {},
-  );
+  const { report: updated } = await reviewClosure({
+    report, user: currentUser(req), decision, details, requestedAt: requested_at, ip: req.ip,
+  });
   res.json({ report: present(updated) });
 });
 

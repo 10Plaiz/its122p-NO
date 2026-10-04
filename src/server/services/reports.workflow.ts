@@ -1,4 +1,6 @@
 import { db } from "../config/supabase.js";
+import { z } from "zod";
+import { rpcData } from "../lib/rpc.js";
 import { ApiError, badRequest, forbidden, orThrow, throwIfFailed } from "../lib/errors.js";
 import type { AuthUser } from "../types/auth.js";
 import { REPORT_FIELDS, recordUpdate, reportLabel, type Notice, type Report, type ReportStatus } from "./reports.common.js";
@@ -38,9 +40,6 @@ export const OPEN_STATUSES = ["pending", "under_review", "in_progress"] as const
 // fixed (SW-7).
 export const CLOSURE_OUTCOMES = ["resolved", "rejected"] as const;
 export type ClosureOutcome = (typeof CLOSURE_OUTCOMES)[number];
-
-// The status an approved request moves the report to.
-const OUTCOME_STATUS: Record<ClosureOutcome, ReportStatus> = { resolved: "resolved", rejected: "rejected" };
 
 // Where each request can start. Resolution needs the work under way; a report can
 // be found unfixable as soon as it is reviewed, without starting work on it.
@@ -342,7 +341,16 @@ export function assertCanRequestClosure(
 }
 
 // An administrator can only decide on a request that is still waiting.
-export function assertCanReviewClosure(report: Report, workflow: Pick<WorkflowRow, "closure_requested_at" | "verified_at">) {
+export function assertCanReviewClosure(
+  report: Report,
+  workflow: Pick<WorkflowRow, "closure_requested_at" | "verified_at" | "closure_requester">,
+  user: AuthUser,
+  decision: "approve" | "return" = "approve",
+) {
+  if (user.role !== "admin") throw forbidden("Only administrators can review closure.");
+  if (decision === "approve" && workflow.closure_requester?.id === user.id) {
+    throw forbidden("A different administrator must approve your closure request.");
+  }
   if (!REQUESTABLE.includes(report.status) || !closurePending(workflow)) {
     throw badRequest("This report has no request waiting for verification.");
   }
@@ -353,123 +361,37 @@ export function assertCanReviewClosure(report: Report, workflow: Pick<WorkflowRo
 const alreadyDecided = () =>
   new ApiError(409, "This request was already handled. Reload the report to see its current state.");
 
-export async function requestClosure({ report, user, details, outcome }: { report: Report; user: AuthUser; details: string; outcome: ClosureOutcome }) {
+export async function requestClosure({ report, user, details, outcome, ip }: {
+  report: Report; user: AuthUser; details: string; outcome: ClosureOutcome; ip?: string;
+}) {
   assertCanRequestClosure(report, user, await findWorkflow(report.id), outcome);
-
-  const { data, error } = await db
-    .from("reports")
-    .update({
-      closure_requested_at: new Date().toISOString(),
-      closure_requested_by: user.id,
-      closure_outcome: outcome,
-      closure_reason: details,
-    })
-    .eq("id", report.id)
-    .in("status", CLOSURE_FROM[outcome])
-    .is("closure_requested_at", null)
-    .select("id");
-  throwIfFailed({ error }, "The request could not be saved.");
-  if (!data || data.length === 0) throw alreadyDecided();
-
-  const admins = await activeAdminIds("The request was saved but administrators could not be found.");
-
-  const rejecting = outcome === "rejected";
-  await recordUpdate({
-    report,
-    actorId: user.id,
-    updateType: "closure_request",
-    details: rejecting ? `Rejection requested: ${details}` : details,
-    notify: [
-      {
-        userId: report.citizen.id,
-        message: rejecting
-          ? `Staff found that report ${report.reference_code} cannot be fixed. An administrator will review the reason.`
-          : `Work on report ${report.reference_code} is finished and waiting for verification.`,
-      },
-      ...admins.map((id): Notice => ({
-        userId: id,
-        message: rejecting
-          ? `${reportLabel(report)}: staff asked to reject it. It is waiting for your verification.`
-          : `${reportLabel(report)} is waiting for your verification.`,
-      })),
-    ],
-  });
+  rpcData(await db.rpc("request_report_closure", {
+    p_report_id: report.id, p_actor_id: user.id, p_outcome: outcome, p_details: details, p_ip: ip ?? null,
+  }), "The closure request could not be saved. Nothing was changed.");
 }
 
-export async function reviewClosure({ report, user, decision, details }: { report: Report; user: AuthUser; decision: "approve" | "return"; details: string }) {
+const closureResult = z.object({
+  status: z.enum(STATUSES),
+  resolved_at: z.string().nullable(),
+  updated_at: z.string(),
+  status_changed_at: z.string(),
+  closure_requested_at: z.string().nullable(),
+  closure_outcome: z.enum(CLOSURE_OUTCOMES).nullable(),
+  closure_reason: z.string().nullable(),
+  verified_at: z.string().nullable(),
+  is_public: z.boolean(),
+});
+
+export async function reviewClosure({ report, user, decision, details, requestedAt, ip }: {
+  report: Report; user: AuthUser; decision: "approve" | "return"; details: string; requestedAt: string; ip?: string;
+}) {
   const workflow = await findWorkflow(report.id);
-  assertCanReviewClosure(report, workflow);
+  if (workflow.closure_requested_at !== requestedAt || workflow.verified_at) throw alreadyDecided();
+  assertCanReviewClosure(report, workflow, user, decision);
 
-  // The requester may have been replaced since asking; both should hear back.
-  const staffIds = [...new Set([report.assigned_staff?.id, workflow.closure_requester?.id])];
-  const tellStaff = (message: string): Notice[] => staffIds.map((userId) => ({ userId, message }));
-
-  if (decision === "return") {
-    const { data, error } = await db
-      .from("reports")
-      .update({ closure_requested_at: null, closure_requested_by: null, closure_outcome: null, closure_reason: null })
-      .eq("id", report.id)
-      .in("status", REQUESTABLE)
-      .not("closure_requested_at", "is", null)
-      .is("verified_at", null)
-      .select(REPORT_FIELDS)
-      .maybeSingle();
-    throwIfFailed({ error }, "The request could not be returned.");
-    if (!data) throw alreadyDecided();
-
-    await recordUpdate({
-      report,
-      actorId: user.id,
-      updateType: "verification",
-      details: `Returned for more work. ${details}`,
-      notify: tellStaff(`${reportLabel(report)} was returned for more work: ${details}`),
-    });
-
-    return { report: data as unknown as Report, outcome: null };
-  }
-
-  const newStatus = workflow.closure_outcome ? OUTCOME_STATUS[workflow.closure_outcome] : undefined;
-  if (!newStatus) throw badRequest("This request asks for an outcome that cannot be applied. Return it instead.");
-
-  const now = new Date().toISOString();
-  const { data, error } = await db
-    .from("reports")
-    .update({
-      status: newStatus,
-      resolved_at: newStatus === "resolved" ? now : null,
-      status_changed_at: now,
-      verified_by: user.id,
-      verified_at: now,
-      is_public: true,
-    })
-    .eq("id", report.id)
-    .in("status", REQUESTABLE)
-    .not("closure_requested_at", "is", null)
-    .is("verified_at", null)
-    .select(REPORT_FIELDS)
-    .maybeSingle();
-  throwIfFailed({ error }, "The report could not be closed.");
-  if (!data) throw alreadyDecided();
-
-  await recordUpdate({
-    report,
-    actorId: user.id,
-    updateType: "verification",
-    previousStatus: report.status,
-    newStatus,
-    details,
-    notify: [
-      {
-        userId: report.citizen.id,
-        // The citizen needs the reason, not just the word (SW-7).
-        message:
-          newStatus === "rejected"
-            ? `Report ${report.reference_code} was rejected: ${workflow.closure_reason ?? details}`
-            : `Report ${report.reference_code} is now "${newStatus}".`,
-      },
-      ...tellStaff(`${reportLabel(report)} was verified and closed as "${newStatus}".`),
-    ],
-  });
-
-  return { report: data as unknown as Report, outcome: workflow.closure_outcome };
+  const result = closureResult.parse(rpcData(await db.rpc("review_report_closure", {
+    p_report_id: report.id, p_actor_id: user.id, p_expected_requested_at: requestedAt,
+    p_decision: decision, p_details: details, p_ip: ip ?? null,
+  }), "The decision could not be saved. Nothing was changed."));
+  return { report: { ...report, ...result }, outcome: result.closure_outcome };
 }

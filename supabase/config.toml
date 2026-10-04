@@ -182,7 +182,7 @@ minimum_password_length = 8
 # Passwords that do not meet the following requirements will be rejected as weak. Supported values
 # are: `letters_digits`, `lower_upper_letters_digits`, `lower_upper_letters_digits_symbols`
 # KAMOTI (UA-4): matches passwordRule in src/server/lib/validate.ts.
-password_requirements = "letters_digits"
+password_requirements = "lower_upper_letters_digits_symbols"
 
 # Configure passkey sign-ins.
 # [auth.passkey]
@@ -226,7 +226,7 @@ double_confirm_changes = true
 # KAMOTI (UA-5): on. Sign-up sends a 6-digit code that the app checks.
 enable_confirmations = true
 # If enabled, users will need to reauthenticate or have logged in recently to change their password.
-secure_password_change = false
+secure_password_change = true
 # Controls the minimum amount of time that must pass before sending another signup confirmation or password reset email.
 max_frequency = "1s"
 # Number of characters used in the email OTP.

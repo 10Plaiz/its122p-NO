@@ -30,7 +30,7 @@ export function VerificationPanel({
   const fields = useLeftFields();
 
   const { run, pending, error } = useAction((body: { decision: Decision; details: string }) =>
-    api.post<{ report: Report }>(`/reports/${report.id}/closure-review`, body),
+    api.post<{ report: Report }>(`/reports/${report.id}/closure-review`, { ...body, requested_at: closure.requested_at }),
   );
 
   const proofCount = report.photos.filter((photo) => photo.kind === "resolution").length;

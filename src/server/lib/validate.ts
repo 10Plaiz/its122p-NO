@@ -136,7 +136,8 @@ export const verificationCode = z.string().trim().regex(/^\d{6}$/, CODE_ERROR);
 
 export const PASSWORD_MIN_ERROR = "Use at least 8 characters.";
 export const PASSWORD_MAX_ERROR = "Keep the password under 72 characters.";
-export const PASSWORD_LETTER_ERROR = "Include at least one letter (A–Z).";
+export const PASSWORD_LOWERCASE_ERROR = "Include at least one lowercase letter (a-z).";
+export const PASSWORD_UPPERCASE_ERROR = "Include at least one uppercase letter (A-Z).";
 export const PASSWORD_DIGIT_ERROR = "Include at least one number (0–9).";
 export const PASSWORD_SPECIAL_ERROR = "Include at least one special character, such as ! or #.";
 
@@ -145,15 +146,13 @@ export const PASSWORD_SPECIAL_ERROR = "Include at least one special character, s
 // missing at once rather than one complaint per submit. Mirrored by
 // PASSWORD_RULES in src/web/lib/passwords.ts, message for message.
 //
-// Letters and digits are ASCII on purpose: config.toml sets Supabase's own
-// `letters_digits` requirement, which checks a-z and 0-9, and a password this rule
-// passes must never be one Supabase then rejects. Anything that is not an ASCII
-// letter or digit counts as special, so ñ, é, and a space all qualify.
+// Match Supabase's lower_upper_letters_digits_symbols requirement. A space or
+// an accented letter does not satisfy its ASCII punctuation requirement.
 export const passwordRule = z
   .string()
   .min(8, PASSWORD_MIN_ERROR)
   .max(72, PASSWORD_MAX_ERROR)
-  .regex(/[A-Za-z]/, PASSWORD_LETTER_ERROR)
+  .regex(/[a-z]/, PASSWORD_LOWERCASE_ERROR)
+  .regex(/[A-Z]/, PASSWORD_UPPERCASE_ERROR)
   .regex(/[0-9]/, PASSWORD_DIGIT_ERROR)
-  .regex(/[^A-Za-z0-9]/, PASSWORD_SPECIAL_ERROR);
-
+  .regex(/[\x21-\x2f\x3a-\x40\x5b-\x60\x7b-\x7e]/, PASSWORD_SPECIAL_ERROR);
