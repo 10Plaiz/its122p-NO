@@ -11,7 +11,9 @@ begin
     foreach client_role in array array['anon', 'authenticated'] loop
         foreach relation_name in array array[
             'profiles', 'reports', 'report_photos', 'report_updates',
-            'notifications', 'activity_logs', 'report_inspections'
+            'notifications', 'activity_logs', 'report_inspections',
+            'problem_types', 'barangays', 'staff_areas', 'staff_specializations',
+            'report_feedback'
         ] loop
             if has_table_privilege(client_role, 'public.' || relation_name,
                                    'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
@@ -34,25 +36,47 @@ $test$;
 
 insert into auth.users (id, email) values
     ('70000000-0000-4000-8000-000000000001', 'access-citizen@example.invalid'),
-    ('70000000-0000-4000-8000-000000000002', 'access-staff@example.invalid');
+    ('70000000-0000-4000-8000-000000000002', 'access-staff@example.invalid'),
+    ('70000000-0000-4000-8000-000000000006', 'access-admin@example.invalid');
 
 -- The backend must retain permission to create profiles and reports.
 set local role service_role;
 insert into public.profiles (id, name, email, role, is_active) values
     ('70000000-0000-4000-8000-000000000001', 'Access Citizen', 'access-citizen@example.invalid', 'citizen', false),
-    ('70000000-0000-4000-8000-000000000002', 'Access Staff', 'access-staff@example.invalid', 'staff', true);
+    ('70000000-0000-4000-8000-000000000002', 'Access Staff', 'access-staff@example.invalid', 'staff', true),
+    ('70000000-0000-4000-8000-000000000006', 'Access Admin', 'access-admin@example.invalid', 'admin', true);
 
 insert into public.reports (id, citizen_id, category_id, title, description, latitude, longitude)
 values ('70000000-0000-4000-8000-000000000003',
         '70000000-0000-4000-8000-000000000001',
         (select id from public.categories where name = 'Road'),
-        'Permission test', 'Synthetic infrastructure report.', 14.5, 121.0);
+        'Permission test', 'Synthetic infrastructure report.', 14.5547, 121.0244);
 
 insert into public.reports (id, citizen_id, category_id, title, description, latitude, longitude)
 values ('70000000-0000-4000-8000-000000000004',
         '70000000-0000-4000-8000-000000000001',
         (select id from public.categories where name = 'Road'),
-        'Pending permission test', 'Synthetic private report.', 14.5, 121.0);
+        'Pending permission test', 'Synthetic private report.', 14.5547, 121.0244);
+
+insert into public.reports (id, citizen_id, category_id, title, description,
+                           latitude, longitude, status, is_public, assigned_staff_id)
+values ('70000000-0000-4000-8000-000000000005',
+        '70000000-0000-4000-8000-000000000001',
+        (select id from public.categories where name = 'Road'),
+        'Rejected permission test', 'Synthetic rejected report.',
+        14.5547, 121.0244, 'under_review', true,
+        '70000000-0000-4000-8000-000000000002');
+
+select public.request_report_closure(
+    '70000000-0000-4000-8000-000000000005',
+    '70000000-0000-4000-8000-000000000002',
+    'rejected', 'Synthetic public rejection reason.');
+select public.review_report_closure(
+    '70000000-0000-4000-8000-000000000005',
+    '70000000-0000-4000-8000-000000000006',
+    (select closure_requested_at from public.reports
+     where id = '70000000-0000-4000-8000-000000000005'),
+    'approve', 'Synthetic approval of public rejection reason.');
 
 update public.reports
 set assigned_staff_id = '70000000-0000-4000-8000-000000000002',
@@ -98,12 +122,20 @@ begin
     perform id from public.categories;
     select to_jsonb(r) into public_row from public.public_reports r
     where id = '70000000-0000-4000-8000-000000000003';
-    if public_row is null or public_row ?| array['citizen_id', 'assigned_staff_id', 'email'] then
+    if public_row is null or public_row ?| array['citizen_id', 'assigned_staff_id',
+        'email', 'contact_number', 'residency_proof_path', 'address_line'] then
         raise exception 'Public board must expose a reviewed report without internal user fields';
     end if;
     if exists (select 1 from public.public_reports
                where id = '70000000-0000-4000-8000-000000000004') then
         raise exception 'Pending report leaked onto public board';
+    end if;
+    select to_jsonb(r) into public_row from public.public_reports r
+    where id = '70000000-0000-4000-8000-000000000005';
+    if public_row is null
+       or public_row->>'status' <> 'rejected'
+       or public_row->>'rejection_reason' <> 'Synthetic public rejection reason.' then
+        raise exception 'Public board must preserve an approved rejection reason';
     end if;
 end;
 $test$;
@@ -126,7 +158,7 @@ select pg_temp.expect_denied($attack$
          latitude, longitude, status, is_public)
     values (auth.uid(), (select id from public.categories where name = 'Road'),
             '70000000-0000-4000-8000-000000000002', 'Forged review',
-            'Citizen skipped the review process.', 14.5, 121.0, 'under_review', true)
+            'Citizen skipped the review process.', 14.5547, 121.0244, 'under_review', true)
 $attack$);
 select pg_temp.expect_denied($attack$
     update public.notifications set message = 'Rewritten' where user_id = auth.uid()

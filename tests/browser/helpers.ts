@@ -10,8 +10,8 @@ export const USERS = {
   staff2: "fixture-staff-2@kamoti.invalid",
 } as const;
 
-// What the tests write to the database. cleanup.ts deletes exactly these after every
-// run, so keep the tests and the cleanup on these two constants.
+// Mark synthetic test writes. Explicitly authorized disposable cleanup uses these
+// constants to identify fixture-owned records; shared verification retains them.
 export const TEST_TITLE_PREFIX = "[TEST]";
 export const TEST_REMARK = "Staff on-site assessment complete. Scheduled for follow-up review.";
 

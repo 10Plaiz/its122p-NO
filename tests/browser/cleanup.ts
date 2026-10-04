@@ -3,8 +3,8 @@
 // runs it on its own.
 //
 // Safety contract:
-// - Runs only when verified: the .env secret key works, and every fixture account
-//   exists in that project, which marks it as the fixture-seeded test project.
+// - Requires an explicit cleanup hostname for an approved disposable target.
+//   A working key and fixture accounts alone do not authorize deletion.
 //   Otherwise it prints why and deletes nothing. It never fails the test run.
 // - Deletes only rows that are both fixture-owned and carry a test marker from
 //   helpers.ts. [FIXTURE] reports, real reports, and demo-seed data never match.
@@ -35,6 +35,9 @@ async function cleanup(): Promise<{ reports: number; remarks: number; rated: num
   const url = process.env.SUPABASE_URL;
   const key = process.env.SUPABASE_SECRET_KEY;
   if (!url || !key) return skip("SUPABASE_URL and SUPABASE_SECRET_KEY are not set in .env.");
+  if (process.env.KAMOTI_TEST_CLEANUP_TARGET !== new URL(url).hostname) {
+    return skip("records are retained; no matching disposable cleanup target was authorized.");
+  }
 
   const db = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
 
