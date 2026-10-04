@@ -3,7 +3,7 @@ import type { ChangeEvent, FormEvent } from "react";
 import { ContactNumberField, validateContactNumber } from "../components/ContactNumberField.js";
 import { ResidencyProofStep } from "../components/ResidencyProofStep.js";
 import { useToast } from "../components/Toast.js";
-import { Alert, Button, Field, Input, Select, useLeftFields } from "../components/ui.js";
+import { Alert, Button, Field, Input, Select, StatusPill, useLeftFields } from "../components/ui.js";
 import { api } from "../lib/api.js";
 import { useAuth } from "../lib/auth.js";
 import { ADDRESS_MAX, BARANGAYS, BARANGAY_ERROR, validateAddressLine } from "../lib/barangays.js";
@@ -76,11 +76,13 @@ export function AccountPage() {
               {account.email}
             </dd>
             <dt className="text-muted">Mobile number</dt>
-            <dd className="!m-0">
+            <dd className="!m-0 flex flex-wrap items-center gap-2">
               {account.contact_number ? (
                 <>
                   <span translate="no">{account.contact_number}</span>
-                  <span className="text-muted"> · {account.phone_verified_at ? "verified" : "not verified"}</span>
+                  <StatusPill tone={account.phone_verified_at ? "success" : "warning"}>
+                    {account.phone_verified_at ? "Verified" : "Not verified"}
+                  </StatusPill>
                 </>
               ) : (
                 <span className="text-muted">Not given</span>
@@ -91,7 +93,9 @@ export function AccountPage() {
             <dt className="text-muted">House number and street</dt>
             <dd className="!m-0 break-words">{account.address_line ?? "—"}</dd>
             <dt className="text-muted">Residency</dt>
-            <dd className="!m-0">{RESIDENCY_LABEL[step]}</dd>
+            <dd className="!m-0">
+              <StatusPill tone={step === "verified" ? "success" : "warning"}>{RESIDENCY_LABEL[step]}</StatusPill>
+            </dd>
           </dl>
           <p className="text-[12px] text-muted !m-0">
             To change your email address, contact a City administrator.

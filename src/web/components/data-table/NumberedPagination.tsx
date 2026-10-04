@@ -6,9 +6,7 @@ import { lastPage, pageItems, parsePage, rangeSummary } from "./pages.js";
 // TB-1: Previous · 1 2 3 … 9 10 · Next, plus a jump-to-page box, driven by the
 // Paged envelope every list route returns ({ page, per_page, total }).
 //
-// Page buttons are plain <button>s rather than .btn: ds.css is unlayered, so a
-// .btn's transparent background would beat the Tailwind fill that marks the
-// current page.
+// Page buttons keep their square, compact layout independent of action buttons.
 const PAGE_BUTTON =
   "inline-flex h-9 min-w-9 cursor-pointer items-center justify-center border border-divider bg-transparent px-2 font-mono text-[12px] tabular-nums text-text hover:bg-neutral-200";
 const CURRENT_PAGE = "inline-flex h-9 min-w-9 items-center justify-center border border-accent bg-accent px-2 font-mono text-[12px] font-semibold tabular-nums text-bg";
@@ -123,7 +121,7 @@ export function NumberedPagination({
       )}
 
       {error && (
-        <p id={errorId} role="alert" className="m-0 w-full text-right text-[11px] text-accent-700">
+        <p id={errorId} role="alert" className="m-0 w-full text-right text-[11px] text-danger">
           {error}
         </p>
       )}

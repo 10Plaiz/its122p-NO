@@ -166,7 +166,7 @@ function RatingForm({
         <span
           id={ratingNoteId}
           role={ratingError ? "alert" : undefined}
-          className={ratingError ? "text-[11px] text-accent-700" : "text-muted text-[11px]"}
+          className={ratingError ? "text-[11px] text-danger" : "text-muted text-[11px]"}
         >
           {ratingError ??
             (rating === null ? "1 is poor, 5 is excellent." : `Selected: ${rating} out of 5, ${RATING_LABEL[rating]}.`)}

@@ -67,10 +67,7 @@ export function ExportMenu({
             <button
               key={format}
               type="button"
-              className="btn btn-secondary flex-col gap-0 text-left"
-              // .btn centres its content from unlayered ds.css, which a Tailwind
-              // items-start cannot override; an inline style can.
-              style={{ alignItems: "flex-start" }}
+              className="btn btn-secondary flex-col items-start gap-0 text-left"
               disabled={busy !== null}
               onClick={() => void run(format)}
             >
@@ -80,7 +77,7 @@ export function ExportMenu({
           ))}
 
           {error && (
-            <p role="alert" className="m-0 text-[12px] text-accent-700">
+            <p role="alert" className="m-0 text-[12px] text-danger">
               {error}
             </p>
           )}

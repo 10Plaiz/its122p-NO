@@ -3,8 +3,7 @@ import { NavLink, Outlet } from "react-router-dom";
 import { Loading } from "./ui.js";
 
 // Persistent secondary sub-navigation tabs for the administrative suite.
-// Grounded in the Modernist design system with zero border radius, industrial contrast,
-// and safety-orange accent highlights for active modules.
+// Active modules use the shared action accent.
 const ADMIN_TABS = [
   { to: "/admin", label: "Dashboard", end: true },
   { to: "/admin/reports", label: "Reports", end: false },
