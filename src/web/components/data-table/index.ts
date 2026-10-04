@@ -1,6 +1,6 @@
 // The data-table kit (TB-1..4). A screen composes these itself:
 //
-//   TableToolbar   title left; search, filters, ColumnMenu, ExportMenu right
+//   TableToolbar   title left; filters and utilities followed by search on the right
 //   DataTable      the visible columns of one page of rows
 //   NumberedPagination   Previous · 1 2 3 … 9 10 · Next, with jump-to-page
 //

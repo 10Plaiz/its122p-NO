@@ -102,8 +102,7 @@ export function MyReportsPage() {
             Report an issue
           </Link>
         }
-      >
-        <ToolbarItem wide>
+        search={
           <Field label="Search" htmlFor="q">
             <Input
               id="q"
@@ -119,8 +118,8 @@ export function MyReportsPage() {
               }}
             />
           </Field>
-        </ToolbarItem>
-
+        }
+      >
         <ToolbarItem>
           <Field label="Status" htmlFor="status">
             <Select
