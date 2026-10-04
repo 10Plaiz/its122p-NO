@@ -12,6 +12,9 @@ import {
 } from "../components/ui.js";
 import { BoardReportCard } from "../components/BoardReportCard.js";
 import { BarangayFilter } from "../components/BarangayFilter.js";
+import { FilterCountsFeedback, FilterOption } from "../components/FilterOption.js";
+import { countFilterOptions } from "../lib/filter-counts.js";
+import { reportFilterValues, useFilterRows } from "../lib/useFilterRows.js";
 import { useApi } from "../lib/useApi.js";
 import { PUBLIC_STATUSES, SORTS, STATUS_LABEL } from "../lib/types.js";
 import type { Category, Paged, PublicReport, PublicStats, Sort } from "../lib/types.js";
@@ -25,22 +28,19 @@ const SORT_LABEL: Record<Sort, string> = {
   status: "By status",
 };
 
-type PublicStatus = (typeof PUBLIC_STATUSES)[number];
-
 // The board's whole state lives in the URL: a filtered view is then something a
 // resident can send to a councillor, and something the Back button can return to.
 // Anything hand-typed into the query string is validated back to a default here
 // rather than forwarded to the API to be rejected.
 function readParams(params: URLSearchParams) {
-  const status = params.get("status") ?? "";
+  const status = params.get("status") ?? "under_review";
   const sort = params.get("sort") ?? "";
   const page = Number(params.get("page"));
 
   return {
     q: params.get("q") ?? "",
-    // `as const` on the empty case, or the union widens to plain string and the
-    // STATUS_LABEL lookup below loses its key type.
-    status: (PUBLIC_STATUSES as readonly string[]).includes(status) ? (status as PublicStatus) : ("" as const),
+    // An explicit "all" preserves a cleared status on reload and shared links.
+    status: status === "all" ? ("" as const) : PUBLIC_STATUSES.find((value) => value === status) ?? "under_review",
     categoryId: params.get("category") ?? "",
     barangay: (BARANGAYS as readonly string[]).includes(params.get("barangay") ?? "") ? (params.get("barangay") as string) : "",
     sort: ((SORTS as readonly string[]).includes(sort) ? sort : "newest") as Sort,
@@ -102,6 +102,9 @@ export function BoardPage() {
   const { data, error, loading } = useApi<Paged<"reports", PublicReport>>("/public/reports", query);
   const { data: stats } = useApi<PublicStats>("/public/stats");
   const { data: categoryData } = useApi<{ categories: Category[] }>("/categories");
+  const countQuery = useMemo(() => ({ q }), [q]);
+  const countRows = useFilterRows<"reports", PublicReport>({ path: "/public/reports", collection: "reports", query: countQuery, perPage: 100, valuesOf: reportFilterValues });
+  const counts = useMemo(() => countFilterOptions(countRows.rows, { status, category: categoryId, barangay }), [countRows.rows, status, categoryId, barangay]);
 
   const reports = useMemo(() => data?.reports ?? [], [data]);
 
@@ -116,6 +119,7 @@ export function BoardPage() {
     // alone: a visitor on the map should not be thrown back to the list for asking
     // to see everything.
     const kept = new URLSearchParams();
+    kept.set("status", "all");
     if (pane === "map") kept.set("pane", "map");
     setParams(kept, { replace: true });
   }
@@ -173,13 +177,11 @@ export function BoardPage() {
           <Select
             id="status"
             value={status}
-            onChange={(event) => update({ status: event.target.value || null, page: null })}
+            onChange={(event) => update({ status: event.target.value || "all", page: null })}
           >
-            <option value="">Any status</option>
+            <FilterOption value="" label="Any status" counts={counts.status} />
             {PUBLIC_STATUSES.map((key) => (
-              <option key={key} value={key}>
-                {STATUS_LABEL[key]}
-              </option>
+              <FilterOption key={key} value={key} label={STATUS_LABEL[key]} counts={counts.status} />
             ))}
           </Select>
         </Field>
@@ -190,18 +192,16 @@ export function BoardPage() {
             value={categoryId}
             onChange={(event) => update({ category: event.target.value || null, page: null })}
           >
-            <option value="">Any category</option>
+            <FilterOption value="" label="Any category" counts={counts.category} />
             {(categoryData?.categories ?? [])
               .filter((category) => category.is_active)
               .map((category) => (
-                <option key={category.id} value={category.id}>
-                  {category.name}
-                </option>
+                <FilterOption key={category.id} value={String(category.id)} label={category.name} counts={counts.category} />
               ))}
           </Select>
         </Field>
 
-        <BarangayFilter value={barangay} onChange={(value) => update({ barangay: value || null, page: null })} />
+        <BarangayFilter value={barangay} counts={counts.barangay} onChange={(value) => update({ barangay: value || null, page: null })} />
 
         <Field label="Sort" htmlFor="sort">
           <Select
@@ -236,6 +236,8 @@ export function BoardPage() {
           </Field>
         </div>
       </div>
+
+      <FilterCountsFeedback loading={countRows.loading} error={countRows.error} onRetry={countRows.reload} />
 
       {error && <Alert title="Could not load the board">{error.message}</Alert>}
 
@@ -299,7 +301,7 @@ export function BoardPage() {
             {summary}
           </p>
 
-          {!loading && reports.length === 0 && (
+          {!loading && !error && reports.length === 0 && (
             <EmptyState title={filtered ? "Nothing matches this view" : "No reports on the board yet"}>
               {filtered ? (
                 <div className="flex flex-col items-start gap-3">
