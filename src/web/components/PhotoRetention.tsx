@@ -61,12 +61,12 @@ export function PhotoRetention() {
       {error && <Alert title="Could not finish the photo cleanup">{error.message}</Alert>}
 
       {confirming && found ? (
-        <div className="flex flex-col gap-2 border border-accent p-3 max-w-prose" role="group" aria-labelledby="retention-confirm">
+        <div className="flex flex-col gap-2 border border-danger bg-danger-100 p-3 max-w-prose" role="group" aria-labelledby="retention-confirm">
           <p id="retention-confirm" className="text-[13px] !m-0">
             Remove {count(found.photos, "photo", "photos")} for good? The files cannot be restored.
           </p>
           <div className="flex flex-wrap gap-2">
-            <Button type="button" variant="primary" disabled={pending} onClick={remove}>
+            <Button type="button" variant="danger" disabled={pending} onClick={remove}>
               {pending ? "Removing…" : `Yes, remove ${count(found.photos, "photo", "photos")}`}
             </Button>
             <Button type="button" disabled={pending} onClick={() => setConfirming(false)}>
@@ -80,7 +80,7 @@ export function PhotoRetention() {
             {pending ? "Checking…" : "Check expired photos"}
           </Button>
           {found && found.photos > 0 && (
-            <Button type="button" variant="primary" disabled={pending} onClick={() => setConfirming(true)}>
+            <Button type="button" variant="danger-outline" disabled={pending} onClick={() => setConfirming(true)}>
               Remove expired photos
             </Button>
           )}

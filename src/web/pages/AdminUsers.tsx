@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { ContactNumberField, validateContactNumber } from "../components/ContactNumberField.js";
 import { useToast } from "../components/Toast.js";
-import { Alert, Button, Field, Input, Loading, Select, formatDate, useLeftFields } from "../components/ui.js";
+import { Alert, Button, Field, Input, Loading, Select, StatusPill, formatDate, useLeftFields } from "../components/ui.js";
 import { api } from "../lib/api.js";
 import { useAuth } from "../lib/auth.js";
 import { useAction, useApi } from "../lib/useApi.js";
@@ -79,7 +79,7 @@ export function AdminUsersPage() {
       {loading && <Loading label="Loading users" />}
 
       {users.length > 0 && (
-        <div className="overflow-x-auto">
+        <div className="relative overflow-x-auto">
           <table className="table w-full">
             <thead>
               <tr>
@@ -157,9 +157,9 @@ function UserRow({ user, onDone }: { user: Profile; onDone: () => void }) {
           {user.contact_number ? (
             <div className="flex flex-col items-start gap-1">
               <span>{user.contact_number}</span>
-              <span className={user.phone_verified_at ? "tag tag-outline" : "text-muted"}>
+              <StatusPill tone={user.phone_verified_at ? "success" : "warning"}>
                 {user.phone_verified_at ? "Verified" : "Not verified"}
-              </span>
+              </StatusPill>
               <Button
                 type="button"
                 variant="ghost"
@@ -170,7 +170,7 @@ function UserRow({ user, onDone }: { user: Profile; onDone: () => void }) {
                 {user.phone_verified_at ? "Mark not verified" : "Mark verified"}
                 <span className="sr-only"> (mobile number of {user.name})</span>
               </Button>
-              {phone.error && <span role="alert" className="text-accent-700">{phone.error.message}</span>}
+              {phone.error && <span role="alert" className="text-danger">{phone.error.message}</span>}
             </div>
           ) : (
             "—"
@@ -196,7 +196,7 @@ function UserRow({ user, onDone }: { user: Profile; onDone: () => void }) {
         <td className="text-[13px]">
           {user.role === "citizen" ? (
             <div className="flex flex-col items-start gap-1">
-              <span>{RESIDENCY_LABEL[residencyStep(user)]}</span>
+              <StatusPill tone={residencyStep(user) === "verified" ? "success" : "warning"}>{RESIDENCY_LABEL[residencyStep(user)]}</StatusPill>
               <Button type="button" variant="ghost" className="!px-0 text-[12px]" onClick={() => setReviewing(true)}>
                 Review<span className="sr-only"> residency of {user.name}</span>
               </Button>
@@ -215,7 +215,7 @@ function UserRow({ user, onDone }: { user: Profile; onDone: () => void }) {
             />
           )}
         </td>
-        <td className="text-[13px]">{active ? "Active" : "Deactivated"}</td>
+        <td className="text-[13px]"><StatusPill tone={active ? "success" : "neutral"}>{active ? "Active" : "Deactivated"}</StatusPill></td>
         <td className="font-mono text-[11px]">{formatDate(user.created_at ?? null)}</td>
         <td>
           <div className="flex gap-2 flex-wrap">
@@ -262,6 +262,7 @@ function UserRow({ user, onDone }: { user: Profile; onDone: () => void }) {
                     activity history survive. */}
                 <Button
                   type="button"
+                  variant={active ? "danger-outline" : "secondary"}
                   disabled={pending || isSelf}
                   onClick={() => save({ is_active: !active })}
                 >
@@ -271,7 +272,7 @@ function UserRow({ user, onDone }: { user: Profile; onDone: () => void }) {
             )}
           </div>
           {isSelf && <span className="text-muted text-[11px]">This is your own account.</span>}
-          {error && <span role="alert" className="text-[11px] text-accent-700">{error.message}</span>}
+          {error && <span role="alert" className="text-[11px] text-danger">{error.message}</span>}
         </td>
       </tr>
       {specializing && (

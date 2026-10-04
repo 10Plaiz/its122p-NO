@@ -22,10 +22,10 @@ function destinationFor(user: Parameters<typeof homePathFor>[0], from?: string) 
 }
 
 // A short message above the form: why the last session ended, or what just changed.
-function Notice({ title, children }: { title: string; children: string }) {
+function Notice({ title, children, success = false }: { title: string; children: string; success?: boolean }) {
   return (
-    <div role="status" className="border border-divider bg-surface p-3 flex flex-col gap-1">
-      <span className="font-mono text-[9.5px] font-semibold uppercase tracking-wider text-accent">{title}</span>
+    <div role="status" className={`border p-3 flex flex-col gap-1 ${success ? "border-success-700 bg-success-100" : "border-info bg-info-100"}`}>
+      <span className={`font-mono text-[9.5px] font-semibold uppercase tracking-wider ${success ? "text-success" : "text-info"}`}>{title}</span>
       <span className="text-[13px] leading-snug">{children}</span>
     </div>
   );
@@ -134,7 +134,7 @@ export function SignInPage() {
       <h2>Sign in</h2>
 
       {passwordChanged ? (
-        <Notice title="Password changed">Sign in with your new password.</Notice>
+        <Notice title="Password changed" success>Sign in with your new password.</Notice>
       ) : ended === "idle" ? (
         <Notice title="Signed out">
           {`You were signed out after ${IDLE_LIMIT_MS / 60_000} minutes without activity. Sign in to continue where you left off.`}

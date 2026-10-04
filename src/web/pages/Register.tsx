@@ -251,7 +251,7 @@ export function RegisterPage() {
             </span>
           </label>
           {shown.privacy_consent && (
-            <span id="consent-error" className="text-[11px] text-accent-700">
+            <span id="consent-error" className="text-[11px] text-danger">
               {shown.privacy_consent}
             </span>
           )}

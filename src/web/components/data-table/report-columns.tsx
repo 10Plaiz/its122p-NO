@@ -6,7 +6,7 @@ import type { Column, ExportFormat, ExportResult } from "../../lib/table-types.j
 import { delayOf } from "../../lib/delay.js";
 import { STATUS_LABEL, closurePendingOf } from "../../lib/types.js";
 import type { Report } from "../../lib/types.js";
-import { DelayBadge, StatusBadge, formatDate } from "../ui.js";
+import { DelayBadge, StatusBadge, StatusPill, formatDate } from "../ui.js";
 
 // The report columns the three report tables share (all reports, the staff queue,
 // my reports). Each screen picks the ones it needs, in its own order, and adds its
@@ -135,7 +135,11 @@ export const reportColumn = {
     header: "Reporter residency",
     defaultHidden: true,
     className: "text-[13px] whitespace-nowrap",
-    cell: residencyText,
+    cell: (report) => (
+      <StatusPill tone={report.citizen?.residency_status === "verified" ? "success" : "warning"}>
+        {residencyText(report)}
+      </StatusPill>
+    ),
     exportValue: residencyText,
   },
 
@@ -144,7 +148,11 @@ export const reportColumn = {
     header: "Phone verified",
     defaultHidden: true,
     className: "text-[13px]",
-    cell: (report) => (report.citizen?.phone_verified_at ? "Yes" : "No"),
+    cell: (report) => (
+      <StatusPill tone={report.citizen?.phone_verified_at ? "success" : "warning"}>
+        {report.citizen?.phone_verified_at ? "Yes" : "No"}
+      </StatusPill>
+    ),
     exportValue: (report) => (report.citizen?.phone_verified_at ? "Yes" : "No"),
   },
 

@@ -1,0 +1,77 @@
+/* Hallmark · scope: application palette · genre: modern-minimal · anchor: teal
+   design-system: design.md · designed-as-app
+   Critique: philosophy 4, hierarchy 4, execution 4, specificity 5,
+   restraint 4, variety 3. */
+@theme {
+  --color-bg: #f4f7f7;
+  --color-surface: #e9efef;
+  --color-text: #1f292b;
+  --color-muted: #526164;
+  --color-divider: #738287;
+
+  --color-neutral-100: #f4f7f7;
+  --color-neutral-200: #e9efef;
+  --color-neutral-300: #d3dddf;
+  --color-neutral-400: #afbec1;
+  --color-neutral-500: #87989c;
+  --color-neutral-600: #526164;
+  --color-neutral-700: #415053;
+  --color-neutral-800: #2f3d40;
+  --color-neutral-900: #1f292b;
+
+  --color-accent: #0d6374;
+  --color-accent-100: #e1eff2;
+  --color-accent-200: #c8e1e6;
+  --color-accent-300: #a7ccd5;
+  --color-accent-400: #76aebb;
+  --color-accent-500: #31889a;
+  --color-accent-600: #0b5261;
+  --color-accent-700: #083f4b;
+  --color-accent-800: #063540;
+  --color-accent-900: #052b33;
+
+  --color-info: #1f5b8f;
+  --color-info-100: #e6eff7;
+  --color-info-700: #1f5b8f;
+  --color-info-800: #19496f;
+
+  --color-success: #155f35;
+  --color-success-100: #e3f3e8;
+  --color-success-200: #c6e6d0;
+  --color-success-700: #1d7a45;
+  --color-success-800: #155f35;
+  --color-success-900: #0f4426;
+
+  --color-warning: #6b4500;
+  --color-warning-100: #fdf0d5;
+  --color-warning-200: #f8dfa8;
+  --color-warning-700: #8a5a00;
+  --color-warning-800: #6b4500;
+  --color-warning-900: #4a3000;
+
+  --color-danger: #b42318;
+  --color-danger-100: #fdece9;
+  --color-danger-600: #912018;
+  --color-danger-700: #761b15;
+  --color-overlay: color-mix(in srgb, var(--color-neutral-900) 80%, transparent);
+
+  --font-heading: "Archivo", system-ui, sans-serif;
+  --font-body: "Archivo", system-ui, sans-serif;
+  --radius-pill: 999px;
+  --radius-sm: 0px;
+  --radius-md: 0px;
+  --radius-lg: 0px;
+  --shadow-sm: 0 1px 2px color-mix(in srgb, var(--color-neutral-900) 14%, transparent);
+  --shadow-md: 0 3px 10px color-mix(in srgb, var(--color-neutral-900) 16%, transparent);
+  --shadow-lg: 0 12px 32px color-mix(in srgb, var(--color-neutral-900) 22%, transparent);
+}
+
+:root {
+  --font-heading-weight: 800;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --space-8: 32px;
+}

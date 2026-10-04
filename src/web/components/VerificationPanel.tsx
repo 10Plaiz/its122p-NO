@@ -111,7 +111,7 @@ export function VerificationPanel({
       {error && <Alert title="Could not record the decision">{error.message}</Alert>}
 
       <div className="flex gap-3 flex-wrap">
-        <Button type="button" variant="primary" disabled={pending || invalid} onClick={() => decide("approve")}>
+        <Button type="button" variant={rejecting ? "danger" : "primary"} disabled={pending || invalid} onClick={() => decide("approve")}>
           {pending && deciding === "approve" ? "Closing…" : `Approve and close as ${outcomeLabel.toLowerCase()}`}
         </Button>
         <Button type="button" disabled={pending || invalid} onClick={() => decide("return")}>

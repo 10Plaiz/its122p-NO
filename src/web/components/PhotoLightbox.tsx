@@ -36,7 +36,7 @@ export function PhotoLightbox({ src, alt, title, onClose }: PhotoLightboxProps) 
 
   return (
     <div
-      className="dialog-backdrop z-[1200] bg-black/80 p-4"
+      className="dialog-backdrop z-[1200] bg-overlay p-4"
       role="presentation"
       onClick={onClose}
     >

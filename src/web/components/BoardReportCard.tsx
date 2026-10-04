@@ -39,7 +39,7 @@ export function BoardReportCard({ report, isSelected, onToggle }: BoardReportCar
       <div className="flex items-center justify-between gap-3 flex-wrap pt-0.5">
         {/* Swapped: Category first, then StatusBadge */}
         <div className="flex items-center gap-2 flex-wrap">
-          <span className="tag tag-outline text-[12px] font-semibold tracking-wide">
+          <span className="tag tag-neutral text-[12px] font-semibold tracking-wide">
             {report.category}
           </span>
           <StatusBadge status={report.status} />
@@ -93,7 +93,7 @@ export function BoardReportCard({ report, isSelected, onToggle }: BoardReportCar
         >
           {/* Reference ID in standard case (no caps lock / uppercase) */}
           <div className="flex items-center gap-1.5 font-mono text-[11px] text-neutral-600">
-            <span className="text-neutral-500 text-[11px]">Reference:</span>
+            <span className="text-muted text-[11px]">Reference:</span>
             <span className="font-semibold select-text cursor-text text-neutral-800">
               {report.reference_code}
             </span>

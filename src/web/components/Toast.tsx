@@ -61,8 +61,7 @@ function ToastItem({ toast, onDismiss }: { toast: Toast; onDismiss: (id: number)
 
   return (
     <div
-      // Dark rather than accent: the accent is the app's error colour, and a
-      // confirmation painted in it reads as something having gone wrong.
+      // Keep routine confirmations visually quiet.
       className="toast-enter pointer-events-auto flex max-w-[min(22rem,calc(100vw-2rem))] items-start gap-3 border-2 border-text bg-text px-3 py-2 text-bg shadow-lg"
       onMouseEnter={() => setHeld(true)}
       onMouseLeave={() => setHeld(false)}
