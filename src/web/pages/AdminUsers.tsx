@@ -1,8 +1,10 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import type { FormEvent } from "react";
 import { ContactNumberField, validateContactNumber } from "../components/ContactNumberField.js";
 import { useToast } from "../components/Toast.js";
-import { Alert, Button, Field, Input, Loading, Select, StatusPill, formatDate, useLeftFields } from "../components/ui.js";
-import { api } from "../lib/api.js";
+import { Alert, Button, EmptyState, Field, Input, Loading, Select, StatusPill, formatDate, useLeftFields } from "../components/ui.js";
+import { TableToolbar, ToolbarItem } from "../components/data-table/index.js";
+import { ApiError, api } from "../lib/api.js";
 import { useAuth } from "../lib/auth.js";
 import { useAction, useApi } from "../lib/useApi.js";
 import { ROLES, ROLE_LABEL } from "../lib/types.js";
@@ -15,44 +17,64 @@ import { AreaEditor } from "../components/AreaEditor.js";
 import { RESIDENCY_LABEL, residencyStep } from "../lib/residency.js";
 import type { Profile, Role } from "../lib/types.js";
 
-// Wireframe 1q. Public registration always creates a citizen, so staff and admin
-// accounts are made here — that is the only way to hand out either role.
 export function AdminUsersPage() {
   const [roleFilter, setRoleFilter] = useState("");
   const [residencyFilter, setResidencyFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
+  const [search, setSearch] = useState("");
   const { data, error, loading, reload } = useApi<{ users: Profile[] }>("/admin/users", {
     role: roleFilter,
     residency: residencyFilter,
   });
 
   const [creating, setCreating] = useState(false);
+  const newAccountRef = useRef<HTMLButtonElement>(null);
+  const wasCreating = useRef(false);
+  useEffect(() => {
+    if (wasCreating.current && !creating) newAccountRef.current?.focus();
+    wasCreating.current = creating;
+  }, [creating]);
   const users = data?.users ?? [];
+  const query = search.trim().toLocaleLowerCase();
+  const visibleUsers = users.filter((user) => {
+    const active = user.is_active !== false;
+    const matchesStatus = !statusFilter || (statusFilter === "active" ? active : !active);
+    return matchesStatus && [user.name, user.email, user.contact_number ?? ""].some((value) => value.toLocaleLowerCase().includes(query));
+  });
+  const filtered = Boolean(roleFilter || residencyFilter || statusFilter || query);
+
+  function clearFilters() {
+    setRoleFilter("");
+    setResidencyFilter("");
+    setStatusFilter("");
+    setSearch("");
+  }
 
   return (
     <div className="flex flex-col gap-6">
-      <header className="flex flex-wrap items-end justify-between gap-3">
-        <div className="flex flex-col gap-1">
-          <h2>User accounts</h2>
-          <p className="text-muted text-[13px]">Citizens register themselves. Staff and admins are created here.</p>
-        </div>
-        <Button type="button" variant="primary" onClick={() => setCreating((open) => !open)}>
-          {creating ? "Close" : "New account"}
-        </Button>
-      </header>
-
-      {creating && (
-        <CreateUser
-          onDone={() => {
-            setCreating(false);
-            reload();
-          }}
-        />
-      )}
-
-      <div className="flex flex-wrap gap-4">
-        <div className="w-full max-w-xs">
+      <TableToolbar
+        title="User accounts"
+        description="Manage access, verify residents, and route staff to their areas."
+        action={
+          <Button ref={newAccountRef} type="button" variant="primary" disabled={creating}
+            aria-expanded={creating} aria-controls={creating ? "new-account-form" : undefined} onClick={() => setCreating(true)}>
+            New account
+          </Button>
+        }
+        search={
+          <Field label="Search" htmlFor="user-search">
+            <Input id="user-search" type="search" autoComplete="off" maxLength={100}
+              placeholder="Name, email, or mobile…" value={search} onChange={(event) => setSearch(event.target.value)} />
+          </Field>
+        }
+      >
+        <ToolbarItem>
           <Field label="Role" htmlFor="role-filter">
-            <Select id="role-filter" value={roleFilter} onChange={(event) => setRoleFilter(event.target.value)}>
+            <Select id="role-filter" value={roleFilter} onChange={(event) => {
+              const next = event.target.value;
+              setRoleFilter(next);
+              if (next === "staff" || next === "admin") setResidencyFilter("");
+            }}>
               <option value="">Every role</option>
               {ROLES.map((role) => (
                 <option key={role} value={role}>
@@ -61,40 +83,68 @@ export function AdminUsersPage() {
               ))}
             </Select>
           </Field>
-        </div>
-        {/* UA-8: the proofs waiting for a decision are the ones an admin looks for. */}
-        <div className="w-full max-w-xs">
+        </ToolbarItem>
+        <ToolbarItem>
           <Field label="Residency" htmlFor="residency-filter">
-            <Select id="residency-filter" value={residencyFilter} onChange={(event) => setResidencyFilter(event.target.value)}>
+            <Select id="residency-filter" value={residencyFilter} disabled={roleFilter === "staff" || roleFilter === "admin"}
+              aria-describedby="residency-filter-note" onChange={(event) => setResidencyFilter(event.target.value)}>
               <option value="">Any residency</option>
               <option value="pending">Proof waiting for review</option>
               <option value="rejected">Proof rejected</option>
               <option value="verified">Verified resident</option>
             </Select>
           </Field>
-        </div>
-      </div>
+          <span className="sr-only" id="residency-filter-note">Residency applies to citizens. Choose Every role or Citizen to use this filter.</span>
+        </ToolbarItem>
+        <ToolbarItem>
+          <Field label="Account status" htmlFor="user-status-filter">
+            <Select id="user-status-filter" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
+              <option value="">Any status</option>
+              <option value="active">Active</option>
+              <option value="deactivated">Deactivated</option>
+            </Select>
+          </Field>
+        </ToolbarItem>
+      </TableToolbar>
 
-      {error && <Alert title="Could not load users">{error.message}</Alert>}
+      {creating && (
+        <CreateUser onCancel={() => setCreating(false)} onDone={() => { setCreating(false); reload(); }} />
+      )}
+
+      {error && <Alert title="Could not load users">
+        <p>{error.message}</p>
+        <Button type="button" onClick={reload}>Try again</Button>
+      </Alert>}
       {loading && <Loading label="Loading users" />}
 
-      {users.length > 0 && (
+      {!loading && !error && data && (
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p role="status" className="m-0 text-muted text-[13px]">
+            {visibleUsers.length} {visibleUsers.length === 1 ? "account" : "accounts"}{filtered ? visibleUsers.length === 1 ? " matches your filters" : " match your filters" : " in total"}
+          </p>
+          {filtered && <Button type="button" variant="ghost" onClick={clearFilters}>Clear filters</Button>}
+        </div>
+      )}
+      {!loading && !error && visibleUsers.length === 0 && (
+        <EmptyState title={filtered ? "No accounts match your filters" : "No user accounts yet"}>
+          {filtered ? "Try another name, email, or mobile number, or clear the filters." : "Citizens appear here after registering. Use New account to add staff or an administrator."}
+        </EmptyState>
+      )}
+      {!loading && !error && visibleUsers.length > 0 && (
         <div className="relative overflow-x-auto">
-          <table className="table w-full">
-            <thead>
-              <tr>
-                <th>Name</th>
-                <th>Email</th>
-                <th>Contact</th>
-                <th>Role</th>
-                <th>Residency</th>
-                <th>Status</th>
-                <th>Joined</th>
-                <th />
+          <table className="table account-table w-full" role="table" aria-label="User accounts">
+            <caption className="sr-only">User accounts matching the selected filters.</caption>
+            <thead role="rowgroup">
+              <tr role="row">
+                <th scope="col">Account</th>
+                <th scope="col">Role</th>
+                <th scope="col">Residency</th>
+                <th scope="col">Status</th>
+                <th scope="col">Actions</th>
               </tr>
             </thead>
-            <tbody>
-              {users.map((user) => (
+            <tbody role="rowgroup">
+              {visibleUsers.map((user) => (
                 <UserRow key={user.id} user={user} onDone={reload} />
               ))}
             </tbody>
@@ -110,19 +160,16 @@ function UserRow({ user, onDone }: { user: Profile; onDone: () => void }) {
   const { user: currentUser } = useAuth();
   const [editing, setEditing] = useState(false);
   const [reviewing, setReviewing] = useState(false);
+  const [confirmingActivation, setConfirmingActivation] = useState(false);
   // SW-1: a staff member's categories and barangays open in a row of their own.
   const [specializing, setSpecializing] = useState(false);
   const specializationsId = `specializations-row-${user.id}`;
   const [role, setRole] = useState<Role>(user.role);
   const active = user.is_active !== false;
 
-  // An admin cannot change their own role or deactivate themselves: the server
-  // refuses both in PATCH /admin/users/:id, because an admin who demoted themselves
-  // would lock everyone out. Saying so with a disabled control is the honest version:
-  // offering the button and then rejecting the click taught nothing.
   const isSelf = currentUser?.id === user.id;
 
-  const { run, pending, error } = useAction((body: Record<string, unknown>) =>
+  const { run, pending, error, setError } = useAction((body: { role?: Role; is_active?: boolean }) =>
     api.patch<{ user: Profile }>(`/admin/users/${user.id}`, body),
   );
   // UA-6 fallback while there is no SMS budget: a number confirmed by other means.
@@ -131,73 +178,79 @@ function UserRow({ user, onDone }: { user: Profile; onDone: () => void }) {
   );
 
   async function setPhoneVerified(verified: boolean) {
+    if (phone.pending || pending) return;
     if (await phone.run(verified)) {
       toast(verified ? "Mobile number marked as verified." : "Mobile number marked as not verified.");
       onDone();
     }
   }
 
-  // Deactivating and reactivating rewrite the Status column in plain sight, so they
-  // pass no confirmation; a role change only swaps a small tag, so it says so.
-  async function save(body: Record<string, unknown>, confirmation?: string) {
+  async function save(body: { role?: Role; is_active?: boolean }, confirmation: string) {
+    if (isSelf || pending || phone.pending) return false;
     const done = await run(body);
     if (done) {
       setEditing(false);
-      if (confirmation) toast(confirmation);
+      toast(confirmation);
       onDone();
     }
+    return Boolean(done);
   }
 
   return (
     <>
-      <tr>
-        <td className="text-[13px]">{user.name}</td>
-        <td className="font-mono text-[11px]">{user.email}</td>
-        <td className="font-mono text-[11px]">
+      <tr role="row">
+        <td role="cell" className="account-identity">
+          <div className="mb-2 flex flex-col items-start gap-1">
+            <span className="text-[14px] font-semibold">{user.name}</span>
+            <span className="break-all font-mono text-[11px]" translate="no">{user.email}</span>
+            <span className="text-muted text-[11px]">Joined {formatDate(user.created_at ?? null)}</span>
+          </div>
           {user.contact_number ? (
-            <div className="flex flex-col items-start gap-1">
-              <span>{user.contact_number}</span>
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px]">
+              <span className="font-mono" translate="no">{user.contact_number}</span>
               <StatusPill tone={user.phone_verified_at ? "success" : "warning"}>
-                {user.phone_verified_at ? "Verified" : "Not verified"}
+                {user.phone_verified_at ? "Number verified" : "Number not verified"}
               </StatusPill>
               <Button
                 type="button"
                 variant="ghost"
                 className="!px-0 text-[11px]"
-                disabled={phone.pending}
+                disabled={phone.pending || pending}
+                aria-busy={phone.pending}
                 onClick={() => setPhoneVerified(!user.phone_verified_at)}
               >
-                {user.phone_verified_at ? "Mark not verified" : "Mark verified"}
+                {phone.pending ? "Saving…" : user.phone_verified_at ? "Mark not verified" : "Mark verified"}
                 <span className="sr-only"> (mobile number of {user.name})</span>
               </Button>
               {phone.error && <span role="alert" className="text-danger">{phone.error.message}</span>}
             </div>
           ) : (
-            "—"
+            <span className="text-muted text-[12px]">No mobile number</span>
           )}
         </td>
-        <td>
+        <td role="cell" data-label="Role">
           {editing ? (
-            <Select
-              aria-label={`Role for ${user.name}`}
-              value={role}
-              onChange={(event) => setRole(event.target.value as Role)}
-            >
-              {ROLES.map((option) => (
-                <option key={option} value={option}>
-                  {ROLE_LABEL[option]}
-                </option>
-              ))}
-            </Select>
+            <Field label="New role" htmlFor={`role-${user.id}`} error={error?.fieldErrors.role}>
+              <Select id={`role-${user.id}`} aria-label={`Role for ${user.name}`} value={role} disabled={pending}
+                onChange={(event) => {
+                  const next = ROLES.find((value) => value === event.target.value);
+                  if (next) setRole(next);
+                  setError(null);
+                }}>
+                {ROLES.map((option) => <option key={option} value={option}>{ROLE_LABEL[option]}</option>)}
+              </Select>
+            </Field>
           ) : (
-            <span className="tag tag-outline">{ROLE_LABEL[user.role]}</span>
+            <span className="tag tag-neutral">{ROLE_LABEL[user.role]}</span>
           )}
         </td>
-        <td className="text-[13px]">
+        <td role="cell" data-label="Residency" className="text-[13px]">
           {user.role === "citizen" ? (
             <div className="flex flex-col items-start gap-1">
-              <StatusPill tone={residencyStep(user) === "verified" ? "success" : "warning"}>{RESIDENCY_LABEL[residencyStep(user)]}</StatusPill>
-              <Button type="button" variant="ghost" className="!px-0 text-[12px]" onClick={() => setReviewing(true)}>
+              <StatusPill tone={residencyStep(user) === "verified" ? "success" : "warning"}>
+                {residencyStep(user) === "pending" ? "Awaiting review" : RESIDENCY_LABEL[residencyStep(user)]}
+              </StatusPill>
+              <Button type="button" variant="ghost" className="!px-0 text-[12px]" disabled={pending || phone.pending} onClick={() => setReviewing(true)}>
                 Review<span className="sr-only"> residency of {user.name}</span>
               </Button>
             </div>
@@ -215,28 +268,32 @@ function UserRow({ user, onDone }: { user: Profile; onDone: () => void }) {
             />
           )}
         </td>
-        <td className="text-[13px]"><StatusPill tone={active ? "success" : "neutral"}>{active ? "Active" : "Deactivated"}</StatusPill></td>
-        <td className="font-mono text-[11px]">{formatDate(user.created_at ?? null)}</td>
-        <td>
+        <td role="cell" data-label="Status">
+          <StatusPill tone={active ? "success" : "neutral"}>{active ? "Active" : "Deactivated"}</StatusPill>
+        </td>
+        <td role="cell" data-label="Actions">
           <div className="flex gap-2 flex-wrap">
             {editing ? (
               <>
                 <Button
                   type="button"
                   variant="primary"
-                  disabled={pending || role === user.role}
-                  onClick={() => save({ role }, "Role updated.")}
+                  disabled={pending || phone.pending || role === user.role}
+                  aria-busy={pending}
+                  onClick={() => save({ role }, `Role updated for ${user.name}.`)}
                 >
-                  Save
+                  {pending ? "Saving…" : "Save role"}
                 </Button>
                 {/* Restores the dropdown as well as closing it. Leaving the picked role in
                     state meant reopening the row showed a change nobody had saved, and the
                     next Save applied it. */}
                 <Button
                   type="button"
+                  disabled={pending}
                   onClick={() => {
                     setRole(user.role);
                     setEditing(false);
+                    setError(null);
                   }}
                 >
                   Cancel
@@ -244,14 +301,18 @@ function UserRow({ user, onDone }: { user: Profile; onDone: () => void }) {
               </>
             ) : (
               <>
-                <Button type="button" disabled={isSelf} onClick={() => setEditing(true)}>
+                <Button type="button" disabled={isSelf || pending || phone.pending}
+                  aria-describedby={isSelf ? `self-restriction-${user.id}` : undefined}
+                  onClick={() => { setRole(user.role); setError(null); setEditing(true); }}>
                   Change role
+                  <span className="sr-only"> for {user.name}</span>
                 </Button>
                 {user.role === "staff" && (
                   <Button
                     type="button"
                     aria-expanded={specializing}
                     aria-controls={specializing ? specializationsId : undefined}
+                    disabled={pending || phone.pending}
                     onClick={() => setSpecializing((open) => !open)}
                   >
                     {specializing ? "Close routing" : "Routing"}
@@ -263,21 +324,30 @@ function UserRow({ user, onDone }: { user: Profile; onDone: () => void }) {
                 <Button
                   type="button"
                   variant={active ? "danger-outline" : "secondary"}
-                  disabled={pending || isSelf}
-                  onClick={() => save({ is_active: !active })}
+                  disabled={pending || phone.pending || isSelf}
+                  aria-describedby={isSelf ? `self-restriction-${user.id}` : undefined}
+                  onClick={() => { setError(null); setConfirmingActivation(true); }}
                 >
                   {active ? "Deactivate" : "Reactivate"}
+                  <span className="sr-only"> {user.name}</span>
                 </Button>
               </>
             )}
           </div>
-          {isSelf && <span className="text-muted text-[11px]">This is your own account.</span>}
-          {error && <span role="alert" className="text-[11px] text-danger">{error.message}</span>}
+          {isSelf && <p id={`self-restriction-${user.id}`} className="mb-0 mt-2 text-muted text-[12px]">
+            This is your own account. You cannot change your own role or deactivate it.
+          </p>}
+          {error && !confirmingActivation && <p role="alert" className="mb-0 text-[12px] text-danger">{error.message}</p>}
+          {confirmingActivation && <ActivationConfirmation user={user} pending={pending} error={error?.message}
+            onClose={() => { if (!pending) { setConfirmingActivation(false); setError(null); } }}
+            onConfirm={async () => {
+              if (await save({ is_active: !active }, `${user.name} ${active ? "deactivated" : "reactivated"}.`)) setConfirmingActivation(false);
+            }} />}
         </td>
       </tr>
       {specializing && (
-        <tr id={specializationsId}>
-          <td colSpan={8} className="bg-neutral-200/60">
+        <tr id={specializationsId} role="row" className="account-routing-row">
+          <td role="cell" colSpan={5} className="bg-neutral-200/60">
             <div className="grid gap-3 lg:grid-cols-2 items-start">
               <SpecializationEditor staffId={user.id} staffName={user.name} />
               <AreaEditor staffId={user.id} staffName={user.name} />
@@ -289,7 +359,66 @@ function UserRow({ user, onDone }: { user: Profile; onDone: () => void }) {
   );
 }
 
-function CreateUser({ onDone }: { onDone: () => void }) {
+function ActivationConfirmation({ user, pending, error, onClose, onConfirm }: {
+  user: Profile;
+  pending: boolean;
+  error?: string;
+  onClose: () => void;
+  onConfirm: () => void;
+}) {
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  const cancelRef = useRef<HTMLButtonElement>(null);
+  const active = user.is_active !== false;
+
+  useEffect(() => {
+    const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const dialog = dialogRef.current;
+    dialog?.showModal();
+    cancelRef.current?.focus();
+    return () => { dialog?.close(); previous?.focus(); };
+  }, []);
+
+  return (
+    <dialog ref={dialogRef} className="dialog account-confirmation max-h-[90vh] overflow-y-auto"
+      aria-labelledby={`activation-title-${user.id}`} aria-describedby={`activation-description-${user.id}`} aria-busy={pending}
+      onCancel={(event) => { event.preventDefault(); if (!pending) onClose(); }}
+      onKeyDown={(event) => {
+        if (event.key !== "Tab") return;
+        const controls = event.currentTarget.querySelectorAll<HTMLButtonElement>("button:not(:disabled)");
+        const first = controls[0];
+        const last = controls[controls.length - 1];
+        if (event.shiftKey && document.activeElement === first) {
+          event.preventDefault();
+          last?.focus();
+        } else if (!event.shiftKey && document.activeElement === last) {
+          event.preventDefault();
+          first?.focus();
+        }
+      }}
+      onClick={(event) => {
+        if (event.target !== event.currentTarget || pending) return;
+        const bounds = event.currentTarget.getBoundingClientRect();
+        if (event.clientX < bounds.left || event.clientX > bounds.right || event.clientY < bounds.top || event.clientY > bounds.bottom) onClose();
+      }}>
+      <h4 className="dialog-title" id={`activation-title-${user.id}`}>{active ? "Deactivate" : "Reactivate"} {user.name}?</h4>
+      <div className="dialog-body">
+        <p id={`activation-description-${user.id}`} className="m-0 text-[14px]">
+          {active ? "This person will lose access to KAMOTI. Their reports and activity history will be kept." : "This person will be able to sign in again with their current role."}
+        </p>
+        <p className="mt-3 break-all font-mono text-[12px]">{user.email}</p>
+        {error && <Alert title={`Could not ${active ? "deactivate" : "reactivate"} the account`}>{error}</Alert>}
+      </div>
+      <div className="dialog-actions flex-wrap">
+        <Button ref={cancelRef} type="button" onClick={onClose} disabled={pending}>Cancel</Button>
+        <Button type="button" variant={active ? "danger" : "primary"} disabled={pending} aria-busy={pending} onClick={onConfirm}>
+          {pending ? "Saving…" : active ? "Deactivate account" : "Reactivate account"}
+        </Button>
+      </div>
+    </dialog>
+  );
+}
+
+function CreateUser({ onDone, onCancel }: { onDone: () => void; onCancel: () => void }) {
   const toast = useToast();
   const [values, setValues] = useState({
     first: "",
@@ -303,7 +432,7 @@ function CreateUser({ onDone }: { onDone: () => void }) {
   });
   const fields = useLeftFields();
 
-  const { run, pending, error } = useAction((body: Record<string, unknown>) =>
+  const { run, pending, error, setError } = useAction((body: Record<string, unknown>) =>
     api.post<{ user: Profile }>("/admin/users", body),
   );
 
@@ -316,31 +445,72 @@ function CreateUser({ onDone }: { onDone: () => void }) {
   const contactError = validateContactNumber(values.contact_number);
   if (contactError) errors.contact_number = contactError;
 
-  const invalid = Object.keys(errors).length > 0;
+  const fieldIds = {
+    first_name: "new-first-name",
+    middle_name: "new-middle-name",
+    last_name: "new-last-name",
+    suffix: "new-suffix",
+    email: "new-email",
+    password: "new-password",
+    contact_number: "new-contact",
+    role: "new-role",
+  };
+  const invalid = Object.keys(errors).length > 0 || Object.keys(error?.fieldErrors ?? {}).length > 0;
   const shown = {
-    ...fields.visible(errors, {
-      first_name: "new-first-name",
-      middle_name: "new-middle-name",
-      last_name: "new-last-name",
-      email: "new-email",
-      password: "new-password",
-      contact_number: "new-contact",
-    }),
+    ...fields.visible(errors, fieldIds),
     ...(error?.fieldErrors ?? {}),
   };
 
+  function clearChangedError(event: FormEvent<HTMLFormElement>) {
+    if (!error) return;
+    const input = event.target;
+    if (!(input instanceof HTMLInputElement || input instanceof HTMLSelectElement)) return;
+    const field = Object.entries(fieldIds).find(([, id]) => id === input.id)?.[0];
+    const serverErrors = Object.entries(error.fieldErrors);
+    if (!serverErrors.length) { setError(null); return; }
+    if (!field || !error.fieldErrors[field]) return;
+    const remaining = serverErrors.filter(([key]) => key !== field).map(([key, message]) => ({ field: key, message }));
+    setError(remaining.length ? new ApiError(error.status, error.message, remaining) : null);
+  }
+
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (invalid || pending) return;
+    const contact = values.contact_number.trim();
+    const middle = values.middle.trim();
+    const done = await run({
+      first_name: values.first.trim(),
+      ...(middle ? { middle_name: middle } : {}),
+      last_name: values.last.trim(),
+      ...(values.suffix ? { suffix: values.suffix } : {}),
+      email: values.email.trim(),
+      password: values.password,
+      role: values.role,
+      ...(contact ? { contact_number: contact } : {}),
+    });
+    if (done) {
+      toast(`Account created for ${done.user.name}.`);
+      onDone();
+    }
+  }
+
   return (
-    <section className="border-2 border-divider p-4 flex flex-col gap-4" onBlur={fields.onBlur}>
-      <h6>New account</h6>
+    <form id="new-account-form" className="border-2 border-divider p-4 flex flex-col gap-4" aria-labelledby="new-account-title" noValidate
+      onSubmit={submit} onBlur={fields.onBlur} onChange={clearChangedError} aria-busy={pending}>
+      <div>
+        <h3 id="new-account-title" className="m-0 text-[18px]">New account</h3>
+        <p className="mb-0 mt-1 text-muted text-[13px]">Citizens can register themselves. Use this form to add staff or an administrator.</p>
+      </div>
 
       {/* These fields describe somebody else's account, not the signed-in administrator's,
           so autofill is turned away from all three: a password manager offering the
           admin's own address here would quietly create the wrong account, and
           `new-password` stops it treating the field as a login to fill or to save. */}
-      <div className="grid gap-3 md:grid-cols-2">
+      <fieldset disabled={pending} className="m-0 min-w-0 border-0 p-0 grid gap-3 md:grid-cols-2">
         <Field label="First name" htmlFor="new-first-name" error={shown.first_name}>
           <Input
             id="new-first-name"
+            autoFocus
             name="new-first-name"
             autoComplete="off"
             maxLength={NAME_PART_MAX}
@@ -427,7 +597,10 @@ function CreateUser({ onDone }: { onDone: () => void }) {
           <Select
             id="new-role"
             value={values.role}
-            onChange={(event) => setValues((v) => ({ ...v, role: event.target.value as Role }))}
+            onChange={(event) => {
+              const next = ROLES.find((value) => value === event.target.value);
+              if (next) setValues((v) => ({ ...v, role: next }));
+            }}
           >
             {ROLES.map((role) => (
               <option key={role} value={role}>
@@ -436,41 +609,16 @@ function CreateUser({ onDone }: { onDone: () => void }) {
             ))}
           </Select>
         </Field>
-      </div>
+      </fieldset>
 
       {error && <Alert title="Could not create the account">{error.message}</Alert>}
 
-      <Button
-        type="button"
-        variant="primary"
-        disabled={pending || invalid}
-        onClick={async () => {
-          if (invalid) return;
-
-          const contact = values.contact_number.trim();
-          const middle = values.middle.trim();
-          const done = await run({
-            first_name: values.first.trim(),
-            ...(middle ? { middle_name: middle } : {}),
-            last_name: values.last.trim(),
-            ...(values.suffix ? { suffix: values.suffix } : {}),
-            email: values.email.trim(),
-            password: values.password,
-            role: values.role,
-            ...(contact ? { contact_number: contact } : {}),
-          });
-          if (done) {
-            // Was left filled in, so the new account's password stayed on screen and a
-            // second click would try to create it again.
-            setValues({ first: "", middle: "", last: "", suffix: "", email: "", password: "", contact_number: "", role: "staff" });
-            fields.reset();
-            toast(`Account created for ${done.user.name}.`);
-            onDone();
-          }
-        }}
-      >
-        {pending ? "Creating…" : "Create account"}
-      </Button>
-    </section>
+      <div className="flex flex-wrap gap-2">
+        <Button type="submit" variant="primary" disabled={pending || invalid} aria-busy={pending}>
+          {pending ? "Creating…" : "Create account"}
+        </Button>
+        <Button type="button" disabled={pending} onClick={onCancel}>Cancel</Button>
+      </div>
+    </form>
   );
 }
