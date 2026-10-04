@@ -8,7 +8,7 @@ reviewed database migration procedure.
 
 - Bun 1.4 or newer
 - Node.js 22 or newer
-- A Supabase project for local development
+- An approved Supabase development target, hosted or local
 - Supabase CLI access through `bunx supabase`
 
 ## First setup
@@ -23,7 +23,10 @@ bunx supabase link --project-ref YOUR_PROJECT_REF
 bunx supabase migration list
 ```
 
-Create a fresh development project in the Supabase dashboard before linking.
+Use the team's approved target, or create a fresh development project before
+linking. A new hosted project is not required for each worktree. Worktrees that
+use one project share its data and Auth settings. Use separate frontend and API
+ports for parallel development, and confirm the API proxy points to that worktree.
 Enable the Data API and automatic Row Level Security, and disable automatic
 exposure of new tables. Complete CLI login in the same environment where the
 commands run.
@@ -37,6 +40,8 @@ Fill the ignored `.env` file with values from the linked Supabase project:
 | `SUPABASE_URL` | Supabase project URL |
 | `SUPABASE_PUBLISHABLE_KEY` | Public key used by the API for authentication requests |
 | `SUPABASE_SECRET_KEY` | Server-only key used by Express for protected data access |
+| `VITE_GOOGLE_MAPS_API_KEY` | Browser Maps key, restricted to approved referrers and Maps APIs |
+| `VITE_GOOGLE_MAPS_MAP_ID` | Optional map ID; development defaults to `DEMO_MAP_ID` |
 
 Follow the reviewed procedure in [API.md](API.md#database-migrations) for any
 database migration operation.
@@ -99,17 +104,26 @@ Required runtime inputs:
 
 The integration suite is safe to rerun: it restores any fixture report titles
 it modifies, deletes temporary test records, and never mutates ordinary user
-accounts or reports. Tokens and credentials are suppressed from logs.
+accounts or reports. Tokens and credentials are suppressed from logs. Its cleanup
+deletes synthetic data. Do not run this suite against a shared project where
+deletion is prohibited. A read-only or record-retaining release check must
+preserve its assertions and record its differences from this suite.
 
 The database suite verifies access boundaries on a disposable database after
 applying all migrations:
 
 ```bash
 psql "$TEST_DATABASE_URL" -X -v ON_ERROR_STOP=1 -f supabase/tests/api_access.sql
+psql "$TEST_DATABASE_URL" -X -v ON_ERROR_STOP=1 -f tests/database/atomic-actions.sql
 ```
 
 It creates synthetic records inside a transaction and rolls them back. Do not
-run it against a database that is not approved for testing.
+run it against a database that is not approved for testing. `atomic-actions.sql`
+injects failures to check rollback of closure and privileged account operations.
+It requires a disposable database with `kamoti.test_database = 'disposable'`.
+Do not enable that setting or install its failure triggers on the shared project.
+Native PostgreSQL replay verifies SQL behavior; it does not run Supabase Auth,
+Storage file handling, or email delivery.
 
 The browser automation suite lives in `tests/browser/` and runs Playwright
 tests against Chromium. It exercises citizen report submission, editing,
@@ -124,17 +138,54 @@ bunx playwright install chromium
 bun run test:browser
 ```
 
-After every run, the suite deletes what the tests wrote: reports titled `[TEST] …`
-and the staff test's remark, both only when owned by fixture accounts. It runs only
-when `.env` has a working `SUPABASE_SECRET_KEY` for a project that has every fixture
-account; otherwise it prints why and deletes nothing. `[FIXTURE]` reports are kept.
-Run `bun run test:cleanup` to do the same cleanup without running the tests.
+Browser runs retain their records by default. Cleanup requires
+`KAMOTI_TEST_CLEANUP_TARGET` to equal the approved disposable Supabase hostname,
+as well as a working secret key and all fixture accounts. It deletes `[TEST]`
+reports and a fixed staff remark only when fixture-owned, and retains rated
+reports. A fixture account's presence does not make a shared project disposable.
+Keep the cleanup variable unset for shared release verification. Do not run
+`bun run test:cleanup` there.
 
 Configuration and runtime parameters:
 - `PLAYWRIGHT_BASE_URL`: Site under test (defaults to `http://localhost:5173`, so start
   `bun run dev` first). Set it to `https://kamoti-chi.vercel.app` to test the deployed site.
 - `EVIDENCE_DIR`: Folder for evidence screenshots (defaults to `tests/evidence`).
 - `FIXTURE_PASSWORD`: Fixture account password (defaults to `Password123!`).
+- `SESSION_TEST_EMAIL` and `SESSION_TEST_PASSWORD`: Optional synthetic Citizen
+  account for the independent refresh and idle/draft tests. Otherwise they use
+  Citizen 1. Keep real recipient addresses and passwords outside Git.
+
+The account-code suite also needs a local Supabase Auth service and Mailpit.
+It skips those cases when Mailpit is unavailable. A native PostgreSQL instance
+does not supply Mailpit. Record hosted email tests separately and do not count
+skips as passes.
+
+Reporting tests also require their synthetic Citizen accounts to have uploaded
+proof or an explicit Administrator residency review. The account-code tests
+start with locked Citizens and test that process themselves. After applying an
+accounts migration to older fixtures, check these preconditions before running
+reporting tests. Prepare only the affected synthetic accounts through the
+application. Do not reset all fixture passwords or reseed the shared project.
+
+## Hosted account configuration
+
+Match the account settings and templates in
+[API.md](API.md#how-authentication-works). Local `supabase/config.toml` is not a
+safe replacement for the entire hosted Auth configuration. Apply only the
+reviewed settings. Preserve the production site URL, redirect allow-list, keys,
+and unrelated provider settings.
+
+Supabase Auth creates and checks signup and recovery codes. SMTP delivers them.
+Free projects using the default sender cannot always customize templates; new
+projects after 3 June 2026 require custom SMTP. The default sender also restricts
+delivery to organization members and two emails per hour. An owner test email
+alone does not make arbitrary-user signup ready. See the
+[official SMTP guide](https://supabase.com/docs/guides/auth/auth-smtp).
+
+Before claiming account readiness, use an approved real recipient to check
+delivery, wrong codes, correct codes, reuse, sign-in, recovery, old and new
+passwords, and old-session access. Enter codes in the local application. Keep
+email addresses, codes, and tokens out of committed evidence and logs.
 
 Test case identifiers, results, evidence, and defects belong in the
 [Phase 4 test report](Phase4_Test_Report.md), not in this guide.
@@ -220,16 +271,10 @@ rewritten, deactivated, or reassigned.
 
 ### Cleanup boundary
 
-No reset or cleanup command exists, and none should be added. To remove the
-fixture from a development project, do it manually and narrowly:
-
-1. Delete the three reports whose titles start with `[FIXTURE]`.
-2. Delete the five auth users with `fixture-*@kamoti.invalid` email addresses
-   through the Supabase dashboard or a targeted admin API call. Their profiles
-   are removed by the database cascade.
-
-Reports must be deleted first, because the schema prevents deleting a profile
-that still owns reports.
+Do not remove or reset the fixture during a shared release. Integration migrations
+replace deletion cascades with restrictions, and feedback is immutable. The old
+report-first deletion recipe is no longer a valid general cleanup procedure.
+Use a separately approved disposable target for destructive test teardown.
 
 ## Makati demo seed
 

@@ -8,15 +8,15 @@ also be exercised with `curl` or Postman.
 
 ## API used
 
-KAMOTI builds one API and consumes three. The browser only ever talks to two of
-them directly: the KAMOTI API, and Nominatim.
+KAMOTI builds one API. The browser calls that API, Google Maps and Places,
+Nominatim, and public report-photo URLs.
 
 | API | Provider | Kind | Authentication |
 | :--- | :--- | :--- | :--- |
 | **KAMOTI REST API** | Built by the team: Express 5 on Node.js, TypeScript | First-party, internal | Supabase Auth bearer token |
 | **Supabase**: Auth, Data API, Storage | Supabase Inc. | Third-party platform | Publishable key for sign-in; secret key server-only |
 | **Nominatim reverse geocoding** | OpenStreetMap Foundation | Third-party, public, free | None: governed by a usage policy |
-| **OpenStreetMap raster tiles** | OpenStreetMap Foundation | Third-party, public, free | None: attribution required |
+| **Google Maps JavaScript and Places** | Google | Third-party maps and place search | Browser key restricted by referrer and API |
 
 Supabase is reached **through** the KAMOTI API and never from the page, because
 the key that reads protected data must not leave the server.
@@ -32,14 +32,15 @@ have to happen somewhere the user cannot edit.
 
 **Supabase** provides three services behind one project. *Auth* owns passwords
 and issues the JWT, so the application never stores a password. *PostgreSQL*,
-reached through the Data API, holds the eight application tables. *Storage*
-holds report photos as files.
+reached through the Data API, holds application records. *Storage* holds public
+report photos and private residency proofs in separate buckets.
 
 **Nominatim** turns the coordinates of a dropped pin into a readable address, so
 a citizen standing next to a broken drain does not have to type where they are
 and the crew sent to fix it gets a street name rather than two decimal numbers.
 
-**OpenStreetMap tiles** are the map imagery under every pin.
+**Google Maps** supplies the map imagery and markers. Places supplies location
+search. The browser and API check report pins against the Makati boundary.
 
 ## Data retrieved from the API
 
@@ -73,9 +74,12 @@ paging numbers needed to draw the pager. `GET /api/public/reports` returns:
 
 `reference_code` is the number a citizen quotes. `address_text` is what
 Nominatim supplied, still editable by the reporter. `total` is the count before
-paging. **Absent by design:** no citizen id, name, email or contact number, and
-no `pending` or `cancelled` report: this endpoint reads the `public_reports`
-view, which cannot return those columns or rows at all.
+paging. The view also includes `barangay` and `rejection_reason`. Approved
+rejection reasons are public, so staff must exclude personal information from
+them. The `public_reports` view omits citizen identity and contact columns.
+It includes only published reports and excludes cancelled reports. The
+application keeps pending reports unpublished. Report text remains user-entered
+content; the view does not remove personal information entered in that text.
 
 `POST /api/auth/login` returns the caller's profile plus `access_token`,
 `refresh_token` and `expires_at`. Failures share one shape:
@@ -88,7 +92,8 @@ view, which cannot return those columns or rows at all.
 ```
 
 `400` invalid input · `401` not signed in · `403` signed in but not allowed ·
-`404` not found · `500` server fault.
+`404` not found · `409` conflicting or already completed action · `429` rate
+limit reached · `500` server fault.
 
 From **Nominatim**, KAMOTI reads exactly one field of the response,
 `display_name`, truncated to 255 characters.
@@ -109,10 +114,10 @@ From **Nominatim**, KAMOTI reads exactly one field of the response,
   error state and abandons superseded requests with `AbortController`. They use
   `useAction` for writes. Uploads send `FormData` with `Content-Type` left unset
   so the browser can write its own multipart boundary.
-- **Request pipeline.** Each route validates with zod (`400` listing the exact
-  fields, which is what draws the red text under a form control), then
-  `requireAuth`, then `requireRole` and the finer service-level checks, and only
-  then queries Supabase. That order is the security model: see
+- **Request pipeline.** Protected routers apply `requireAuth` and their role or
+  residency gates. Routes validate fields with Zod and services check record
+  ownership before their protected writes. Invalid fields return `400` with
+  field messages. Public account routes also apply rate limits. See
   [How authentication works](#how-authentication-works).
 - **Nominatim.** Called from `src/web/lib/maps.ts` as `reverseGeocode()`, used
   by the report wizard. Debounced 1000 ms and throttled to start no more than
@@ -137,7 +142,7 @@ below remains here because it changes the API's database contract.
 
 Any contributor may add a migration to a feature branch, but the shared
 Supabase project has one designated migration owner. Only that owner applies
-migrations after the pull request has been reviewed and merged. Other
+migrations after review, normally after the pull request is merged. Other
 contributors may inspect migration status but must not push feature-branch
 migrations to the shared project.
 
@@ -147,20 +152,28 @@ owner runs:
 ```bash
 bunx supabase db push --dry-run
 # Confirm that only the expected migrations are listed, then:
-bunx supabase db push --skip-vault
+bunx supabase db push
 bunx supabase migration list
 ```
 
-The owner confirms the dry-run output before applying anything. The
-`--skip-vault` flag keeps the command focused on SQL migrations. CI does not
-receive Supabase secrets and never runs `supabase db push`.
+The owner confirms the project ref and exact dry-run list before applying
+anything. Do not add `--include-seed`, reset the project, or repair migration
+history to force a match. CI never runs `supabase db push`.
 
-The six timestamped SQL files in `supabase/migrations/` are applied in order.
-They create the schema, access rules, reference categories, photo bucket,
-inspection records, and the public board's category filter. The CLI tracks which
-migrations have reached the linked project. Use a fresh project for this
-baseline; an older database built from earlier copies of the schema needs its
-history reconciled before `db push`.
+Apply the timestamped SQL files in `supabase/migrations/` in order.
+The CLI tracks which migrations reached the linked project. The integration
+adds account and residency fields, private proof storage, problem types,
+closure review, rejected reports, immutable feedback, staff areas, and
+transactional closure and account operations. A bounding-box database check
+complements the API's more precise Makati polygon check. Existing report pins
+are not backfilled or corrected automatically.
+
+For PR #56, the owner approved applying the reviewed migrations before the
+application merge. This exception requires a recoverable baseline and an
+immediate check of the still-deployed `main`. It does not authorize seeding,
+deleting records, changing photo retention, or pushing unrelated Auth settings.
+A Git revert does not undo database or Auth changes. Database dumps contain
+Storage metadata, but do not contain the stored file bytes.
 
 Environment and credential safety rules belong to
 [LOCAL_DEV.md](LOCAL_DEV.md#safety-boundaries).
@@ -176,6 +189,55 @@ Supabase Auth owns passwords and issues the JWT. The API verifies that token and
 2. Send it on every protected request: `Authorization: Bearer <access_token>`.
 3. `requireAuth` attaches `req.user = { id, name, email, role }`.
 4. `requireRole("admin")` gates whatever comes after it.
+
+Public registration collects name parts, email, password, barangay, address,
+optional contact number, and privacy consent. It always creates a Citizen.
+`POST /api/auth/register` starts signup without returning a session. The
+application accepts a six-digit signup code at `/api/auth/verify-email` before
+creating the application profile. Staff and Administrator accounts use the
+Administrator account-management route.
+
+New passwords require 8 to 72 characters, including an ASCII lowercase letter,
+uppercase letter, digit, and punctuation character. A space or accented letter
+does not satisfy the punctuation rule. Sign-in accepts existing passwords
+without applying the new-password form validation.
+
+The hosted Email provider, Confirm email, Secure email change, Secure password
+change, and Require current password settings must be ON. Leaked-password
+protection remains OFF under the team's free-plan choice. Forgot-password
+recovery uses a valid, single-use recovery code. It does not ask for the forgotten
+password. The API verifies the code's `recovery` purpose before its server-side
+password update and global session sign-out. If the update fails after code
+verification, that code has been consumed and a new one is required.
+
+The confirmation and recovery templates in `supabase/templates/` contain
+`{{ .Token }}`. Configure the hosted provider to send those templates with
+six-digit codes and a one-hour expiry. Setting local `config.toml` does not
+configure the hosted project. Supabase's default sender accepts only organization
+members and currently allows two emails per hour. Free projects created after
+3 June 2026 need custom SMTP to change their templates. See the
+[SMTP guide](https://supabase.com/docs/guides/auth/auth-smtp) and
+[template restriction](https://supabase.com/changelog/46599-changes-to-email-template-customisation-on-free-tier).
+Do not mark real signup or recovery as verified until delivery and code use pass.
+
+Account activity and role come from the current profile on each protected API
+request. A deactivated account is refused. Citizens with no residency proof, or
+rejected proof, can use their account, proof-upload and sign-out routes but cannot
+use reporting, notifications, feedback, or exports. Uploading proof unlocks
+those routes while an Administrator reviews it. Rejection locks them again.
+This is the owner-confirmed team rule.
+
+Residency proofs use the private `residency-proofs` bucket. Ordinary responses
+expose a proof-present flag, not the object key. Administrators can request a
+five-minute signed URL through the proof endpoint. The API must save its access
+audit entry before returning the URL.
+
+Administrator profile creation, role and activation changes, residency review,
+and manual phone verification save their database change and audit entry in one
+transaction. Auth account creation happens first through a separate service.
+If its profile transaction fails, the Auth login can remain without application
+access. Do not report that as a fully rolled-back account creation or delete it
+automatically. Other application logs still use best-effort writes.
 
 The API holds a **Supabase secret key**, which acts as the database
 `service_role` and bypasses Row Level Security. Permission checks in
@@ -200,30 +262,49 @@ The test uses synthetic records inside a transaction and rolls them back.
 | --- | --- | --- |
 | `GET` | `/api/health` | anyone |
 | `POST` | `/api/auth/register` | anyone: always creates a **citizen** |
+| `POST` | `/api/auth/verify-email`, `/resend-code`, `/forgot-password`, `/reset-password` | anyone: validated, rate-limited account flows |
+| `POST` | `/api/auth/refresh` | holder of a valid refresh token |
 | `POST` | `/api/auth/login` | anyone |
 | `POST` | `/api/auth/logout` | signed in: records the sign-out in the activity log |
 | `GET` | `/api/auth/me` | signed in |
+| `PATCH` | `/api/auth/me` | signed-in Citizen: own account fields |
+| `POST` | `/api/auth/me/residency-proof` | signed-in Citizen: private proof upload |
 | `GET` | `/api/categories` | anyone |
-| `POST` `PATCH` `DELETE` | `/api/categories[/:id]` | admin |
+| `POST` `PATCH` `DELETE` | `/api/categories[/:id]` | admin; `DELETE` deactivates the category |
 | `GET` | `/api/reports` | signed in: scoped by role |
 | `POST` | `/api/reports` | citizen (multipart, optional `photo`, up to 3 MB) |
 | `GET` | `/api/reports/:id` | owner, assigned staff, admin |
 | `PATCH` | `/api/reports/:id` | owner, while `pending` |
 | `POST` | `/api/reports/:id/cancel` | owner, while `pending` |
 | `GET` | `/api/reports/:id/updates` | owner, assigned staff, admin |
+| `GET` | `/api/reports/meta/problem-types` | signed in and residency-unlocked |
+| `GET` | `/api/reports/:id/workflow` | owner, assigned staff, admin |
 | `PATCH` | `/api/reports/:id/status` | assigned staff, admin |
 | `PATCH` | `/api/reports/:id/assign` | **admin only** |
-| `POST` | `/api/reports/:id/remarks` | assigned staff, admin |
+| `POST` | `/api/reports/:id/remarks` | reporting Citizen, assigned staff, admin |
+| `POST` | `/api/reports/:id/closure-request` | assigned Staff |
+| `POST` | `/api/reports/:id/closure-review` | admin; approval requires a different account from the requester |
 | `POST` | `/api/reports/:id/photos` | owner (initial), assigned staff (resolution) |
 | `GET` | `/api/notifications` | signed in |
 | `PATCH` | `/api/notifications/:id/read`, `/read-all` | owner |
 | `GET` `POST` `PATCH` | `/api/admin/users[/:id]` | admin |
+| `GET` | `/api/admin/users/:id/residency-proof` | admin; required access audit |
+| `PATCH` | `/api/admin/users/:id/residency`, `/phone-verified` | admin |
+| `GET` | `/api/staff` | admin: ranked assignment choices |
+| `GET` `PUT` | `/api/staff/:id/areas`, `/api/staff/:id/specializations` | admin |
+| `GET` `POST` | `/api/feedback/:reportId` | authorized reader; only the reporting Citizen can rate a resolved report, once |
+| `GET` | `/api/feedback/summary/staff` | Staff's own summary; admin may select any Staff |
+| `GET` | `/api/exports/reports`, `/api/exports/logs` | role-scoped reports; admin-only logs |
 | `GET` | `/api/admin/analytics` | admin |
 | `GET` | `/api/admin/logs` | admin |
 | `GET` | `/api/public/reports` | **anyone, no login** |
 | `GET` | `/api/public/stats` | **anyone, no login**: counts above the board |
 
-`GET /api/reports` is a single handler that filters by role: a citizen sees only their own reports, a staff member sees only reports assigned to them, an admin sees all. Query parameters: `q`, `status`, `category_id`, `from`, `to`, `sort`, `page`, `per_page`. `GET /api/public/reports` takes the same set, except that `status` accepts only the three the board can show.
+`GET /api/reports` filters by role: Citizens see their own reports, Staff see
+assigned reports, and Administrators see all. Query parameters are `q`, `status`,
+`category_id`, `barangay`, `from`, `to`, `sort`, `page`, and `per_page`. The public
+route accepts the same filters, with status limited to `under_review`,
+`in_progress`, `resolved`, and `rejected`.
 
 Protected report-detail access (`GET /api/reports/:id` and `GET /api/reports/:id/updates`) enforces record-level authorization: a Citizen may only view their own report, Staff may only view a report assigned to them, and an Administrator may view any report. Unpermitted requests receive `403 Forbidden` and disclose no report data or timeline history. This contrasts with the public transparency board (`GET /api/public/reports`), which requires no sign-in and displays reviewed reports without reporter identity, contact numbers, pending or cancelled reports, protected history, or operational notes.
 
@@ -237,12 +318,32 @@ GET https://nominatim.openstreetmap.org/reverse
 ## Status flow
 
 ```
-pending  →  under_review  →  in_progress  →  resolved
-   ↓
-cancelled          (citizen only, and only from pending)
+pending -> under_review -> in_progress
+pending -> cancelled                         (owner withdrawal)
+in_progress -> resolved                      (closure approval)
+under_review or in_progress -> rejected      (closure approval)
 ```
 
-One step at a time, no skipping and no going back. Enforced in `changeStatus()`. Each change writes a `report_updates` row and a notification for the citizen, and a report becomes visible on the public board once it leaves `pending`.
+Status changes and assignments require a non-empty comment of up to 500
+characters. Direct staff status changes stop at `in_progress`. For resolution,
+assigned Staff must upload repair proof and request closure. They may request
+rejection from `under_review` or `in_progress` with a reason. Both requests keep
+the current status until Administrator review.
+
+Closure review sends `decision`, `details`, and the unchanged `requested_at`
+value from the displayed closure request. Approval requires an account different
+from the requester, including when the requester has become an Administrator.
+Returning a request keeps the status and clears the request for more work.
+A replaced or already completed request returns `409`; reload before deciding.
+
+The closure functions lock the report and save its change, history, audit entry,
+and notifications in one transaction. Any failed required write rolls back that
+closure action. They can be called only by `service_role`, through the authorized
+API. Other status and assignment actions still use separate writes.
+
+Approved rejection becomes `rejected` and publishes its reason. Resolution
+sets `resolved_at`; rejection does not. Pending and cancelled reports remain
+private. The public board does not expose citizen identities or private history.
 
 While a report is still `pending` its owner may edit it (`PATCH /api/reports/:id`) or cancel it (`POST /api/reports/:id/cancel`). Once staff have picked it up, it is out of the citizen's hands: staff may already be acting on what it says. A cancelled report is kept, never deleted, so its history survives, and it never appears on the public board.
 
@@ -253,17 +354,23 @@ curl http://localhost:4000/api/health
 
 curl -X POST http://localhost:4000/api/auth/register \
   -H "Content-Type: application/json" \
-  -d '{"name":"Juan Dela Cruz","email":"juan@example.com","password":"password123","contact_number":"09171234567"}'
+  -d '{"first_name":"Juan","last_name":"Dela Cruz","email":"juan@example.com","password":"Password123!","barangay":"Poblacion","address_line":"Synthetic test address","privacy_consent":true}'
+
+# Read the emailed code, then confirm it before signing in.
+curl -X POST http://localhost:4000/api/auth/verify-email \
+  -H "Content-Type: application/json" \
+  -d '{"email":"juan@example.com","token":"<six-digit-code>"}'
 
 curl -X POST http://localhost:4000/api/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"email":"juan@example.com","password":"password123"}'
+  -d '{"email":"juan@example.com","password":"Password123!"}'
 
 curl -X POST http://localhost:4000/api/reports \
   -H "Authorization: Bearer <access_token>" \
   -F "title=Pothole on Rizal Street" \
   -F "description=Deep pothole near the corner, cars are swerving around it." \
   -F "category_id=1" \
+  -F "primary_problem_id=<active-problem-id-from-meta-endpoint>" \
   -F "latitude=14.5547" \
   -F "longitude=121.0244" \
   -F "photo=@pothole.jpg"
@@ -274,7 +381,10 @@ starting `09`.
 
 ## Making the first admin
 
-Public registration always produces a citizen, so promote yourself once directly in Supabase:
+For a fresh project with no Administrator, the designated project owner must
+review and perform the one-time bootstrap. Public registration cannot grant
+that role. In an existing project, use its Administrator account-management
+screen; do not run bootstrap SQL as a routine role change.
 
 ```sql
 update profiles set role = 'admin' where email = 'you@example.com';
@@ -284,7 +394,5 @@ After that, create staff accounts through `POST /api/admin/users`.
 
 ## Not built yet
 
-- Email notifications (in-app only for now; the proposal marks email optional)
-- Password reset
-- Rate limiting on login
+- Report-event email notifications (in-app only; Auth code emails are implemented)
 - Inspection routes and screens for the `report_inspections` table
