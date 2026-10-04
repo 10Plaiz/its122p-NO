@@ -4,6 +4,9 @@ import { ContactNumberField, validateContactNumber } from "../components/Contact
 import { useToast } from "../components/Toast.js";
 import { Alert, Button, EmptyState, Field, Input, Loading, Select, StatusPill, formatDate, useLeftFields } from "../components/ui.js";
 import { TableToolbar, ToolbarItem } from "../components/data-table/index.js";
+import { FilterOption } from "../components/FilterOption.js";
+import { countFilterOptions } from "../lib/filter-counts.js";
+import type { FilterValues } from "../lib/filter-counts.js";
 import { ApiError, api } from "../lib/api.js";
 import { useAuth } from "../lib/auth.js";
 import { useAction, useApi } from "../lib/useApi.js";
@@ -17,15 +20,20 @@ import { AreaEditor } from "../components/AreaEditor.js";
 import { RESIDENCY_LABEL, residencyStep } from "../lib/residency.js";
 import type { Profile, Role } from "../lib/types.js";
 
+function userFilterValues(user: Profile): FilterValues {
+  return {
+    role: user.role,
+    status: user.is_active === false ? "deactivated" : "active",
+    residency: user.residency_status === "pending" && !user.has_residency_proof ? "" : user.residency_status ?? "",
+  };
+}
+
 export function AdminUsersPage() {
   const [roleFilter, setRoleFilter] = useState("");
   const [residencyFilter, setResidencyFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [search, setSearch] = useState("");
-  const { data, error, loading, reload } = useApi<{ users: Profile[] }>("/admin/users", {
-    role: roleFilter,
-    residency: residencyFilter,
-  });
+  const { data, error, loading, reload } = useApi<{ users: Profile[] }>("/admin/users");
 
   const [creating, setCreating] = useState(false);
   const newAccountRef = useRef<HTMLButtonElement>(null);
@@ -36,11 +44,20 @@ export function AdminUsersPage() {
   }, [creating]);
   const users = data?.users ?? [];
   const query = search.trim().toLocaleLowerCase();
-  const visibleUsers = users.filter((user) => {
-    const active = user.is_active !== false;
-    const matchesStatus = !statusFilter || (statusFilter === "active" ? active : !active);
-    return matchesStatus && [user.name, user.email, user.contact_number ?? ""].some((value) => value.toLocaleLowerCase().includes(query));
+  const searchedUsers = users.filter((user) => [user.name, user.email, user.contact_number ?? ""].some((value) => value.toLocaleLowerCase().includes(query)));
+  const selected = { role: roleFilter, residency: residencyFilter, status: statusFilter };
+  const visibleUsers = searchedUsers.filter((user) => {
+    const values = userFilterValues(user);
+    return Object.entries(selected).every(([name, value]) => !value || values[name] === value);
   });
+  const countRows = data && !loading && !error ? searchedUsers.map((user) => ({ id: user.id, values: userFilterValues(user) })) : null;
+  const counts = countFilterOptions(countRows, selected);
+  // Choosing staff/admin also clears residency, so their counts reflect that action.
+  const rolesWithoutResidency = countFilterOptions(countRows, { role: roleFilter, status: statusFilter }).role;
+  const roleCounts = counts.role && rolesWithoutResidency ? {
+    ...counts.role,
+    values: new Map([...counts.role.values, ...["staff", "admin"].map((role): [string, number] => [role, rolesWithoutResidency.values.get(role) ?? 0])]),
+  } : undefined;
   const filtered = Boolean(roleFilter || residencyFilter || statusFilter || query);
 
   function clearFilters() {
@@ -75,11 +92,9 @@ export function AdminUsersPage() {
               setRoleFilter(next);
               if (next === "staff" || next === "admin") setResidencyFilter("");
             }}>
-              <option value="">Every role</option>
+              <FilterOption value="" label="Every role" counts={roleCounts} />
               {ROLES.map((role) => (
-                <option key={role} value={role}>
-                  {ROLE_LABEL[role]}
-                </option>
+                <FilterOption key={role} value={role} label={ROLE_LABEL[role]} counts={roleCounts} />
               ))}
             </Select>
           </Field>
@@ -88,10 +103,10 @@ export function AdminUsersPage() {
           <Field label="Residency" htmlFor="residency-filter">
             <Select id="residency-filter" value={residencyFilter} disabled={roleFilter === "staff" || roleFilter === "admin"}
               aria-describedby="residency-filter-note" onChange={(event) => setResidencyFilter(event.target.value)}>
-              <option value="">Any residency</option>
-              <option value="pending">Proof waiting for review</option>
-              <option value="rejected">Proof rejected</option>
-              <option value="verified">Verified resident</option>
+              <FilterOption value="" label="Any residency" counts={counts.residency} />
+              <FilterOption value="pending" label="Proof waiting for review" counts={counts.residency} />
+              <FilterOption value="rejected" label="Proof rejected" counts={counts.residency} />
+              <FilterOption value="verified" label="Verified resident" counts={counts.residency} />
             </Select>
           </Field>
           <span className="sr-only" id="residency-filter-note">Residency applies to citizens. Choose Every role or Citizen to use this filter.</span>
@@ -99,9 +114,9 @@ export function AdminUsersPage() {
         <ToolbarItem>
           <Field label="Account status" htmlFor="user-status-filter">
             <Select id="user-status-filter" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
-              <option value="">Any status</option>
-              <option value="active">Active</option>
-              <option value="deactivated">Deactivated</option>
+              <FilterOption value="" label="Any status" counts={counts.status} />
+              <FilterOption value="active" label="Active" counts={counts.status} />
+              <FilterOption value="deactivated" label="Deactivated" counts={counts.status} />
             </Select>
           </Field>
         </ToolbarItem>
