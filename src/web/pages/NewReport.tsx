@@ -94,8 +94,10 @@ export function NewReportPage() {
   const [geoError, setGeoError] = useState<string | null>(null);
   const addressTouched = useRef(false);
 
-  const { run, pending, error } = useAction((formData: FormData) =>
-    api.upload<{ report: Report }>("/reports", formData),
+  const { run, pending, error } = useAction((submission: FormData | Record<string, string>) =>
+    submission instanceof FormData
+      ? api.upload<{ report: Report }>("/reports", submission)
+      : api.post<{ report: Report }>("/reports", submission),
   );
 
   // RS-5: everything but the photo is kept as a draft in this tab. The key carries
@@ -219,19 +221,26 @@ export function NewReportPage() {
   async function submit() {
     if (firstInvalid !== -1 || !values.point) return;
 
-    // Multipart, because the photo rides along with the fields.
-    const formData = new FormData();
-    formData.set("title", values.title.trim());
-    formData.set("description", values.description.trim());
-    formData.set("category_id", values.categoryId);
-    formData.set("latitude", String(values.point.lat));
-    formData.set("longitude", String(values.point.lng));
-    if (values.address.trim()) formData.set("address_text", values.address.trim());
-    formData.set("primary_problem_id", values.primaryId);
-    if (values.secondaryId) formData.set("secondary_problem_id", values.secondaryId);
-    if (values.photo) formData.set("photo", values.photo);
+    const payload: Record<string, string> = {
+      title: values.title.trim(),
+      description: values.description.trim(),
+      category_id: values.categoryId,
+      latitude: String(values.point.lat),
+      longitude: String(values.point.lng),
+      primary_problem_id: values.primaryId,
+    };
+    if (values.address.trim()) payload.address_text = values.address.trim();
+    if (values.secondaryId) payload.secondary_problem_id = values.secondaryId;
 
-    const created = await run(formData);
+    let submission: FormData | Record<string, string> = payload;
+    if (values.photo) {
+      const form = new FormData();
+      for (const [key, value] of Object.entries(payload)) form.set(key, value);
+      form.set("photo", values.photo);
+      submission = form;
+    }
+
+    const created = await run(submission);
     if (created) {
       drafts.clear();
       setSubmitted(true);
@@ -554,7 +563,7 @@ export function NewReportPage() {
         </div>
       )}
 
-      {error && <Alert title="Could not submit">{error.message}</Alert>}
+      {error && <Alert title="Could not submit">{error.displayMessage}</Alert>}
 
       <div className="flex flex-wrap gap-3 border-t-2 border-divider pt-4">
         {step > 0 && (

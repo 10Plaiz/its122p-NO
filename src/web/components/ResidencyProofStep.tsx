@@ -7,6 +7,7 @@ import { api } from "../lib/api.js";
 import { useAuth } from "../lib/auth.js";
 import { PROOF_TYPES, residencyStep, validateProof } from "../lib/residency.js";
 import { useAction } from "../lib/useApi.js";
+import { useUnsavedChangesWarning } from "../lib/useDraft.js";
 import type { Profile } from "../lib/types.js";
 
 // UA-8, the last step of registering and the only screen a locked citizen can use:
@@ -19,6 +20,7 @@ export function ResidencyProofStep({ variant = "locked" }: { variant?: "locked" 
   const { user, replaceUser, signOut } = useAuth();
   const toast = useToast();
   const [file, setFile] = useState<File | null>(null);
+  useUnsavedChangesWarning(file !== null);
 
   const { run, pending, error } = useAction((proof: File) => {
     const form = new FormData();
@@ -84,7 +86,7 @@ export function ResidencyProofStep({ variant = "locked" }: { variant?: "locked" 
           onChange={setFile}
         />
 
-        {error && !error.fieldErrors.proof && <Alert title="Could not send your proof">{error.message}</Alert>}
+        {error && !error.fieldErrors.proof && <Alert title="Could not send your proof">{error.displayMessage}</Alert>}
 
         <Button type="submit" variant="primary" block disabled={pending || Boolean(fileError)}>
           {pending ? "Uploading…" : "Send proof"}

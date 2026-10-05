@@ -4,6 +4,7 @@
 // Vite proxies /api to the Express server on :4000 in development; in production
 // Vercel rewrites the same path to the Node function. Relative URLs work in both.
 
+import { z } from "zod";
 import type { Session } from "./types.js";
 
 export const TOKEN_KEY = "kamoti.token";
@@ -30,22 +31,65 @@ const SESSIONLESS = new Set([
   "/auth/logout",
 ]);
 
+type SubmissionRetry = { afterSeconds: number; at: Date };
+
+const retryDetailsSchema = z.object({
+  retry_after_seconds: z.number().int().nonnegative().safe().optional(),
+  retry_at: z.iso.datetime({ offset: true }).optional(),
+});
+
+function submissionRetry(response: Response, details: unknown): SubmissionRetry | undefined {
+  if (response.status !== 429 && response.status !== 503) return undefined;
+  const now = Date.now();
+  const header = response.headers.get("Retry-After")?.trim();
+  if (header && /^\d+$/.test(header)) {
+    const seconds = Number(header);
+    const at = new Date(now + seconds * 1000);
+    if (Number.isSafeInteger(seconds) && Number.isFinite(at.getTime())) return { afterSeconds: seconds, at };
+  }
+  if (header && /^(Mon|Tue|Wed|Thu|Fri|Sat|Sun), \d{2} (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) \d{4} \d{2}:\d{2}:\d{2} GMT$/.test(header)) {
+    const at = new Date(header);
+    if (Number.isFinite(at.getTime()) && at.toUTCString() === header) {
+      return { afterSeconds: Math.max(0, Math.ceil((at.getTime() - now) / 1000)), at };
+    }
+  }
+  const parsed = retryDetailsSchema.safeParse(details);
+  if (!parsed.success) return undefined;
+  if (parsed.data.retry_at !== undefined) {
+    const at = new Date(parsed.data.retry_at);
+    if (Number.isFinite(at.getTime())) return { afterSeconds: Math.max(0, Math.ceil((at.getTime() - now) / 1000)), at };
+  }
+  if (parsed.data.retry_after_seconds !== undefined) {
+    const seconds = parsed.data.retry_after_seconds;
+    const at = new Date(now + seconds * 1000);
+    if (Number.isFinite(at.getTime())) return { afterSeconds: seconds, at };
+  }
+  return undefined;
+}
+
 // The server's error shape, from src/server/middleware/error.ts.
 export class ApiError extends Error {
   constructor(
     public status: number,
     message: string,
     public details?: unknown,
+    public retry?: SubmissionRetry,
   ) {
     super(message);
     this.name = "ApiError";
   }
 
+  get displayMessage(): string {
+    if (!this.retry) return this.message;
+    const deadline = new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "medium" }).format(this.retry.at);
+    return `${this.message} Try again after ${deadline}.`;
+  }
+
   // A machine-readable reason, such as "email_not_confirmed", for a screen that
   // switches to a next step instead of only showing the message.
   get code(): string | undefined {
-    const details = this.details as { code?: unknown } | null | undefined;
-    return details && typeof details === "object" && typeof details.code === "string" ? details.code : undefined;
+    const details = this.details;
+    return details && typeof details === "object" && "code" in details && typeof details.code === "string" ? details.code : undefined;
   }
 
   // zod rejections arrive as [{ field, message }] so a form can mark its own inputs.
@@ -216,7 +260,7 @@ async function request<T>(path: string, options: RequestOptions = {}, retried = 
   if (response.status === 204) return undefined as T;
 
   // A crash or a proxy failure can return HTML, so never assume the body is JSON.
-  const payload = await response.json().catch(() => null);
+  const payload: unknown = await response.json().catch(() => null);
 
   // UA-9: an expired access token gets one refresh and one retry before the
   // session is treated as over.
@@ -227,7 +271,7 @@ async function request<T>(path: string, options: RequestOptions = {}, retried = 
   if (!response.ok) {
     const message =
       payload && typeof payload === "object" && "error" in payload
-        ? String((payload as { error: unknown }).error)
+        ? String(payload.error)
         : "Something went wrong. Try again.";
 
     if (
@@ -239,7 +283,8 @@ async function request<T>(path: string, options: RequestOptions = {}, retried = 
       window.dispatchEvent(new CustomEvent("kamoti:auth-expired", { detail: { status: response.status, message } }));
     }
 
-    const error = new ApiError(response.status, message, (payload as { details?: unknown } | null)?.details);
+    const details = payload && typeof payload === "object" && "details" in payload ? payload.details : undefined;
+    const error = new ApiError(response.status, message, details, submissionRetry(response, details));
     if (typeof window !== "undefined" && response.status === 403 && error.code === "residency_required") {
       window.dispatchEvent(new CustomEvent(RESIDENCY_REQUIRED_EVENT));
     }
