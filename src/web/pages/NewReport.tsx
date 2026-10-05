@@ -219,7 +219,7 @@ export function NewReportPage() {
   }
 
   async function submit() {
-    if (firstInvalid !== -1 || !values.point) return;
+    if (pending || firstInvalid !== -1 || !values.point) return;
 
     const payload: Record<string, string> = {
       title: values.title.trim(),
