@@ -1,9 +1,11 @@
 import { Router } from "express";
 import { z } from "zod";
+import type { ParsedQs } from "qs";
 import { db } from "../config/supabase.js";
 import { badRequest, forbidden, orThrow } from "../lib/errors.js";
 import { BARANGAYS, parse } from "../lib/validate.js";
 import { photoUpload, photoUrl, savePhoto } from "../lib/photos.js";
+import { citizenSubmissionLimit } from "../lib/submission-limits.js";
 import { endOfDay, pageFields, searchFields, searchFilter, sortColumn } from "../lib/query.js";
 import { currentUser, requireAuth, requireResidency } from "../middleware/auth.js";
 import { findReport, present, type Report } from "../services/reports.common.js";
@@ -84,13 +86,10 @@ router.get("/:id/updates", async (req, res) => {
 });
 
 // POST /api/reports/:id/photos — the citizen adds evidence, staff add proof of repair.
-router.post("/:id/photos", photoUpload.single("photo"), async (req, res) => {
-  if (!req.file) throw badRequest("Attach a photo file in the `photo` field.");
-
+type PhotoResponseLocals = { photoAdmission: { report: Report; kind: "initial" | "resolution" } };
+router.post<{ id: string }, unknown, unknown, ParsedQs, PhotoResponseLocals>("/:id/photos", async (req, res, next) => {
   const report = await findReport(req.params.id);
   const isOwner = report.citizen.id === currentUser(req).id;
-  const kind = isOwner ? "initial" : "resolution";
-
   if (isOwner) {
     if (report.status !== "pending") {
       throw forbidden("Photos can only be added while the report is still pending.");
@@ -98,7 +97,11 @@ router.post("/:id/photos", photoUpload.single("photo"), async (req, res) => {
   } else {
     assertCanUpdate(report, currentUser(req));
   }
-
+  res.locals.photoAdmission = { report, kind: isOwner ? "initial" : "resolution" };
+  next();
+}, citizenSubmissionLimit("report.photo"), photoUpload.single("photo"), async (req, res) => {
+  if (!req.file) throw badRequest("Attach a photo file in the `photo` field.");
+  const { report, kind } = res.locals.photoAdmission;
   const photo = await savePhoto({
     file: req.file,
     reportId: report.id,
