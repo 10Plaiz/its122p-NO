@@ -17,7 +17,7 @@ import maintenanceRoutes from "./routes/maintenance.routes.js";
 export const app = express();
 
 app.set("trust proxy", process.env.VERCEL === "1" ? 1 : false);
-app.use(cors({ origin: env.corsOrigin }));
+app.use(cors({ origin: env.corsOrigin, exposedHeaders: ["Retry-After"] }));
 
 // Webhooks are signed over the raw request body, so they are mounted before the
 // JSON parser replaces it with an object.
