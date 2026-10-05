@@ -56,6 +56,8 @@ database migration operation.
 | `bun run typecheck` | Check frontend, API, and deployment TypeScript |
 | `bun run test` | Run the fast test suite in `tests/fast/` |
 | `bun run test:security -- --target REF` | Run the security integration test suite against Express and Supabase |
+| `bun run test:submission-limits` | Verify shared quotas through local Supabase and independent API processes |
+| `bun run test:submission-browser` | Verify quota errors and form state in Chromium against local servers |
 | `bun run test:smoke` | Run deployed smoke verification against the test site |
 | `bun run test:browser` | Run Playwright browser automation suite and capture evidence screenshots |
 | `bun run build` | Compile the API and build the web application |
@@ -74,6 +76,8 @@ change and the others only when their environment is ready.
 | Fast | `bun run test` | Nothing beyond `bun install` |
 | Security integration | `bun run test:security -- --target YOUR_PROJECT_REF` | A running Express API and linked Supabase project with synthetic fixture accounts |
 | Database access | `psql` command below | A disposable database with every migration applied |
+| Submission limits | `bun run test:submission-limits` | An exclusive local Supabase CLI stack with all migrations and the disposable marker |
+| Submission browser | `bun run test:submission-browser` | The same local stack, running API and Vite servers, and Playwright Chromium |
 | Smoke | `bun run test:smoke` | Deployed test site or running app with fixture data |
 | Browser automation | `bun run test:browser` | Deployed test site or local app with fixture accounts, and Chromium installed via `bunx playwright install chromium` |
 
@@ -109,12 +113,71 @@ deletes synthetic data. Do not run this suite against a shared project where
 deletion is prohibited. A read-only or record-retaining release check must
 preserve its assertions and record its differences from this suite.
 
-The database suite verifies access boundaries on a disposable database after
-applying all migrations:
+### Verify submission limits with an isolated local stack
+
+Create a separate Supabase CLI workdir for these tests. Copy this repository's
+`supabase/config.toml`, `supabase/migrations/`, and `supabase/templates/` into
+its `supabase/` directory. Give the copy its own `project_id` and unused ports
+before starting it. Do not run these tests in a worktree that shares another
+local Supabase project's `project_id` or ports.
+
+For issue #60, the isolated CLI project used `project_id = "kamoti-issue-60"`,
+API port `54461`, and database port `54462`. Its shadow, Studio, Mailpit,
+analytics, and pooler ports used `54460`, `54463`, `54464`, `54467`, and
+`54469`; the edge inspector used `55468`. The repository's default project is
+`kamoti` with API port `54321` and database port `54322`. If those or another
+stack are running, keep every configured listener separate. The issue #60
+stack started with Studio, Realtime, edge runtime, Logflare, Vector,
+Supavisor, and postgres-meta excluded. Keep Auth, the Data API, PostgreSQL,
+and Storage available to the tests.
+
+Start the isolated stack with the Supabase CLI from the environment that can
+access Docker. `supabase start` applies the copied migrations:
+
+```bash
+bunx supabase start --workdir "$LOCAL_SUPABASE_WORKDIR" \
+  --exclude studio,realtime,edge-runtime,logflare,vector,supavisor,postgres-meta
+bunx supabase migration list --local --workdir "$LOCAL_SUPABASE_WORKDIR"
+```
+
+Confirm that the local migration list matches the copied SQL files. The issue #60
+copy contained all 19 migration files, including
+`20261005000100_citizen_submission_limits.sql`. Run the repository migrations
+through the CLI; an ad hoc bootstrap schema does not verify migration replay.
+Run `bunx supabase status --workdir "$LOCAL_SUPABASE_WORKDIR"` to obtain the
+API URL, local keys, and database URL. Keep those values in an
+ignored local environment file or process environment. Do not paste status
+output into an issue or PR because it contains credentials.
+
+The SQL and both runtime suites require `kamoti.test_database = 'disposable'` on
+new connections. Set this database-level marker only on the confirmed local
+CLI database, as `supabase_admin`. For the issue #60 container, the command
+run from a shell with Docker access is:
+
+```bash
+printf '%s\n' "alter database postgres set kamoti.test_database = 'disposable';" |
+  docker exec -i supabase_db_kamoti-issue-60 \
+    psql -X -v ON_ERROR_STOP=1 -U supabase_admin -d postgres
+```
+
+Set `TEST_DATABASE_URL` to that local database's `postgres` owner connection.
+Confirm that its host is `127.0.0.1` or `localhost`. Then check the marker:
+
+```bash
+psql "$TEST_DATABASE_URL" -X -v ON_ERROR_STOP=1 \
+  -c "select current_setting('kamoti.test_database', true);"
+```
+
+The result must be `disposable`. Never set this marker on a shared or hosted
+database. The marker is a guard, not permission to modify another project.
+
+The database suite verifies access boundaries and submission limits on this
+disposable database after all migrations are applied:
 
 ```bash
 psql "$TEST_DATABASE_URL" -X -v ON_ERROR_STOP=1 -f supabase/tests/api_access.sql
 psql "$TEST_DATABASE_URL" -X -v ON_ERROR_STOP=1 -f tests/database/atomic-actions.sql
+psql "$TEST_DATABASE_URL" -X -v ON_ERROR_STOP=1 -f tests/database/submission-limits.sql
 ```
 
 It creates synthetic records inside a transaction and rolls them back. Do not
@@ -123,7 +186,50 @@ injects failures to check rollback of closure and privileged account operations.
 It requires a disposable database with `kamoti.test_database = 'disposable'`.
 Do not enable that setting or install its failure triggers on the shared project.
 Native PostgreSQL replay verifies SQL behavior; it does not run Supabase Auth,
-Storage file handling, or email delivery.
+Storage file handling, or email delivery. The submission limits SQL test uses
+the actual admission RPC and rolls back its synthetic rows.
+
+Run the live quota suite from the repository root with `SUPABASE_URL`,
+`SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY`, and `TEST_DATABASE_URL` set
+to this one local stack:
+
+```bash
+bun run test:submission-limits
+```
+
+The runner refuses non-local API and database addresses and checks the
+disposable marker before creating data. It requires exclusive use of the local
+stack because it creates Auth users, reports, photos, proofs, Storage objects,
+and notifications. It starts two independent Node API processes on ports
+`56400` and `56401` by default; `SUBMISSION_TEST_PORT` changes the first port
+and reserves the next one. It retains its synthetic records under a unique run
+ID. During one failure check, it temporarily revokes the service role's
+execute privilege on the admission function and restores it in `finally`.
+Run no other application or test against this stack during the suite.
+
+For the browser check, start the API on `4000` and Vite on `5173` with the
+same local Supabase values and a working browser Maps key. Install Chromium
+before starting the servers:
+
+```bash
+bunx playwright install chromium
+bun run dev
+```
+
+After `bun run dev` is ready, run this command in a second terminal:
+
+```bash
+bun run test:submission-browser
+```
+
+`PLAYWRIGHT_BASE_URL` defaults to `http://localhost:5173` and must point to a
+local app. The browser suite checks the disposable marker, requires exclusive
+use of this stack, and retains its synthetic records. It checks actual `429`
+and `503` responses, manual retry, and retained form state in Chromium. It
+temporarily revokes the admission RPC's execute privilege for the `503` check
+and restores it in `finally`. Screenshots go to
+`tests/evidence/submission-limits-2026-10-05/` by default; `EVIDENCE_DIR`
+changes the parent directory.
 
 The browser automation suite lives in `tests/browser/` and runs Playwright
 tests against Chromium. It exercises citizen report submission, editing,

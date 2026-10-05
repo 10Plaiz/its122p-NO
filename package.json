@@ -19,6 +19,8 @@
     "test:browser:report": "playwright show-report",
     "test:cleanup": "tsx tests/browser/cleanup.ts",
     "test:security": "tsx tests/integration/security.ts",
+    "test:submission-limits": "bun tests/integration/submission-limits.ts",
+    "test:submission-browser": "bun tests/integration/submission-browser.ts",
     "test:smoke": "bun scripts/smoke/verify-deployment.ts",
     "typecheck": "bun run typecheck:api && bun run typecheck:web && bun run typecheck:deploy && bun run typecheck:test",
     "typecheck:api": "tsc --noEmit -p tsconfig.server.json",

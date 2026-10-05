@@ -256,6 +256,82 @@ psql "$TEST_DATABASE_URL" -X -v ON_ERROR_STOP=1 -f supabase/tests/api_access.sql
 
 The test uses synthetic records inside a transaction and rolls them back.
 
+## Citizen submission quotas
+
+Reports, report photos, and residency proofs use the existing Supabase database
+for shared quotas. One service-only `admit_citizen_operation` call checks the
+Citizen account and network together. The check runs before multipart file
+handling, report insertion, Storage writes, and submission notifications.
+Verified Citizens have the same report and photo quotas as other eligible
+Citizens. Existing residency, ownership, assignment, and role checks still apply.
+Staff and Administrator photo uploads retain their existing permissions.
+
+The owner agreed to proceed with this trial policy on 5 October 2026:
+
+| Operation | Account attempts in the preceding 60 minutes | Network attempts in the preceding 60 minutes |
+| :--- | ---: | ---: |
+| Submit a report | 5 | 50 |
+| Upload a report photo | 15 | 150 |
+| Upload residency proof | 3 | 30 |
+
+These are trial allowances, not measured capacity. Five reports allow several
+distinct hazards in one session. Fifteen aggregate photo attempts are three
+times the five-report allowance, leaving room for retries. They are not an
+allocation of three attempts to each report. At the current 3 MiB file limit,
+fifteen admitted photo uploads can contain at most 45 MiB of file data per
+account in an hour. Three proof attempts allow an initial document and two
+corrections. At the current 5 MiB file limit, those uploads can contain at
+most 15 MiB per account in an hour. The network allowances let ten Citizens
+each use their full account quota on one shared connection.
+Actual Citizen demand, upload retries, shared-network size, and Staff review
+capacity have not been measured. Hourly quotas also do not impose a daily
+report ceiling.
+
+OWASP recommends operation-specific request and payload limits based on
+business needs. It does not prescribe these numbers. See its
+[resource-consumption guidance](https://api-security.owasp.org/editions/2023/en/0xa4-unrestricted-resource-consumption/)
+and [workflow-abuse guidance](https://api-security.owasp.org/editions/2023/en/0xa6-unrestricted-access-to-sensitive-business-flows/).
+Use observed legitimate peaks, review backlog, upload sizes, and quota refusals
+to review the trial policy. Synthetic demo data does not establish demand.
+The migration owns the thresholds, so running server instances use one policy.
+Changing the policy requires a reviewed database migration.
+
+A JSON report consumes a report attempt. A multipart report reserves both a
+report attempt and a photo attempt, even if its body contains no photo. The
+browser sends JSON when no photo is selected. This keeps photo-free reports
+outside the photo quota. Every admitted attempt counts, including later field
+validation, file validation, Storage failure, or interrupted uploads. A quota
+refusal spends none of the requested allowances.
+
+An exhausted quota returns `429` with an integer `Retry-After` header. JSON
+details contain `code: citizen_submission_limited`, the operation,
+`retry_after_seconds`, and `retry_at`. The browser shows a local retry time
+and retains entered text and selected files while the page stays open. Retry
+is manual. Existing report drafts retain text after reload. Files must be
+selected again after a confirmed reload. A shared network can consume newly
+available capacity before a Citizen retries.
+
+Store errors, timeouts, missing migrations, and malformed RPC responses return
+`503` with `Retry-After: 60` and `code: citizen_submission_unavailable`.
+These requests reach no report, file, photo-row, or notification write.
+There is no in-memory or unrestricted fallback. Admission has no automatic
+retry. A lost response after the database commits can consume an attempt
+without saving a report or file.
+
+The ledger uses database time and transaction locks to enforce an exact
+preceding-hour window across concurrent requests, process restarts, and server
+instances. IPv6 addresses share a `/56` quota key. Local Node uses the socket
+address. Only the Vercel runtime trusts its deployment proxy for client IPs.
+No new service, credential, or paid plan is required. Indexed event rows and
+RPC calls use the existing database allowance.
+
+`citizen_submission_events` stores only operation, account or network identity,
+and timing metadata. RLS and grants deny browser access to this table and both
+quota functions. Each admission removes at most 256 expired events.
+`purge_citizen_submission_events()` provides the same bounded cleanup for an
+idle database. It never removes live quota events or application records.
+Expired metadata remains until an admission or an owner-run cleanup occurs.
+
 ## API endpoints
 
 | Method | Route | Who can call it |
