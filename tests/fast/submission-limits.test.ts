@@ -164,4 +164,31 @@ describe("citizen admission before upload parsing", () => {
       server.close();
     }
   });
+
+  test("residency proof admission sends the proof action to the store", async () => {
+    const result = await requestAdmission({ operation: "residency.proof", storeBody: { kind: "allowed" } });
+    expect(result.status).toBe(201);
+    expect(result.rpcRequests).toEqual([{ action: "residency.proof", network: "127.0.0.1" }]);
+    expect(result.uploadReached).toBe(true);
+  });
+
+  test("confirmed residency database rejection returns bad request", async () => {
+    const result = await requestAdmission({
+      storeStatus: 400,
+      storeBody: { code: "PT400", message: "Your residency is already confirmed. There is nothing more to upload." },
+    });
+    expect(result.status).toBe(400);
+    expect(result.uploadReached).toBe(false);
+    expect(result.body).toEqual({ error: "Your residency is already confirmed. There is nothing more to upload." });
+  });
+
+  test("unauthorized account database rejection returns forbidden", async () => {
+    const result = await requestAdmission({
+      storeStatus: 400,
+      storeBody: { code: "PT403", message: "Only active citizens can submit this request." },
+    });
+    expect(result.status).toBe(403);
+    expect(result.uploadReached).toBe(false);
+    expect(result.body).toEqual({ error: "Your account cannot submit this request. Reload your account and try again." });
+  });
 });
