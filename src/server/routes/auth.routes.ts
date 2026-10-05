@@ -14,6 +14,7 @@ import { ACCOUNT_FIELDS, revokeSession, sessionResponse, withProofFlag } from ".
 import { badRequest, orThrow } from "../lib/errors.js";
 import { checkProof, removeProof, residencyUpload, saveProof } from "../lib/residency.js";
 import { limits } from "../lib/rate-limit.js";
+import { citizenSubmissionLimit } from "../lib/submission-limits.js";
 import {
   addressLine,
   barangay,
@@ -235,12 +236,14 @@ router.post(
   "/me/residency-proof",
   requireAuth,
   requireRole("citizen"),
-  limits.proofUpload,
+  (req, _res, next) => {
+    if (currentUser(req).residency_status === "verified") throw badRequest(ALREADY_VERIFIED_ERROR);
+    next();
+  },
+  citizenSubmissionLimit("residency.proof"),
   residencyUpload,
   async (req, res) => {
     const user = currentUser(req);
-    if (user.residency_status === "verified") throw badRequest(ALREADY_VERIFIED_ERROR);
-
     const extension = checkProof(req.file);
     const { data: before } = await db.from("profiles").select("residency_proof_path").eq("id", user.id).single();
     const path = await saveProof(user.id, req.file!, extension);

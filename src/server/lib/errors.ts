@@ -1,7 +1,7 @@
 // One error type for everything the API deliberately rejects.
 // Anything else that throws is a bug and becomes a 500.
 export class ApiError extends Error {
-  constructor(public status: number, message: string, public details?: unknown) {
+  constructor(public status: number, message: string, public details?: unknown, public retryAfterSeconds?: number) {
     super(message);
   }
 }

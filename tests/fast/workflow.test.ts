@@ -456,6 +456,11 @@ describe("WF-06 staff ranking by specialization (SW-1)", () => {
 });
 
 describe("WF-07 every logged action has a readable label (SW-3)", () => {
+  function loggedActions(text: string): string[] {
+    return [...text.matchAll(/\blog(?:Report)?Activity\([^,]*,\s*([^,)]+)/g)]
+      .flatMap((call) => [...call[1].matchAll(/["']([a-z]+\.[a-z_]+)["']/g)].map((action) => action[1]));
+  }
+
   function sourceFiles(dir: string): string[] {
     return readdirSync(dir).flatMap((name) => {
       const path = join(dir, name);
@@ -467,15 +472,20 @@ describe("WF-07 every logged action has a readable label (SW-3)", () => {
     const actions = new Set<string>();
     for (const file of sourceFiles(join(import.meta.dir, "../../src/server"))) {
       const text = readFileSync(file, "utf8");
-      if (!/log(Report)?Activity\(/.test(text) || file.endsWith(join("lib", "activity.ts"))) continue;
-      for (const match of text.matchAll(/"([a-z]+\.[a-z_]+)"/g)) {
-        if (!/\.(js|ts|json)$/.test(match[1])) actions.add(match[1]);
-      }
+      for (const action of loggedActions(text)) actions.add(action);
     }
 
     expect(actions.size).toBeGreaterThan(5);
     const missing = [...actions].filter((action) => !ACTIVITY_LABEL[action]);
     expect(missing).toEqual([]);
+  });
+
+  it("checks audit actions when the route also has a quota operation", () => {
+    expect(loggedActions(`
+      citizenSubmissionLimit("residency.proof");
+      logActivity(req, "residency.uploaded");
+      logReportActivity(req, "report.unlabelled", report);
+    `)).toEqual(["residency.uploaded", "report.unlabelled"]);
   });
 
   it("names the new report actions", () => {

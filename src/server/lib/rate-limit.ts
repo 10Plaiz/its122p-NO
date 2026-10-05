@@ -76,8 +76,6 @@ export const limits = {
     message: "Too many codes were requested. Wait a few minutes before asking for another.",
   }),
   refresh: limit({ windowMs: 15 * MINUTE, limit: 60, message: WAIT }),
-  // UA-8: a few retries for a wrong or blurry file, not a way to fill the bucket.
-  proofUpload: limit({ windowMs: 60 * MINUTE, limit: 10, message: "Too many uploads. Try again in an hour." }),
   // RS-6: each comment notifies staff and every administrator, so ten an hour per
   // citizen keeps real follow-ups and stops a flood (decision 2026-10-03).
   citizenComment: limit({

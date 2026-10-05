@@ -16,7 +16,7 @@ import maintenanceRoutes from "./routes/maintenance.routes.js";
 
 export const app = express();
 
-app.set("trust proxy", 1); // so req.ip is the real client behind the deployment proxy
+app.set("trust proxy", process.env.VERCEL === "1" ? 1 : false);
 app.use(cors({ origin: env.corsOrigin }));
 
 // Webhooks are signed over the raw request body, so they are mounted before the

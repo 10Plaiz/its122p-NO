@@ -14,6 +14,7 @@ export function errorHandler(err: unknown, _req: Request, res: Response, _next: 
   }
 
   if (err instanceof ApiError) {
+    if (err.retryAfterSeconds !== undefined) res.set("Retry-After", String(err.retryAfterSeconds));
     return res.status(err.status).json({ error: err.message, details: err.details });
   }
 
