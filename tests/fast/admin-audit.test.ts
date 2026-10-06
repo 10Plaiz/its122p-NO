@@ -8,6 +8,8 @@ import { db } from "../../src/server/config/supabase.js";
 // separately by tests/database/atomic-actions.sql against PostgreSQL.
 const ADMIN = "c0000000-0000-4000-8000-000000000001";
 const CITIZEN = "c0000000-0000-4000-8000-000000000002";
+const VERSION = "c0000000-0000-4000-8000-000000000010";
+const PROOF = "c0000000-0000-4000-8000-000000000011";
 const PROOF_URL = "https://proof.test.invalid/private-signed-link";
 const original = { from: db.from, rpc: db.rpc, getUser: db.auth.getUser, storage: db.storage.from, fetch: globalThis.fetch };
 let server: Server;
@@ -20,6 +22,7 @@ let rpcCalls: { name: string; args: Record<string, unknown> }[];
 function profile(id: string) {
   return {
     id, name: "Synthetic Test Person", email: "synthetic@kamoti.invalid", role: id === ADMIN ? "admin" : "citizen",
+    residency_review_version: VERSION, residency_proof_id: PROOF,
     is_active: true, first_name: "Synthetic", middle_name: null, last_name: "Person", suffix: null,
     contact_number: null, phone_verified_at: null, barangay: null, address_line: null,
     residency_status: "pending", residency_note: null, residency_proof_path: "synthetic/proof.pdf",
@@ -80,18 +83,18 @@ afterEach(() => {
 });
 
 test("private proof access returns its five-minute URL when its audit write succeeds", async () => {
-  const response = await fetch(`${base}/api/admin/users/${CITIZEN}/residency-proof`, { headers: { Authorization: "Bearer synthetic-admin" } });
+  const response = await fetch(`${base}/api/admin/users/${CITIZEN}/residency-proof?expected_version=${VERSION}`, { headers: { Authorization: "Bearer synthetic-admin" } });
   expect(response.status).toBe(200);
   expect(await response.json()).toMatchObject({ url: PROOF_URL, expires_in: 300 });
 });
 test("private proof access withholds the signed URL when its audit write fails", async () => {
   auditFails = true;
-  const response = await fetch(`${base}/api/admin/users/${CITIZEN}/residency-proof`, { headers: { Authorization: "Bearer synthetic-admin" } });
+  const response = await fetch(`${base}/api/admin/users/${CITIZEN}/residency-proof?expected_version=${VERSION}`, { headers: { Authorization: "Bearer synthetic-admin" } });
   expect(response.status).toBe(500);
   expect(await response.text()).not.toContain(PROOF_URL);
 });
 test("a citizen cannot obtain a private proof URL", async () => {
-  const response = await fetch(`${base}/api/admin/users/${CITIZEN}/residency-proof`, { headers: { Authorization: "Bearer synthetic-citizen" } });
+  const response = await fetch(`${base}/api/admin/users/${CITIZEN}/residency-proof?expected_version=${VERSION}`, { headers: { Authorization: "Bearer synthetic-citizen" } });
   expect(response.status).toBe(403);
   expect(await response.text()).not.toContain(PROOF_URL);
 });

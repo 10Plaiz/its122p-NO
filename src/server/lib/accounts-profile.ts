@@ -4,6 +4,16 @@ import { ApiError, forbidden, orThrow, unauthorized } from "./errors.js";
 import { BARANGAYS, SUFFIXES, composeName } from "./validate.js";
 import type { Session, User } from "@supabase/supabase-js";
 
+export const accountProfileSchema = z.object({
+  id: z.uuid(), name: z.string(), email: z.string(), role: z.enum(["admin", "staff", "citizen"]),
+  first_name: z.string().nullable(), middle_name: z.string().nullable(), last_name: z.string().nullable(),
+  suffix: z.string().nullable(), contact_number: z.string().nullable(), phone_verified_at: z.string().nullable(),
+  barangay: z.string().nullable(), address_line: z.string().nullable(),
+  residency_status: z.enum(["pending", "verified", "rejected"]).nullable(), residency_note: z.string().nullable(),
+  is_active: z.boolean(), has_residency_proof: z.boolean(),
+  residency_review_version: z.uuid(), residency_proof_id: z.uuid().nullable(),
+});
+
 // The columns a signed-in person gets back about themselves. residency_note is the
 // administrator's reason when a proof is rejected, which the citizen must see to
 // fix it. The proof's storage path is read (SESSION_FIELDS) only to derive
@@ -11,7 +21,7 @@ import type { Session, User } from "@supabase/supabase-js";
 // through a signed URL.
 export const ACCOUNT_FIELDS =
   "id, name, first_name, middle_name, last_name, suffix, email, role, contact_number, phone_verified_at, " +
-  "barangay, address_line, residency_status, residency_note, is_active";
+  "barangay, address_line, residency_status, residency_note, is_active, residency_review_version, residency_proof_id";
 const SESSION_FIELDS = `${ACCOUNT_FIELDS}, residency_proof_path`;
 
 // What the users table shows an administrator. has_residency_proof is derived
@@ -23,26 +33,7 @@ export const ADMIN_USER_FIELDS =
   // local Supabase, 2026-10-03; the constraint-name form broke the users list).
   "reviewer:residency_reviewed_by ( id, name )";
 
-// One account as ACCOUNT_FIELDS returns it. Spelled out because supabase-js cannot
-// infer a select list that is built from joined strings.
-export type AccountProfile = {
-  id: string;
-  name: string;
-  first_name: string | null;
-  middle_name: string | null;
-  last_name: string | null;
-  suffix: string | null;
-  email: string;
-  role: "admin" | "staff" | "citizen";
-  contact_number: string | null;
-  phone_verified_at: string | null;
-  barangay: string | null;
-  address_line: string | null;
-  residency_status: "pending" | "verified" | "rejected" | null;
-  residency_note: string | null;
-  has_residency_proof: boolean;
-  is_active: boolean;
-};
+export type AccountProfile = z.infer<typeof accountProfileSchema>;
 
 // Swaps the proof's storage path for a yes/no, for every response that carries a
 // profile.

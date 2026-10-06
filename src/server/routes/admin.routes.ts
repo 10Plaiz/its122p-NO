@@ -3,7 +3,7 @@ import { z } from "zod";
 import { db } from "../config/supabase.js";
 import { accountError } from "../lib/accounts-errors.js";
 import { ADMIN_USER_FIELDS, withProofFlag } from "../lib/accounts-profile.js";
-import { badRequest, notFound, orThrow } from "../lib/errors.js";
+import { ApiError, badRequest, notFound, orThrow } from "../lib/errors.js";
 import { PROOF_URL_SECONDS, proofKind, signedProofUrl } from "../lib/residency.js";
 import { composeName, contactNumber, nameParts, optional, parse, passwordRule } from "../lib/validate.js";
 import { requireAuth, requireRole } from "../middleware/auth.js";
@@ -11,7 +11,7 @@ import { logActivity } from "../lib/activity.js";
 import { currentUser } from "../middleware/auth.js";
 import { ROLES } from "../types/auth.js";
 import { calculateAnalytics, type AnalyticsReportRow } from "../lib/analytics.js";
-import { changeAccount, createAccountProfile } from "../services/admin.accounts.js";
+import { adminAccount, changeAccount, createAccountProfile } from "../services/admin.accounts.js";
 import { applyLogFilters, logFilterFields, logSelect } from "../lib/log-filters.js";
 
 const router = Router();
@@ -49,6 +49,7 @@ export const RESIDENCY_NOTE_ERROR = "Say why the proof was not accepted, so the 
 export const residencyReviewSchema = z
   .object({
     decision: z.enum(["verified", "rejected"], "Choose whether to accept or reject the proof."),
+    expected_version: z.uuid("Refresh the review before deciding.").transform(value => value.toLowerCase()),
     note: z.string().trim().max(500, "Keep the reason under 500 characters.").optional(),
   })
   .refine((input) => input.decision !== "rejected" || (input.note?.length ?? 0) >= 5, {
@@ -57,6 +58,11 @@ export const residencyReviewSchema = z
   });
 
 export const phoneVerifiedSchema = z.object({ verified: z.boolean("Say whether the number is verified.") });
+
+const userIdSchema = z.uuid("Send a valid user ID.").transform(value => value.toLowerCase());
+const proofQuerySchema = z.object({
+  expected_version: z.uuid("Refresh the review before opening its proof.").transform(value => value.toLowerCase()),
+});
 
 // ---------------------------------------------------------------------- users
 
@@ -109,6 +115,7 @@ router.post("/users", async (req, res) => {
 });
 
 router.patch("/users/:id", async (req, res) => {
+  const userId = parse(userIdSchema, req.params.id);
   const input = parse(updateUserSchema, req.body);
 
   // An admin who demotes or deactivates themselves would lock everyone out.
@@ -130,40 +137,52 @@ router.patch("/users/:id", async (req, res) => {
     });
   }
 
-  const user = await changeAccount({ actorId: currentUser(req).id, userId: req.params.id,
+  const user = await changeAccount({ actorId: currentUser(req).id, userId,
     action: "user.updated", input: changes, ip: req.ip });
   res.json({ user });
 });
 
 async function findUser(id: string) {
-  const { data } = await db.from("profiles").select("id, role, contact_number, residency_proof_path").eq("id", id).maybeSingle();
+  const { data, error } = await db.from("profiles").select(ADMIN_USER_FIELDS).eq("id", id).maybeSingle();
+  if (error) throw new ApiError(500, "That user could not be loaded.");
   if (!data) throw notFound("That user does not exist.");
-  return data as { id: string; role: string; contact_number: string | null; residency_proof_path: string | null };
+  return adminAccount.omit({ has_residency_proof: true }).extend({ residency_proof_path: z.string().nullable() }).parse(data);
 }
+
+router.get("/users/:id", async (req, res) => {
+  const user = await findUser(parse(userIdSchema, req.params.id));
+  res.json({ user: withProofFlag(user) });
+});
 
 // UA-8. The proof holds an address and often an ID number, so the link lasts five
 // minutes and every opening is logged.
 router.get("/users/:id/residency-proof", async (req, res) => {
-  const user = await findUser(req.params.id);
+  const userId = parse(userIdSchema, req.params.id);
+  const { expected_version } = parse(proofQuerySchema, req.query);
+  const user = await findUser(userId);
+  if (user.residency_review_version !== expected_version) {
+    throw new ApiError(409, "This residency review has changed. Refresh the review before continuing.");
+  }
   if (!user.residency_proof_path) throw notFound("This account has not uploaded a proof of residency.");
+  if (!user.residency_proof_id) throw new ApiError(500, "This proof has no review identity. Refresh the review.");
 
   const url = await signedProofUrl(user.residency_proof_path);
-  await logActivity(req, "residency.proof_viewed", { entityType: "user", entityId: user.id, required: true });
-  res.json({ url, kind: proofKind(user.residency_proof_path), expires_in: PROOF_URL_SECONDS });
+  await logActivity(req, "residency.proof_viewed", {
+    entityType: "user", entityId: user.id, required: true,
+    metadata: { residency_proof_id: user.residency_proof_id, residency_review_version: user.residency_review_version },
+  });
+  res.json({ url, kind: proofKind(user.residency_proof_path), expires_in: PROOF_URL_SECONDS,
+    residency_proof_id: user.residency_proof_id, residency_review_version: user.residency_review_version });
 });
 
 // Accepting needs no upload (an administrator may know an existing citizen);
 // rejecting does, because the citizen is then locked until they send a new one.
 router.patch("/users/:id/residency", async (req, res) => {
   const input = parse(residencyReviewSchema, req.body);
-  const user = await findUser(req.params.id);
-  if (user.role !== "citizen") throw badRequest("Only citizens have a residency to confirm.");
-  if (input.decision === "rejected" && !user.residency_proof_path) {
-    throw badRequest("There is no proof to reject. This citizen has not uploaded one yet.");
-  }
-
-  const updated = await changeAccount({ actorId: currentUser(req).id, userId: user.id,
-    action: "residency.reviewed", input: { decision: input.decision, note: input.note ?? null }, ip: req.ip });
+  const userId = parse(userIdSchema, req.params.id);
+  const updated = await changeAccount({ actorId: currentUser(req).id, userId,
+    action: "residency.reviewed", input: { decision: input.decision, note: input.note ?? null,
+      expected_version: input.expected_version }, ip: req.ip });
   res.json({ user: updated });
 });
 
@@ -171,7 +190,7 @@ router.patch("/users/:id/residency", async (req, res) => {
 // a number by other means (a call, an ID) marks it verified.
 router.patch("/users/:id/phone-verified", async (req, res) => {
   const { verified } = parse(phoneVerifiedSchema, req.body);
-  const user = await findUser(req.params.id);
+  const user = await findUser(parse(userIdSchema, req.params.id));
   if (verified && !user.contact_number) throw badRequest("This account has no mobile number to verify.");
 
   const updated = await changeAccount({ actorId: currentUser(req).id, userId: user.id,

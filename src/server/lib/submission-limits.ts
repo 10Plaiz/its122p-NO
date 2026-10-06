@@ -20,6 +20,7 @@ const operationRegistry = {
 
 const actorIdSchema = z.uuid().brand<"CitizenId">();
 const networkKeySchema = z.string().min(1).max(128).brand<"NetworkKey">();
+const proofSubmissionIdSchema = z.uuid().transform(value => value.toLowerCase());
 const admissionResultSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("allowed") }).strict(),
   z.object({
@@ -78,12 +79,20 @@ export function citizenSubmissionLimit(operation: CitizenOperation): RequestHand
     }
     if (!networkKey.success) throw unavailable();
 
+    let submissionId: string | undefined;
+    if (operation === "residency.proof" && req.query.submission_id !== undefined) {
+      const parsed = proofSubmissionIdSchema.safeParse(req.query.submission_id);
+      if (!parsed.success) throw badRequest("Send a valid proof submission ID.");
+      submissionId = parsed.data;
+    }
+
     let response;
     try {
       response = await db.rpc("admit_citizen_operation", {
         p_actor_id: actorId.data,
         p_network_key: networkKey.data,
         p_action: action,
+        ...(submissionId ? { p_submission_id: submissionId } : {}),
       }).retry(false).abortSignal(AbortSignal.timeout(5000));
     } catch {
       throw unavailable();

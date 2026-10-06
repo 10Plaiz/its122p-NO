@@ -16,7 +16,7 @@ export async function requireAuth(req: Request, _res: Response, next: NextFuncti
 
   const { data: profile } = await db
     .from("profiles")
-    .select("id, name, email, role, is_active, residency_status, residency_proof_path")
+    .select("id, name, email, role, is_active, residency_status, residency_proof_path, residency_review_version, residency_proof_id")
     .eq("id", data.user.id)
     .single();
 
