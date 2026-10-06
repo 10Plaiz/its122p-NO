@@ -184,7 +184,7 @@ export function ResidencyReview({
               {refresh.pending ? "Refreshing..." : "Refresh review"}
             </Button>
           )}
-          {refresh.error && <Alert title="Could not refresh the review">{refresh.error.message}</Alert>}
+          {refresh.error && <Alert title="Could not refresh the review">{refresh.error.displayMessage}</Alert>}
 
           {!stale && (user.has_residency_proof ? (
             opened ? (
@@ -212,7 +212,7 @@ export function ResidencyReview({
             <p className="text-muted">No proof uploaded yet. You can still confirm a resident you know.</p>
           ))}
           {opened && <p className="text-muted text-[11px]">The link works for 5 minutes and every opening is logged.</p>}
-          {proofView.kind === "error" && <Alert title="Could not open the proof">{proofView.error.message}</Alert>}
+          {proofView.kind === "error" && <Alert title="Could not open the proof">{proofView.error.displayMessage}</Alert>}
 
           {rejecting && (
             <Field
@@ -236,7 +236,7 @@ export function ResidencyReview({
             </Field>
           )}
 
-          {review.error && review.error.status !== 409 && !review.error.fieldErrors.note && <Alert title="Could not save the review">{review.error.message}</Alert>}
+          {review.error && review.error.status !== 409 && !review.error.fieldErrors.note && <Alert title="Could not save the review">{review.error.displayMessage}</Alert>}
         </div>
 
         <div className="dialog-actions flex flex-wrap gap-3">
