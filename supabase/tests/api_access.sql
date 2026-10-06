@@ -13,7 +13,7 @@ begin
             'profiles', 'reports', 'report_photos', 'report_updates',
             'notifications', 'activity_logs', 'report_inspections',
             'problem_types', 'barangays', 'staff_areas', 'staff_specializations',
-            'report_feedback', 'citizen_submission_events'
+            'report_feedback', 'citizen_submission_events', 'residency_proof_versions'
         ] loop
             if has_table_privilege(client_role, 'public.' || relation_name,
                                    'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')

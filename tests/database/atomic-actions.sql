@@ -21,7 +21,11 @@ insert into auth.users (id) values
 insert into public.profiles (id, name, email, role, residency_status, residency_proof_path) values
     ('a0000000-0000-4000-8000-000000000001', 'Test Administrator', 'atomic-admin@kamoti.invalid', 'admin', null, null),
     ('a0000000-0000-4000-8000-000000000002', 'Test Staff', 'atomic-staff@kamoti.invalid', 'staff', null, null),
-    ('a0000000-0000-4000-8000-000000000003', 'Test Citizen', 'atomic-citizen@kamoti.invalid', 'citizen', 'pending', 'test/proof.pdf');
+    ('a0000000-0000-4000-8000-000000000003', 'Test Citizen', 'atomic-citizen@kamoti.invalid', 'citizen', 'pending', null);
+insert into public.residency_proof_versions (id, user_id, object_path) values
+    ('c0000000-0000-4000-8000-000000000001', 'a0000000-0000-4000-8000-000000000003', 'test/proof.pdf');
+update public.profiles set residency_proof_id = 'c0000000-0000-4000-8000-000000000001', residency_proof_path = 'test/proof.pdf'
+where id = 'a0000000-0000-4000-8000-000000000003';
 insert into public.reports (id, citizen_id, assigned_staff_id, category_id, title, description, latitude, longitude, status, is_public)
 select 'b0000000-0000-4000-8000-000000000001', 'a0000000-0000-4000-8000-000000000003',
     'a0000000-0000-4000-8000-000000000002', min(id), '[TEST] Atomic closure', 'Synthetic transaction test.', 14.555, 121.025, 'in_progress', true
@@ -117,7 +121,8 @@ select pg_temp.check_that((select count(*) = 1 from public.report_updates where 
 select pg_temp.check_that((select count(*) = 1 from public.activity_logs where action = 'report.closure_approved'),
     'approved rejection retains one audit');
 select public.admin_change_profile('a0000000-0000-4000-8000-000000000001', 'a0000000-0000-4000-8000-000000000003', 'residency.reviewed',
-    '{"decision":"rejected","note":"Please upload a readable proof."}');
+    jsonb_build_object('decision', 'rejected', 'note', 'Please upload a readable proof.', 'expected_version',
+        (select residency_review_version from public.profiles where id = 'a0000000-0000-4000-8000-000000000003')));
 select pg_temp.check_that((select residency_status = 'rejected' and residency_reviewed_by = 'a0000000-0000-4000-8000-000000000001'
     from public.profiles where id = 'a0000000-0000-4000-8000-000000000003'), 'residency decision retains reviewer');
 select pg_temp.check_that((select count(*) = 1 from public.activity_logs where action = 'residency.reviewed'), 'residency decision retains audit');
