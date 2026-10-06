@@ -34,6 +34,7 @@ function replace(target: object, key: string, value: unknown) {
   });
 }
 
+const VERSION = "c0000000-0000-4000-8000-000000000010";
 const STATUSES = [null, "pending", "verified", "rejected"] as const;
 const ROLES = ["citizen", "staff", "admin"] as const;
 
@@ -118,18 +119,18 @@ describe("RES-02 the server enforces the lock (UA-8)", () => {
 
 describe("RES-03 rejecting a proof needs a reason the citizen can act on (UA-8)", () => {
   it("accepts without a note and rejects only with one", () => {
-    expect(residencyReviewSchema.safeParse({ decision: "verified" }).success).toBe(true);
-    const bare = residencyReviewSchema.safeParse({ decision: "rejected" });
+    expect(residencyReviewSchema.safeParse({ decision: "verified", expected_version: VERSION }).success).toBe(true);
+    const bare = residencyReviewSchema.safeParse({ decision: "rejected", expected_version: VERSION });
     expect(bare.success).toBe(false);
     expect(bare.error?.issues[0]?.message).toBe(RESIDENCY_NOTE_ERROR);
-    expect(residencyReviewSchema.safeParse({ decision: "rejected", note: "  no  " }).success).toBe(false);
-    expect(residencyReviewSchema.safeParse({ decision: "rejected", note: "Address is in Taguig." }).success).toBe(true);
+    expect(residencyReviewSchema.safeParse({ decision: "rejected", expected_version: VERSION, note: "  no  " }).success).toBe(false);
+    expect(residencyReviewSchema.safeParse({ decision: "rejected", expected_version: VERSION, note: "Address is in Taguig." }).success).toBe(true);
     expect(residencyReviewSchema.safeParse({ decision: "maybe" }).success).toBe(false);
   });
 
   it("checks the note in the browser the way the server does", () => {
     for (const note of ["", "  no  ", "Address is in Taguig.", "x".repeat(501)]) {
-      const server = residencyReviewSchema.safeParse({ decision: "rejected", note });
+      const server = residencyReviewSchema.safeParse({ decision: "rejected", expected_version: VERSION, note });
       expect(validateResidencyNote(note)).toBe(server.success ? undefined : server.error.issues[0]?.message);
     }
   });
@@ -162,7 +163,7 @@ describe("RES-04 the upload is checked the same way on both sides (UA-8)", () =>
 
   it("refuses a file whose bytes do not match its claimed type on the server", () => {
     const pdf = { mimetype: "application/pdf", buffer: Buffer.from("%PDF-1.7 rest") } as Express.Multer.File;
-    expect(server.checkProof(pdf)).toBe("pdf");
+    expect(server.checkProof(pdf).extension).toBe("pdf");
     const renamed = { mimetype: "application/pdf", buffer: Buffer.from("MZ executable") } as Express.Multer.File;
     expect(() => server.checkProof(renamed)).toThrow();
     expect(() => server.checkProof(undefined)).toThrow();

@@ -71,28 +71,16 @@ export function looksLike(buffer: Buffer, mimetype: string): boolean {
 }
 
 // Throws the same field error the form shows when the upload is missing or is
-// not what it claims to be. Returns the extension to store it under.
-export function checkProof(file: Express.Multer.File | undefined): ProofExtension {
+// not what it claims to be. Returns the checked file and its storage extension.
+export function checkProof(file: Express.Multer.File | undefined) {
   if (!file) throw proofFieldError(PROOF_MISSING_ERROR);
   const extension = PROOF_TYPES[file.mimetype as keyof typeof PROOF_TYPES];
   if (!extension || !looksLike(file.buffer, file.mimetype)) throw proofFieldError(PROOF_TYPE_ERROR);
-  return extension;
+  return { file, extension };
 }
 
-// One file per account, named by the account, so a repeated registration for the
-// same unconfirmed address replaces its own proof rather than piling up copies,
-// and a path can always be rebuilt from the user id and extension.
-export function proofPath(userId: string, extension: ProofExtension) {
-  return `${userId}/residency-proof.${extension}`;
-}
-
-export async function saveProof(userId: string, file: Express.Multer.File, extension: ProofExtension) {
-  const path = proofPath(userId, extension);
-  const result = await db.storage
-    .from(RESIDENCY_BUCKET)
-    .upload(path, file.buffer, { contentType: file.mimetype, upsert: true });
-  orThrow(result, "Your proof of residency could not be saved.");
-  return path;
+export function proofPath(userId: string, submissionId: string, extension: ProofExtension) {
+  return `${userId}/${submissionId}.${extension}`;
 }
 
 export async function signedProofUrl(path: string) {
@@ -103,11 +91,6 @@ export async function signedProofUrl(path: string) {
 // For the reviewer's preview: an image can be shown inline, a PDF only linked.
 export function proofKind(path: string): "image" | "pdf" {
   return path.endsWith(".pdf") ? "pdf" : "image";
-}
-
-export async function removeProof(path: string) {
-  const { error } = await db.storage.from(RESIDENCY_BUCKET).remove([path]);
-  if (error) console.error("Could not remove a replaced residency proof:", error.message);
 }
 
 // UA-8: where a citizen stands, from the two facts that decide it. A citizen with

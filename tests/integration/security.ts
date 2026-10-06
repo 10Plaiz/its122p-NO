@@ -741,10 +741,14 @@ async function main(): Promise<void> {
 
       // Restore citizen 1 exactly as it was, whatever happens below.
       const fields = "first_name, middle_name, last_name, suffix, name, contact_number, phone_verified_at, barangay, address_line, residency_status, residency_note, residency_reviewed_by, residency_reviewed_at";
-      const { data: before } = await db.from("profiles").select(`id, ${fields}`).eq("email", "fixture-citizen-1@kamoti.invalid").single();
+      const { data: before, error: snapshotError } = await db.from("profiles").select(`id, ${fields}`).eq("email", "fixture-citizen-1@kamoti.invalid").single();
+      if (snapshotError || !before) throw new Error("Could not read the citizen account before the details test");
       const restore = async () => {
-        const { id, ...rest } = before as Record<string, unknown>;
-        await db.from("profiles").update(rest).eq("id", id as string);
+        const { id, residency_status, residency_note, residency_reviewed_by, residency_reviewed_at, ...details } = before;
+        const restoredDetails = await db.from("profiles").update(details).eq("id", id);
+        if (restoredDetails.error) throw new Error("Could not restore citizen identity and address details");
+        const restoredResidency = await db.from("profiles").update({ residency_status, residency_note, residency_reviewed_by, residency_reviewed_at }).eq("id", id);
+        if (restoredResidency.error) throw new Error("Could not restore the citizen residency decision");
       };
       cleanups.push(restore);
       try {

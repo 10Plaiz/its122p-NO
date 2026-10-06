@@ -12,7 +12,8 @@ import {
 } from "../lib/accounts-email.js";
 import { ACCOUNT_FIELDS, revokeSession, sessionResponse, withProofFlag } from "../lib/accounts-profile.js";
 import { badRequest, orThrow } from "../lib/errors.js";
-import { checkProof, removeProof, residencyUpload, saveProof } from "../lib/residency.js";
+import { residencyUpload } from "../lib/residency.js";
+import { completeResidencyProof, updateOwnProfile } from "../services/residency.js";
 import { limits } from "../lib/rate-limit.js";
 import { citizenSubmissionLimit } from "../lib/submission-limits.js";
 import {
@@ -157,121 +158,53 @@ export const accountUpdateSchema = z.object({
   address_line: addressLine,
 });
 
-type AccountBefore = {
-  contact_number: string | null;
-  barangay: string | null;
-  address_line: string | null;
-  residency_status: "pending" | "verified" | "rejected" | null;
-};
-
-// What a change of details does to the rest of the account (decisions 2026-10-04):
-// a new number has not been verified by anyone (UA-6), and a new barangay or street
-// sends residency back to review while the account stays usable (UA-8). An account
-// an administrator verified without any upload has no proof to review, so the same
-// "pending" locks it to the upload step until one is sent (residencyStep). A
-// rejected proof stays rejected: the citizen still has to send a new one.
-export function accountChanges(before: AccountBefore, input: z.output<typeof accountUpdateSchema>) {
-  const changes: Record<string, unknown> = {
-    first_name: input.first_name,
-    middle_name: input.middle_name ?? null,
-    last_name: input.last_name,
-    suffix: input.suffix ?? null,
-    name: composeName(input),
-    contact_number: input.contact_number ?? null,
-    barangay: input.barangay,
-    address_line: input.address_line,
-  };
-  const phoneChanged = (before.contact_number ?? null) !== (input.contact_number ?? null);
-  const addressChanged = before.barangay !== input.barangay || before.address_line !== input.address_line;
-
-  if (phoneChanged) changes.phone_verified_at = null;
-  if (addressChanged && (before.residency_status === "verified" || before.residency_status === "pending")) {
-    Object.assign(changes, {
-      residency_status: "pending",
-      residency_note: null,
-      residency_reviewed_by: null,
-      residency_reviewed_at: null,
-    });
-  }
-  return { changes, phoneChanged, addressChanged };
-}
-
-// PATCH /api/auth/me — UA-13. Citizens only; administrators change other accounts
-// on the Users screen. Email stays out: changing it needs a new confirmation code.
 router.patch("/me", requireAuth, requireRole("citizen"), async (req, res) => {
-  const user = currentUser(req);
   const input = parse(accountUpdateSchema, req.body);
-  const before = orThrow(
-    await db.from("profiles").select("contact_number, barangay, address_line, residency_status").eq("id", user.id).single(),
-    "Your account could not be loaded.",
-  ) as AccountBefore;
-
-  const { changes, phoneChanged, addressChanged } = accountChanges(before, input);
-  const profile = orThrow(
-    await db.from("profiles").update(changes).eq("id", user.id).select(`${ACCOUNT_FIELDS}, residency_proof_path`).single(),
-    "Your details could not be saved. Try again.",
-  );
-
-  // The old and new number stay in the log for administrators (decision 2026-10-04);
-  // the profile keeps only the current one.
-  await logActivity(req, "user.updated", {
-    entityType: "user",
-    entityId: user.id,
-    metadata: {
-      by: "self",
-      ...(phoneChanged ? { contact_number: { from: before.contact_number, to: input.contact_number ?? null } } : {}),
-      ...(addressChanged ? { barangay: input.barangay, residency_review: changes.residency_status === "pending" } : {}),
+  const user = await updateOwnProfile({
+    userId: currentUser(req).id, ip: req.ip,
+    input: {
+      first_name: input.first_name,
+      middle_name: input.middle_name ?? null,
+      last_name: input.last_name,
+      suffix: input.suffix ?? null,
+      name: composeName(input),
+      contact_number: input.contact_number ?? null,
+      barangay: input.barangay,
+      address_line: input.address_line,
     },
   });
-  res.json({ user: withProofFlag(profile as unknown as { residency_proof_path: string | null }) });
+  res.json({ user });
+});
+
+export const proofSubmissionSchema = z.object({
+  submission_id: z.uuid("Send a valid proof submission ID.").transform(value => value.toLowerCase()),
+  expected_version: z.uuid("Refresh your account before uploading your proof.").transform(value => value.toLowerCase()),
 });
 
 export const ALREADY_VERIFIED_ERROR = "Your residency is already confirmed. There is nothing more to upload.";
 
-// UA-8. A signed-in citizen sends their proof of residency: right after confirming
-// their email, again after a rejection, or as an existing citizen at the next
-// sign-in. Signed in, because only then is it certain whose account the file
-// belongs to. Each upload replaces the last and goes back to an administrator.
 router.post(
   "/me/residency-proof",
   requireAuth,
   requireRole("citizen"),
   (req, _res, next) => {
-    if (currentUser(req).residency_status === "verified") throw badRequest(ALREADY_VERIFIED_ERROR);
+    if (currentUser(req).residency_status === "verified" && req.query.submission_id === undefined) {
+      throw badRequest(ALREADY_VERIFIED_ERROR);
+    }
     next();
   },
   citizenSubmissionLimit("residency.proof"),
   residencyUpload,
   async (req, res) => {
-    const user = currentUser(req);
-    const extension = checkProof(req.file);
-    const { data: before } = await db.from("profiles").select("residency_proof_path").eq("id", user.id).single();
-    const path = await saveProof(user.id, req.file!, extension);
-
-    const profile = orThrow(
-      await db
-        .from("profiles")
-        .update({
-          residency_proof_path: path,
-          residency_status: "pending",
-          residency_note: null,
-          residency_reviewed_by: null,
-          residency_reviewed_at: null,
-        })
-        .eq("id", user.id)
-        .select(`${ACCOUNT_FIELDS}, residency_proof_path`)
-        .single(),
-      "Your proof was saved but your account could not be updated. Try again.",
-    );
-
-    // A JPG replaced by a PDF lands at a new path. The old file is personal data
-    // nobody needs any more (RA 10173), so it goes, but only once the profile
-    // points at the new one.
-    const previous = (before as { residency_proof_path: string | null } | null)?.residency_proof_path;
-    if (previous && previous !== path) await removeProof(previous);
-
-    await logActivity(req, "residency.uploaded", { entityType: "user", entityId: user.id });
-    res.json({ user: withProofFlag(profile as unknown as { residency_proof_path: string | null }) });
+    const input = parse(proofSubmissionSchema, req.body);
+    if (req.query.submission_id !== undefined && req.query.submission_id.toString().toLowerCase() !== input.submission_id) {
+      throw badRequest("Use the same proof submission ID in the URL and form.");
+    }
+    const user = await completeResidencyProof({
+      userId: currentUser(req).id, submissionId: input.submission_id,
+      expectedVersion: input.expected_version, file: req.file, ip: req.ip,
+    });
+    res.json({ user });
   },
 );
 

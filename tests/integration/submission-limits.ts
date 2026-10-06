@@ -114,6 +114,17 @@ async function reportMultipart(label: string, invalid = false) {
   return form;
 }
 
+async function proofMultipart(actor: Actor, invalid = false) {
+  const profile = await db.from("profiles").select("residency_review_version").eq("id", actor.id).single();
+  assert.equal(profile.error, null, "Read the current residency version before each proof replacement");
+  const { residency_review_version } = z.object({ residency_review_version: z.uuid() }).parse(profile.data);
+  const submissionId = randomUUID();
+  const form = await multipart("proof", invalid);
+  form.set("submission_id", submissionId);
+  form.set("expected_version", residency_review_version);
+  return { path: `/api/auth/me/residency-proof?submission_id=${submissionId}`, form };
+}
+
 function limited(result: Awaited<ReturnType<typeof request>>, operation: "report" | "photo" | "proof") {
   assert.equal(result.status, 429, `${operation} request beyond its limit returns HTTP 429`);
   const value = limitedSchema.parse(result.value);
@@ -159,7 +170,7 @@ async function check(name: string, run: () => Promise<void>) {
 async function main() {
   const marker = z.array(z.object({ marker: z.string() })).length(1).parse(await sql`select current_setting('kamoti.test_database', true) as marker`);
   assert.equal(marker[0]?.marker, "disposable", "Database must already be approved and marked disposable");
-  const privilege = z.array(z.object({ can_execute: z.boolean() })).length(1).parse(await sql`select has_function_privilege('service_role', 'public.admit_citizen_operation(uuid,text,text)', 'execute') as can_execute`);
+  const privilege = z.array(z.object({ can_execute: z.boolean() })).length(1).parse(await sql`select has_function_privilege('service_role', 'public.admit_citizen_operation(uuid,text,text,uuid)', 'execute') as can_execute`);
   assert.equal(privilege[0]?.can_execute, true, "The migrated admission RPC is available to the server role");
   const problems = await db.from("problem_types").select("id,category_id").eq("is_active", true).order("id").limit(1);
   assert.equal(problems.error, null);
@@ -211,9 +222,13 @@ async function main() {
 
   await check("Three real residency proofs succeed; the fourth is rejected before Multer", async () => {
     const resident = await actor("citizen", "pending");
-    for (let index = 0; index < 3; index++) assert.equal((await request(resident, "/api/auth/me/residency-proof", await multipart("proof"))).status, 200);
+    for (let index = 0; index < 3; index++) {
+      const proof = await proofMultipart(resident);
+      assert.equal((await request(resident, proof.path, proof.form)).status, 200);
+    }
     const before = await effects();
-    limited(await request(resident, "/api/auth/me/residency-proof", await multipart("proof", true)), "proof");
+    const invalidProof = await proofMultipart(resident, true);
+    limited(await request(resident, invalidProof.path, invalidProof.form), "proof");
     assert.deepEqual(await effects(), before);
     assert.equal(await countEvents(resident), 3);
   });
@@ -325,12 +340,13 @@ async function main() {
     assert.equal(created.status, 201);
     const id = reportSchema.parse(created.value).report.id;
     const before = await effects();
-    await sql`revoke execute on function public.admit_citizen_operation(uuid,text,text) from service_role`;
+    const invalidProof = await proofMultipart(unavailable, true);
+    await sql`revoke execute on function public.admit_citizen_operation(uuid,text,text,uuid) from service_role`;
     try {
       for (const input of [
         { citizen: available, path: "/api/reports", form: await reportMultipart("unavailable", true) },
         { citizen: available, path: `/api/reports/${id}/photos`, form: await multipart("photo", true) },
-        { citizen: unavailable, path: "/api/auth/me/residency-proof", form: await multipart("proof", true) },
+        { citizen: unavailable, ...invalidProof },
       ]) {
         const result = await request(input.citizen, input.path, input.form);
         assert.equal(result.status, 503);
@@ -341,7 +357,7 @@ async function main() {
       assert.equal(await countEvents(unavailable), 0);
       assert.equal(await countEvents(available), 1);
     } finally {
-      await sql`grant execute on function public.admit_citizen_operation(uuid,text,text) to service_role`;
+      await sql`grant execute on function public.admit_citizen_operation(uuid,text,text,uuid) to service_role`;
     }
     assert.equal((await request(available, "/api/reports", reportBody("RPC restored"))).status, 201);
   });

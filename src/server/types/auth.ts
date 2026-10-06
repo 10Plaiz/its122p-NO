@@ -9,4 +9,6 @@ export type AuthUser = {
   // UA-8. Only meaningful for citizens; see residencyStep in lib/residency.ts.
   residency_status?: "pending" | "verified" | "rejected" | null;
   has_residency_proof?: boolean;
+  residency_review_version?: string;
+  residency_proof_id?: string | null;
 };
