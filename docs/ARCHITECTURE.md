@@ -48,6 +48,15 @@ use separate database writes.
 Residency proof files use a private Storage bucket. API responses return a
 proof-present flag instead of the object path. An Administrator can obtain a
 five-minute file URL only after the API saves a proof-view audit entry.
+Each proof has an immutable object path and proof identity. The profile has a
+review version that covers its proof, identity, address, and decision. Proof
+access and residency decisions use the displayed version. The database checks
+that version under the profile lock before it saves a decision and its effects.
+Proof attachment and self account changes also use locked database functions.
+Storage uploads remain separate from the database transaction. Failed or
+uncertain attachments retain the uploaded object so they cannot remove a
+committed current proof. The [API guide](API.md#residency-reviews) owns
+the exact fields, retry rules, and retention proposal.
 
 Use [Final_Project.md](Final_Project.md) for intended behavior and system
 diagrams, [FRONTEND.md](FRONTEND.md) for browser routes and page behavior,

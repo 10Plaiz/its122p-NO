@@ -189,6 +189,57 @@ Native PostgreSQL replay verifies SQL behavior; it does not run Supabase Auth,
 Storage file handling, or email delivery. The submission limits SQL test uses
 the actual admission RPC and rolls back its synthetic rows.
 
+### Residency version checks
+
+Use a fresh local PostgreSQL database named `kamoti_test_*` for a native replay.
+`tests/database/bootstrap.sql` creates minimal Auth and Storage metadata tables
+and marks that database as disposable. It refuses an existing application schema.
+It does not start Supabase services or create file objects.
+
+To test the legacy backfill, apply all migrations through
+`20261005000100_citizen_submission_limits.sql`. Then prepare the old proof rows
+before applying the residency migrations:
+
+```bash
+psql "$TEST_DATABASE_URL" -X -v ON_ERROR_STOP=1 -f tests/database/bootstrap.sql || exit 1
+for migration in supabase/migrations/*.sql; do
+  case "$migration" in
+    *20261006000100_residency_review_versions.sql)
+      psql "$TEST_DATABASE_URL" -X -v ON_ERROR_STOP=1 -v prepare_legacy=1 \
+        -f tests/database/residency-reviews.sql || exit 1 ;;
+  esac
+  psql "$TEST_DATABASE_URL" -X -v ON_ERROR_STOP=1 -f "$migration" || exit 1
+done
+psql "$TEST_DATABASE_URL" -X -v ON_ERROR_STOP=1 -f supabase/tests/api_access.sql
+psql "$TEST_DATABASE_URL" -X -v ON_ERROR_STOP=1 -f tests/database/atomic-actions.sql
+psql "$TEST_DATABASE_URL" -X -v ON_ERROR_STOP=1 -f tests/database/residency-reviews.sql
+psql "$TEST_DATABASE_URL" -X -v ON_ERROR_STOP=1 -f tests/database/submission-limits.sql
+psql "$TEST_DATABASE_URL" -X -v ON_ERROR_STOP=1 -f tests/database/proof-retry-admission.sql
+bun tests/database/residency-concurrency.ts
+```
+
+The SQL files roll back their fault triggers and test writes. The concurrency
+runner requires a loopback URL and the disposable marker. It retains synthetic
+records in that local database. It uses separate connections and confirms that
+the competing transaction waits for the profile lock before releasing the winner.
+It checks two reviewers, proof replacements, address changes, and receipt retries.
+Run the SQL files before the concurrency runner to keep their fixture counts isolated.
+
+The focused browser suite uses the application UI with simulated API responses.
+It starts its own Vite server on `127.0.0.1:5174` and requires full Chromium:
+
+```bash
+bunx playwright install chromium
+bunx playwright test --config playwright.issue61.config.ts
+```
+
+The configuration uses `channel: "chromium"` so the PDF proof can open in the
+browser. It does not use the default headless shell. See the
+[Playwright browser guide](https://playwright.dev/docs/browsers#chromium-new-headless-mode).
+These checks prove dialog conflicts, refresh, and upload retry controls. They
+do not prove hosted Supabase file handling. See [API.md](API.md#residency-reviews)
+for the review contract, retention proposal, and coordinated deployment procedure.
+
 Run the live quota suite from the repository root with `SUPABASE_URL`,
 `SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY`, and `TEST_DATABASE_URL` set
 to this one local stack:

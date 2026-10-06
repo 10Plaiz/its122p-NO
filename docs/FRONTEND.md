@@ -133,6 +133,11 @@ are in the components cascade layer in `src/web/styles/ds.css`.
   existing complete users response locally. Proof waiting for review counts
   only pending accounts with an uploaded proof. Selecting Staff or Administrator
   clears and disables residency; their role-option counts reflect that reset.
+- The residency review dialog keeps one account snapshot. Proof access and
+  decisions send its review version. A conflict keeps the dialog open and blocks
+  decisions until **Refresh review** succeeds. Refresh loads the current address
+  and version, then clears the previous proof preview and rejection reason.
+  Only a successful decision shows a success message.
 - An unsuccessful users request shows an alert with Try again. Empty results
   explain the active filters and offer Clear filters. Loading does not show
   outdated rows under newly selected filters.
