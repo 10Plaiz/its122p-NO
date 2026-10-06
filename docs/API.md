@@ -256,6 +256,97 @@ psql "$TEST_DATABASE_URL" -X -v ON_ERROR_STOP=1 -f supabase/tests/api_access.sql
 
 The test uses synthetic records inside a transaction and rolls them back.
 
+## Residency reviews
+
+Each profile has a `residency_review_version` UUID. Each proof has an immutable
+`residency_proof_id` UUID. The private `residency_proof_versions` table binds that
+proof identity to its owner, object path, and content hash. Existing proofs keep
+their paths and residency states after migration. Their content hashes remain
+null because SQL cannot read the stored file bytes.
+
+The review version changes when any of these values change:
+
+- The proof identity or object path.
+- The name, first name, middle name, last name, or suffix.
+- The barangay or address line.
+- The account role or active state.
+- The residency decision, note, reviewer, or review time.
+
+An identity or address change sends pending or verified residency back to
+pending. A rejected proof stays rejected until the Citizen submits a new proof.
+The database applies these rules to the current row. A profile pre-read cannot
+clear a newer decision. Contact-number changes still clear phone verification.
+
+`GET /api/admin/users/:id` returns the current account snapshot. Proof access
+requires its displayed version:
+
+```text
+GET /api/admin/users/:id/residency-proof?expected_version=<UUID>
+```
+
+The response includes the signed URL, file kind, five-minute expiry, proof ID,
+and review version. The required access audit identifies that exact proof and
+version. An older version receives `409` and no signed URL.
+
+`PATCH /api/admin/users/:id/residency` requires `expected_version` with the
+decision and optional note. Approval without a document still requires that
+version. The database locks the profile before it compares the version. It
+saves one decision, one notification, and the required audit in one transaction.
+The audit records the inspected version, proof identity, and relevant account
+details. A stale or repeated request receives `409` with a refresh instruction.
+It changes no residency state and adds no decision audit or notification.
+
+`POST /api/auth/me/residency-proof` requires multipart fields `proof`,
+`submission_id`, and `expected_version`. Use a new UUID for each selected file.
+Keep that submission ID and expected version for retries of the same submission.
+Send the same ID in the `submission_id` query parameter. The admission check
+uses it before file parsing. A verified Citizen can retry an owned, committed
+submission with a content hash. Other new uploads remain blocked after approval.
+Every retry still counts toward the existing proof admission limits.
+New objects use `<user-id>/<submission-id>.<extension>` with overwrite disabled.
+The database attaches the object only if the expected review version still
+matches and the object metadata exists. It also saves the upload audit.
+An exact committed retry returns the current profile. It does not clear a later
+decision or add another upload audit. Reusing an identity for different content
+receives a conflict.
+
+A failed upload leaves the current proof unchanged. A failed profile write
+retains both objects. An uncertain response can mean that the database committed
+the attachment. The API never deletes an object after such a response. An exact
+retry resolves the result. Storage and PostgreSQL do not share a transaction.
+
+An upload conflict blocks further submissions until the Citizen selects
+**Refresh account**. Refresh keeps the selected file and loads the current
+account into the proof form. It shows a current rejection without redirecting
+and discarding that file. The Citizen checks the current address before sending
+a new submission. A confirmed submission updates the signed-in account.
+A failed refresh keeps the form blocked. A confirmed retry displays the current
+residency result, including a later approval or rejection.
+
+Replaced proofs stay private and keep their original bytes. Existing signed
+links remain tied to their original document until their five-minute expiry.
+This migration installs no automatic deletion. The proposed retention period is
+30 days after replacement, subject to an owner-approved rule. That rule must
+cover audit needs, active signed links, uncertain uploads, and removal failures.
+Do not treat this proposal as approval for indefinite retention or deletion.
+
+### Deploy the review contract
+
+The migration owner applies these files in order after review:
+
+1. `20261006000100_residency_review_versions.sql`
+2. `20261006000200_proof_retry_admission.sql`
+
+Pause proof uploads and account writes before migration. Let current requests
+finish. Apply both migrations, deploy the matching API and web build, then
+verify the review flow before you resume writes. The second migration reloads
+the Data API schema cache. The earlier API can overwrite fixed proof paths
+and cannot use the new version contract.
+
+An application-only rollback is unsafe after this migration. The earlier API
+does not send review versions and uses mutable proof paths. Prefer a compatible
+forward fix. A database backup does not contain Storage file bytes.
+
 ## Citizen submission quotas
 
 Reports, report photos, and residency proofs use the existing Supabase database
@@ -365,6 +456,7 @@ Expired metadata remains until an admission or an owner-run cleanup occurs.
 | `PATCH` | `/api/notifications/:id/read`, `/read-all` | owner |
 | `GET` `POST` `PATCH` | `/api/admin/users[/:id]` | admin |
 | `GET` | `/api/admin/users/:id/residency-proof` | admin; required access audit |
+| `GET` | `/api/admin/users/:id` | admin; current account and review snapshot |
 | `PATCH` | `/api/admin/users/:id/residency`, `/phone-verified` | admin |
 | `GET` | `/api/staff` | admin: ranked assignment choices |
 | `GET` `PUT` | `/api/staff/:id/areas`, `/api/staff/:id/specializations` | admin |
