@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { PhotoPicker } from "./PhotoPicker.js";
 import { useToast } from "./Toast.js";
@@ -17,16 +17,23 @@ import type { Profile } from "../lib/types.js";
 // citizen is not locked: they send a proof for the address on file, usually just
 // after changing it (UA-13), and the sign-out offer is left out.
 export function ResidencyProofStep({ variant = "locked" }: { variant?: "locked" | "account" } = {}) {
-  const { user, replaceUser, signOut } = useAuth();
+  const { user: sessionUser, replaceUser, signOut } = useAuth();
   const toast = useToast();
   const [file, setFile] = useState<File | null>(null);
   useUnsavedChangesWarning(file !== null);
+  const submission = useRef<{ file: File; id: string; version: string } | null>(null);
+  const [refreshedUser, setRefreshedUser] = useState<Profile | null>(null);
+  const user = refreshedUser ?? sessionUser;
 
-  const { run, pending, error } = useAction((proof: File) => {
+  const { run, pending, error, setError } = useAction((upload: NonNullable<typeof submission.current>) => {
     const form = new FormData();
-    form.append("proof", proof);
-    return api.upload<{ user: Profile }>("/auth/me/residency-proof", form);
+    form.append("proof", upload.file);
+    form.append("submission_id", upload.id);
+    form.append("expected_version", upload.version);
+    return api.upload<{ user: Profile }>(`/auth/me/residency-proof?submission_id=${upload.id}`, form);
   });
+  const refresh = useAction(() => api.get<{ user: Profile }>("/auth/me"));
+  const needsRefresh = error?.status === 409;
 
   if (!user) return null;
   const rejected = residencyStep(user) === "rejected";
@@ -38,13 +45,34 @@ export function ResidencyProofStep({ variant = "locked" }: { variant?: "locked" 
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
-    if (fileError || !file) return;
-    const result = await run(file);
+    if (fileError || !file || !user || pending || refresh.pending || needsRefresh) return;
+    submission.current ??= { file, id: crypto.randomUUID(), version: user.residency_review_version };
+    const sent = submission.current;
+    const result = await run(sent);
     if (!result) return;
-    // The page around this moves on by itself once the account is unlocked.
-    toast(variant === "account" ? "Proof sent. An administrator will review it." : "Proof sent. You can use KAMOTI while an administrator reviews it.");
+    if (result.user.residency_status === "verified") toast("Your residency is confirmed.");
+    else if (result.user.residency_status === "rejected") toast("Your proof was not accepted. Select a new proof to try again.");
+    else if (result.user.residency_proof_id !== sent.id) toast("Your account is up to date. Check the current proof.");
+    else toast(variant === "account" ? "Proof sent. An administrator will review it." : "Proof sent. You can use KAMOTI while an administrator reviews it.");
     replaceUser(result.user);
-    setFile(null);
+    setRefreshedUser(null);
+    if (submission.current === sent) {
+      submission.current = null;
+      setFile(null);
+    }
+  }
+
+  async function refreshAccount() {
+    if (pending || refresh.pending || !needsRefresh) return;
+    const result = await refresh.run();
+    if (!result) return;
+    if (result.user.role !== "citizen" || result.user.is_active === false || result.user.residency_status === "verified") {
+      replaceUser(result.user);
+      return;
+    }
+    setRefreshedUser(result.user);
+    submission.current = null;
+    setError(null);
   }
 
   return (
@@ -83,12 +111,26 @@ export function ResidencyProofStep({ variant = "locked" }: { variant?: "locked" 
           hint="Only City administrators can open it. It is used to confirm your address and nothing else."
           error={shownError}
           value={file}
-          onChange={setFile}
+          onChange={(next) => {
+            if (next !== file) submission.current = null;
+            setFile(next);
+          }}
         />
 
         {error && !error.fieldErrors.proof && <Alert title="Could not send your proof">{error.displayMessage}</Alert>}
+        {needsRefresh && (
+          <Button type="button" disabled={pending || refresh.pending} onClick={refreshAccount}>
+            {refresh.pending ? "Refreshing..." : "Refresh account"}
+          </Button>
+        )}
+        {refresh.error && <Alert title="Could not refresh your account">{refresh.error.displayMessage}</Alert>}
+        {refreshedUser && (
+          <Alert title="Account refreshed">
+            Check this address before you send your proof: {user.address_line ?? "Address not set"}, {user.barangay ?? "Barangay not set"}.
+          </Alert>
+        )}
 
-        <Button type="submit" variant="primary" block disabled={pending || Boolean(fileError)}>
+        <Button type="submit" variant="primary" block disabled={pending || refresh.pending || needsRefresh || Boolean(fileError)}>
           {pending ? "Uploading…" : "Send proof"}
         </Button>
       </form>
