@@ -240,6 +240,8 @@ test("Simulated reactivation and phone verification retain the correct status la
     is_active: false,
     contact_number: "09170000001",
     phone_verified_at: null,
+    residency_review_version: "d0261004-0000-4000-8000-000000000002",
+    residency_proof_id: null,
     created_at: "2026-10-04T00:00:00Z",
   };
   await page.route("**/api/admin/users**", async (route) => {

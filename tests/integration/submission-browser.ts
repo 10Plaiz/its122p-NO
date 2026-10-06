@@ -76,7 +76,7 @@ async function fillReport(page: Page, title: string) {
 }
 
 async function refusal(page: Page, path: string, button: string, status: number) {
-  const responsePromise = page.waitForResponse((response) => response.url().endsWith(`/api${path}`) && response.request().method() === "POST");
+  const responsePromise = page.waitForResponse((response) => new URL(response.url()).pathname === `/api${path}` && response.request().method() === "POST");
   await page.getByRole("button", { name: button, exact: true }).click();
   const response = await responsePromise;
   assert.equal(response.status(), status);
@@ -111,7 +111,7 @@ async function pageFor(width: number, height: number) {
 async function main() {
   const [marker] = await sql`select current_setting('kamoti.test_database', true) as marker`;
   assert.equal(marker?.marker, "disposable", "Use an already approved disposable database");
-  const [privilege] = await sql`select has_function_privilege('service_role', 'public.admit_citizen_operation(uuid,text,text)', 'execute') as can_execute`;
+  const [privilege] = await sql`select has_function_privilege('service_role', 'public.admit_citizen_operation(uuid,text,text,uuid)', 'execute') as can_execute`;
   assert.equal(privilege?.can_execute, true);
   const ready = await fetch(new URL("/api/health", config.PLAYWRIGHT_BASE_URL));
   assert.equal(ready.status, 200, "Start the real API and Vite servers first");
@@ -213,7 +213,7 @@ async function main() {
   await outage.page.locator("#proof").setInputFiles(photoPath);
   const beforeOutage = await effects();
   try {
-    await sql`revoke execute on function public.admit_citizen_operation(uuid,text,text) from service_role`;
+    await sql`revoke execute on function public.admit_citizen_operation(uuid,text,text,uuid) from service_role`;
     await refusal(outage.page, "/auth/me/residency-proof", "Send proof", 503);
     assert.deepEqual(await effects(), beforeOutage);
     assert.equal(await session(outage.page), outageToken);
@@ -221,9 +221,9 @@ async function main() {
     await assertLayout(outage.page);
     await captureEvidence(outage.page, `${evidenceFolder}/proof-unavailable-mobile.png`);
   } finally {
-    await sql`grant execute on function public.admit_citizen_operation(uuid,text,text) to service_role`;
+    await sql`grant execute on function public.admit_citizen_operation(uuid,text,text,uuid) to service_role`;
   }
-  const proofPromise = outage.page.waitForResponse((response) => response.url().endsWith("/api/auth/me/residency-proof") && response.request().method() === "POST");
+  const proofPromise = outage.page.waitForResponse((response) => new URL(response.url()).pathname === "/api/auth/me/residency-proof" && response.request().method() === "POST");
   await outage.page.getByRole("button", { name: "Send proof", exact: true }).click();
   const proof = await proofPromise;
   assert.equal(proof.status(), 200);

@@ -123,6 +123,8 @@ export type Profile = {
   address_line?: string | null;
   residency_status?: "pending" | "verified" | "rejected" | null;
   residency_note?: string | null;
+  residency_review_version: string;
+  residency_proof_id: string | null;
   has_residency_proof?: boolean;
   // Admin users list only (ADMIN_USER_FIELDS).
   residency_reviewed_at?: string | null;

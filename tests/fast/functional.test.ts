@@ -574,9 +574,10 @@ describe("FUNC-12 responsive navigation and role-aware layouts", () => {
   });
 
   it("determines home path for each user role upon login", () => {
-    const citizenProfile: Profile = { id: "c1", name: "Citizen", email: "c@test.com", role: "citizen" };
-    const staffProfile: Profile = { id: "s1", name: "Staff", email: "s@test.com", role: "staff" };
-    const adminProfile: Profile = { id: "a1", name: "Admin", email: "a@test.com", role: "admin" };
+    const residency = { residency_review_version: "d0261006-0000-4000-8000-000000000001", residency_proof_id: null };
+    const citizenProfile: Profile = { ...residency, id: "c1", name: "Citizen", email: "c@test.com", role: "citizen" };
+    const staffProfile: Profile = { ...residency, id: "s1", name: "Staff", email: "s@test.com", role: "staff" };
+    const adminProfile: Profile = { ...residency, id: "a1", name: "Admin", email: "a@test.com", role: "admin" };
 
     expect(homePathFor(citizenProfile)).toBe("/my-reports");
     expect(homePathFor(staffProfile)).toBe("/staff/queue");

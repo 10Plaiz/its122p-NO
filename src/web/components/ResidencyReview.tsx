@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useToast } from "./Toast.js";
 import { Alert, Button, Field, StatusPill, Textarea, formatDate, useLeftFields } from "./ui.js";
-import { api } from "../lib/api.js";
+import { ApiError, api } from "../lib/api.js";
 import { RESIDENCY_LABEL, residencyStep } from "../lib/residency.js";
 import { useAction } from "../lib/useApi.js";
 import type { Profile } from "../lib/types.js";
@@ -17,13 +17,20 @@ export function validateResidencyNote(note: string): string | undefined {
   return undefined;
 }
 
-type Proof = { url: string; kind: "image" | "pdf"; expires_in: number };
-
-// UA-8. An administrator opens a citizen's proof through a five-minute link and
-// accepts or rejects it. Rejecting needs a reason: the citizen reads it on the
-// upload screen they are sent back to.
+type Proof = {
+  url: string;
+  kind: "image" | "pdf";
+  expires_in: number;
+  residency_proof_id: string;
+  residency_review_version: string;
+};
+type ProofView =
+  | { kind: "idle" }
+  | { kind: "loading" }
+  | { kind: "opened"; proof: Proof }
+  | { kind: "error"; error: ApiError };
 export function ResidencyReview({
-  user,
+  user: initialUser,
   onClose,
   onDone,
 }: {
@@ -32,26 +39,33 @@ export function ResidencyReview({
   onDone: () => void;
 }) {
   const toast = useToast();
+  const [user, setUser] = useState(initialUser);
+  const [stale, setStale] = useState(false);
   const [rejecting, setRejecting] = useState(false);
   const [note, setNote] = useState("");
   const fields = useLeftFields();
   const closeRef = useRef<HTMLButtonElement>(null);
 
-  const proof = useAction(() => api.get<Proof>(`/admin/users/${user.id}/residency-proof`));
-  const [opened, setOpened] = useState<Proof | null>(null);
-  const review = useAction((body: { decision: "verified" | "rejected"; note?: string }) =>
+  const [proofView, setProofView] = useState<ProofView>({ kind: "idle" });
+  const requestVersion = useRef(0);
+  const opened = proofView.kind === "opened" ? proofView.proof : null;
+  const review = useAction((body: { decision: "verified" | "rejected"; note?: string; expected_version: string }) =>
     api.patch<{ user: Profile }>(`/admin/users/${user.id}/residency`, body),
   );
+  const refresh = useAction(() => api.get<{ user: Profile }>(`/admin/users/${user.id}`));
+  const blocked = stale || review.pending || refresh.pending || user.role !== "citizen" || user.is_active === false;
 
   const step = residencyStep(user);
   const noteError = validateResidencyNote(note);
   const shownNoteError = fields.visible(noteError ? { "residency-note": noteError } : {})["residency-note"];
 
-  // Focus moves in on open and back to the row's button on close.
   useEffect(() => {
     const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     closeRef.current?.focus();
-    return () => previous?.focus();
+    return () => {
+      requestVersion.current++;
+      previous?.focus();
+    };
   }, []);
 
   useEffect(() => {
@@ -63,16 +77,62 @@ export function ResidencyReview({
   }, [onClose, review.pending]);
 
   async function openProof() {
-    const result = await proof.run();
-    if (result) setOpened(result);
+    if (blocked || proofView.kind === "loading") return;
+    const request = ++requestVersion.current;
+    setProofView({ kind: "loading" });
+    try {
+      const result = await api.get<Proof>(`/admin/users/${user.id}/residency-proof`, {
+        expected_version: user.residency_review_version,
+      });
+      if (request !== requestVersion.current) return;
+      setProofView({ kind: "opened", proof: result });
+    } catch (caught: unknown) {
+      if (request !== requestVersion.current) return;
+      const error = caught instanceof ApiError ? caught : new ApiError(0, "The server could not be reached.");
+      if (error.status === 409) {
+        requestVersion.current++;
+        setStale(true);
+        setProofView({ kind: "idle" });
+      } else {
+        setProofView({ kind: "error", error });
+      }
+    }
+  }
+
+  async function refreshReview() {
+    if (refresh.pending || review.pending) return;
+    const request = ++requestVersion.current;
+    setProofView({ kind: "idle" });
+    setNote("");
+    setRejecting(false);
+    fields.reset();
+    review.setError(null);
+    const result = await refresh.run();
+    if (!result || request !== requestVersion.current) return;
+    setUser(result.user);
+    setStale(false);
   }
 
   async function decide(decision: "verified" | "rejected") {
-    const result = await review.run(decision === "rejected" ? { decision, note: note.trim() } : { decision });
+    if (blocked || (decision === "rejected" && noteError)) return;
+    const request = requestVersion.current;
+    const result = await review.run({
+      decision,
+      ...(decision === "rejected" ? { note: note.trim() } : {}),
+      expected_version: user.residency_review_version,
+    });
+    if (request !== requestVersion.current) return;
     if (!result) return;
     toast(decision === "verified" ? `${user.name} is now a verified resident.` : `${user.name} was asked for a new proof.`);
     onDone();
   }
+
+  useEffect(() => {
+    if (review.error?.status !== 409) return;
+    requestVersion.current++;
+    setStale(true);
+    setProofView({ kind: "idle" });
+  }, [review.error]);
 
   return (
     <div className="dialog-backdrop z-[1100] overscroll-contain" role="presentation" onClick={onClose}>
@@ -114,7 +174,19 @@ export function ResidencyReview({
             )}
           </dl>
 
-          {user.has_residency_proof ? (
+          {stale && (
+            <Alert title="Refresh review" tone="warning">
+              This review has changed. Refresh review to load the current account and proof before you decide.
+            </Alert>
+          )}
+          {stale && (
+            <Button type="button" className="self-start" disabled={refresh.pending} onClick={refreshReview}>
+              {refresh.pending ? "Refreshing..." : "Refresh review"}
+            </Button>
+          )}
+          {refresh.error && <Alert title="Could not refresh the review">{refresh.error.message}</Alert>}
+
+          {!stale && (user.has_residency_proof ? (
             opened ? (
               opened.kind === "image" ? (
                 <a href={opened.url} target="_blank" rel="noreferrer" className="block">
@@ -132,15 +204,15 @@ export function ResidencyReview({
                 </a>
               )
             ) : (
-              <Button type="button" className="self-start" disabled={proof.pending} onClick={openProof}>
-                {proof.pending ? "Opening…" : "Open proof"}
+              <Button type="button" className="self-start" disabled={blocked || proofView.kind === "loading"} onClick={openProof}>
+                {proofView.kind === "loading" ? "Opening..." : "Open proof"}
               </Button>
             )
           ) : (
             <p className="text-muted">No proof uploaded yet. You can still confirm a resident you know.</p>
-          )}
+          ))}
           {opened && <p className="text-muted text-[11px]">The link works for 5 minutes and every opening is logged.</p>}
-          {proof.error && <Alert title="Could not open the proof">{proof.error.message}</Alert>}
+          {proofView.kind === "error" && <Alert title="Could not open the proof">{proofView.error.message}</Alert>}
 
           {rejecting && (
             <Field
@@ -153,6 +225,7 @@ export function ResidencyReview({
             >
               <Textarea
                 id="residency-note"
+                name="note"
                 rows={3}
                 maxLength={RESIDENCY_NOTE_MAX}
                 placeholder="e.g. The address on the bill is not in Makati…"
@@ -163,7 +236,7 @@ export function ResidencyReview({
             </Field>
           )}
 
-          {review.error && !review.error.fieldErrors.note && <Alert title="Could not save the review">{review.error.message}</Alert>}
+          {review.error && review.error.status !== 409 && !review.error.fieldErrors.note && <Alert title="Could not save the review">{review.error.message}</Alert>}
         </div>
 
         <div className="dialog-actions flex flex-wrap gap-3">
@@ -172,7 +245,7 @@ export function ResidencyReview({
               <Button
                 type="button"
                 variant="danger"
-                disabled={review.pending || Boolean(noteError)}
+                disabled={blocked || Boolean(noteError)}
                 onClick={() => decide("rejected")}
               >
                 {review.pending ? "Saving…" : "Reject and ask again"}
@@ -184,12 +257,12 @@ export function ResidencyReview({
           ) : (
             <>
               {step !== "verified" && (
-                <Button type="button" variant="primary" disabled={review.pending} onClick={() => decide("verified")}>
+                <Button type="button" variant="primary" disabled={blocked} onClick={() => decide("verified")}>
                   {review.pending ? "Saving…" : "Accept as resident"}
                 </Button>
               )}
               {user.has_residency_proof && step !== "rejected" && (
-                <Button type="button" variant="danger-outline" disabled={review.pending} onClick={() => setRejecting(true)}>
+                <Button type="button" variant="danger-outline" disabled={blocked} onClick={() => setRejecting(true)}>
                   Reject…
                 </Button>
               )}

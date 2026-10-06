@@ -123,9 +123,9 @@ test("Admin Reports starts Pending and its counts match category and barangay qu
 
 test("Account filters count proof waiting for review, role changes, status, and search", async ({ page }) => {
   await signIn(page, adminEmail);
-  const base = { is_active: true, contact_number: null, created_at: "2026-10-05T00:00:00Z" };
+  const base = { is_active: true, contact_number: null, created_at: "2026-10-05T00:00:00Z", residency_review_version: "d0261005-0000-4000-8000-000000000001", residency_proof_id: null };
   const users: Profile[] = [
-    { ...base, id: "pending-proof", name: "Counted citizen one", email: "count-one@kamoti.invalid", role: "citizen", residency_status: "pending", has_residency_proof: true },
+    { ...base, id: "pending-proof", name: "Counted citizen one", email: "count-one@kamoti.invalid", role: "citizen", residency_status: "pending", residency_proof_id: "d0261005-0000-4000-8000-000000000002", has_residency_proof: true },
     { ...base, id: "missing-proof", name: "Counted citizen two", email: "count-two@kamoti.invalid", role: "citizen", residency_status: "pending", has_residency_proof: false },
     { ...base, id: "verified", name: "Verified citizen", email: "verified-count@kamoti.invalid", role: "citizen", residency_status: "verified", is_active: false },
     { ...base, id: "staff", name: "Counted staff", email: "count-staff@kamoti.invalid", role: "staff" },
