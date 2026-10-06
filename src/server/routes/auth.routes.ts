@@ -197,7 +197,7 @@ router.post(
   residencyUpload,
   async (req, res) => {
     const input = parse(proofSubmissionSchema, req.body);
-    if (req.query.submission_id !== undefined && req.query.submission_id.toString().toLowerCase() !== input.submission_id) {
+    if (req.query.submission_id !== undefined && req.query.submission_id.toString().trim().toLowerCase() !== input.submission_id) {
       throw badRequest("Use the same proof submission ID in the URL and form.");
     }
     const user = await completeResidencyProof({
