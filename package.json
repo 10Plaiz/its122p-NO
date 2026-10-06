@@ -17,6 +17,7 @@
     "test": "bun test",
     "test:browser": "playwright test",
     "test:browser:report": "playwright show-report",
+    "test:browser:residency": "playwright test --config playwright.issue61.config.ts",
     "test:cleanup": "tsx tests/browser/cleanup.ts",
     "test:security": "tsx tests/integration/security.ts",
     "test:submission-limits": "bun tests/integration/submission-limits.ts",
