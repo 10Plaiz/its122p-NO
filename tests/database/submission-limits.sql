@@ -18,17 +18,21 @@ end $$;
 insert into auth.users (id) values
     ('c0000000-0000-4000-8000-000000000001'), ('c0000000-0000-4000-8000-000000000002'),
     ('c0000000-0000-4000-8000-000000000003'), ('c0000000-0000-4000-8000-000000000004');
-insert into public.profiles (id, name, email, role, residency_status, residency_proof_path) values
-    ('c0000000-0000-4000-8000-000000000001', 'Limit Citizen', 'limit-one@kamoti.invalid', 'citizen', 'pending', 'test/proof.pdf'),
-    ('c0000000-0000-4000-8000-000000000002', 'Other Citizen', 'limit-two@kamoti.invalid', 'citizen', 'verified', null),
-    ('c0000000-0000-4000-8000-000000000003', 'No Proof Citizen', 'limit-three@kamoti.invalid', 'citizen', 'pending', null),
-    ('c0000000-0000-4000-8000-000000000004', 'Limit Staff', 'limit-staff@kamoti.invalid', 'staff', null, null);
+insert into public.profiles (id, name, email, role, residency_status) values
+    ('c0000000-0000-4000-8000-000000000001', 'Limit Citizen', 'limit-one@kamoti.invalid', 'citizen', 'pending'),
+    ('c0000000-0000-4000-8000-000000000002', 'Other Citizen', 'limit-two@kamoti.invalid', 'citizen', 'verified'),
+    ('c0000000-0000-4000-8000-000000000003', 'No Proof Citizen', 'limit-three@kamoti.invalid', 'citizen', 'pending'),
+    ('c0000000-0000-4000-8000-000000000004', 'Limit Staff', 'limit-staff@kamoti.invalid', 'staff', null);
+insert into public.residency_proof_versions (id, user_id, object_path) values
+    ('c1000000-0000-4000-8000-000000000001', 'c0000000-0000-4000-8000-000000000001', 'test/proof.pdf');
+update public.profiles set residency_proof_id = 'c1000000-0000-4000-8000-000000000001', residency_proof_path = 'test/proof.pdf'
+where id = 'c0000000-0000-4000-8000-000000000001';
 
 do $$ declare client_role text; begin
     foreach client_role in array array['anon', 'authenticated'] loop
         perform pg_temp.check_that(not has_table_privilege(client_role, 'public.citizen_submission_events', 'SELECT,INSERT,UPDATE,DELETE')
             and not has_any_column_privilege(client_role, 'public.citizen_submission_events', 'SELECT,INSERT,UPDATE'), client_role || ' cannot access ledger');
-        perform pg_temp.check_that(not has_function_privilege(client_role, 'public.admit_citizen_operation(uuid,text,text)', 'execute'), client_role || ' cannot reserve attempts');
+        perform pg_temp.check_that(not has_function_privilege(client_role, 'public.admit_citizen_operation(uuid,text,text,uuid)', 'execute'), client_role || ' cannot reserve attempts');
         perform pg_temp.check_that(not has_function_privilege(client_role, 'public.purge_citizen_submission_events()', 'execute'), client_role || ' cannot purge attempts');
     end loop;
     perform pg_temp.check_that((select relrowsecurity from pg_class where oid = 'public.citizen_submission_events'::regclass), 'ledger has RLS');
