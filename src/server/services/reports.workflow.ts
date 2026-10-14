@@ -157,6 +157,9 @@ export function presentWorkflow(report: Report, workflow: WorkflowRow, now: Date
   };
 }
 
+const reportChanged = () =>
+  new ApiError(409, "This report changed while you were working on it. Reload it and try again.");
+
 export async function changeStatus({ report, user, newStatus, details }: { report: Report; user: AuthUser; newStatus: ReportStatus; details: string }) {
   if (report.status === newStatus) {
     throw badRequest(`This report is already marked "${newStatus}".`);
@@ -194,10 +197,12 @@ export async function changeStatus({ report, user, newStatus, details }: { repor
     is_public: report.is_public || newStatus !== "pending",
   };
 
-  const updated = orThrow(
-    await db.from("reports").update(changes).eq("id", report.id).select(REPORT_FIELDS).single(),
-    "The report status could not be updated.",
-  );
+  // The checks above read an earlier copy. Writing only while the status and
+  // closure request still match keeps a closure decided in between from being undone.
+  const { data: updated, error } = await db.from("reports").update(changes).eq("id", report.id)
+    .eq("status", report.status).is("closure_requested_at", null).select(REPORT_FIELDS).maybeSingle();
+  throwIfFailed({ error }, "The report status could not be updated.");
+  if (!updated) throw reportChanged();
 
   await recordUpdate({
     report,
@@ -226,6 +231,14 @@ export async function assignStaff({ report, user, staffId, details }: { report: 
 
   if (!staff || staff.role !== "staff") throw badRequest("That user is not a staff member.");
   if (!staff.is_active) throw badRequest("That staff account is deactivated.");
+  // A waiting request belongs to whoever asked; reassigning would close the report
+  // under someone who did not do the work. Return or approve it first.
+  if (closurePending({
+    closure_requested_at: (report.closure_requested_at as string | null) ?? null,
+    verified_at: (report.verified_at as string | null) ?? null,
+  })) {
+    throw badRequest("This report is waiting for an administrator to verify a request. Decide on that first.");
+  }
 
   // Read before the row is overwritten. Left undefined when the report is simply
   // being assigned again to the same person, who should not be told they lost it.
@@ -238,10 +251,10 @@ export async function assignStaff({ report, user, staffId, details }: { report: 
     ? { assigned_staff_id: staff.id }
     : { assigned_staff_id: staff.id, assigned_at: new Date().toISOString() };
 
-  const updated = orThrow(
-    await db.from("reports").update(changes).eq("id", report.id).select(REPORT_FIELDS).single(),
-    "The report could not be assigned.",
-  );
+  const { data: updated, error } = await db.from("reports").update(changes).eq("id", report.id)
+    .is("closure_requested_at", null).select(REPORT_FIELDS).maybeSingle();
+  throwIfFailed({ error }, "The report could not be assigned.");
+  if (!updated) throw reportChanged();
 
   await recordUpdate({
     report,

@@ -390,6 +390,46 @@ describe("WF-08 who may request a rejection (SW-7)", () => {
   });
 });
 
+// #54 review: a status change or assignment validates the report it read, so the
+// write must still match that state, or a closure decided in between is undone.
+describe("WF-10 status and assignment writes only apply to the state that was checked", () => {
+  const underReview = report({ status: "under_review", closure_requested_at: null, verified_at: null });
+  const updateOf = (calls: Call[]) => calls.find((call) => call.table === "reports" && call.op === "update")!;
+
+  it("moves a report only while its status and closure request are unchanged", async () => {
+    const calls = useFake((call) => ok(call.table === "reports" ? { ...underReview, status: "in_progress" } : null));
+    await server.changeStatus({ report: underReview, user: user("admin", ADMIN_ID), newStatus: "in_progress", details: "Go." });
+    expect(updateOf(calls).filters).toContainEqual(["eq", "status", "under_review"]);
+    expect(updateOf(calls).filters).toContainEqual(["is", "closure_requested_at", null]);
+  });
+
+  it("answers 409 and records nothing when the report changed in between", async () => {
+    const calls = useFake((call) => ok(call.table === "reports" ? null : {}));
+    await expect(server.changeStatus({ report: underReview, user: user("admin", ADMIN_ID), newStatus: "in_progress", details: "Go." }))
+      .rejects.toMatchObject({ status: 409 });
+    expect(calls.some((call) => call.table === "report_updates")).toBe(false);
+  });
+
+  it("refuses to reassign while a closure request waits for an administrator", async () => {
+    const waiting = report({ status: "in_progress", closure_requested_at: REQUESTED_AT, verified_at: null });
+    const calls = useFake(() => ok({ id: OTHER_STAFF_ID, name: "Other staff", role: "staff", is_active: true }));
+    await expect(server.assignStaff({ report: waiting, user: user("admin", ADMIN_ID), staffId: OTHER_STAFF_ID, details: "Swap." }))
+      .rejects.toThrow("This report is waiting for an administrator to verify a request.");
+    expect(calls.some((call) => call.op === "update")).toBe(false);
+  });
+
+  it("assigns only while no closure request is waiting, and answers 409 otherwise", async () => {
+    const staffRow = { id: OTHER_STAFF_ID, name: "Other staff", role: "staff", is_active: true };
+    const calls = useFake((call) => ok(call.table === "profiles" ? staffRow : call.table === "reports" ? underReview : null));
+    await server.assignStaff({ report: underReview, user: user("admin", ADMIN_ID), staffId: OTHER_STAFF_ID, details: "Swap." });
+    expect(updateOf(calls).filters).toContainEqual(["is", "closure_requested_at", null]);
+
+    useFake((call) => ok(call.table === "profiles" ? staffRow : null));
+    await expect(server.assignStaff({ report: underReview, user: user("admin", ADMIN_ID), staffId: OTHER_STAFF_ID, details: "Swap." }))
+      .rejects.toMatchObject({ status: 409 });
+  });
+});
+
 describe("WF-09 rejection uses the closure transaction", () => {
   it("requests rejection under review without repair photos", async () => {
     const calls = useFake((call) => ok(call.op === "select" ? NO_REQUEST : null));
