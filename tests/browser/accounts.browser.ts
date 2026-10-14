@@ -1,5 +1,5 @@
 import { test, expect, type Browser, type Page } from "@playwright/test";
-import { captureEvidence, FIXTURE_PASSWORD, latestCode, mailpitAvailable, signIn, USERS } from "./helpers.js";
+import { captureEvidence, expectProofAccepted, FIXTURE_PASSWORD, latestCode, mailpitAvailable, signIn, USERS } from "./helpers.js";
 
 // Account flows (UA-5, UA-8, UA-9, UA-12) end to end. They create real accounts and
 // read the emailed codes from Mailpit, so they run only against a local Supabase
@@ -31,6 +31,15 @@ async function fillRegister(page: Page, email: string) {
   await page.click('button[type="submit"]');
 }
 
+const CODE_REFUSED = "That code is wrong or has expired";
+
+// A code Supabase already accepted must not work a second time.
+async function expectCodeUsedUp(page: Page, path: string, data: Record<string, string>) {
+  const response = await page.request.post(path, { data });
+  expect(response.status()).toBe(400);
+  expect((await response.json()).error).toContain(CODE_REFUSED);
+}
+
 const tokenStatus = (page: Page, path: string) =>
   page.evaluate(async (url) => {
     const token = localStorage.getItem("kamoti.token");
@@ -53,10 +62,13 @@ test("UA-5: registering sends a 6-digit code; a wrong code is refused, the right
   await citizen.getByRole("button", { name: "Confirm email" }).click();
   await expect(citizen.getByText("Could not confirm your email")).toBeVisible();
 
-  await citizen.fill("#email-code", await latestCode(NEW, since, "sign-up code"));
+  const code = await latestCode(NEW, since, "sign-up code");
+  await citizen.fill("#email-code", code);
   await citizen.getByRole("button", { name: "Confirm email" }).click();
   await citizen.waitForURL(/register\?step=proof/);
   await captureEvidence(citizen, "UA-5-code-confirmed-proof-step.png");
+
+  await expectCodeUsedUp(citizen, "/api/auth/verify-email", { email: NEW, token: code });
 });
 
 test("UA-8: until a proof is sent the citizen is locked: greyed menu, redirect, and a 403 from the API", async () => {
@@ -67,8 +79,7 @@ test("UA-8: until a proof is sent the citizen is locked: greyed menu, redirect, 
 
   await citizen.setInputFiles("#proof", { name: "bill.pdf", mimeType: "application/pdf", buffer: PDF });
   await citizen.getByRole("button", { name: "Send proof" }).click();
-  await citizen.waitForURL(/my-reports/);
-  await expect(citizen.locator('nav a[aria-disabled="true"]')).toHaveCount(0);
+  await expectProofAccepted(citizen);
 });
 
 test("UA-8: an administrator rejects the proof with a reason; the citizen sees it and sends another", async ({ browser }) => {
@@ -92,7 +103,38 @@ test("UA-8: an administrator rejects the proof with a reason; the citizen sees i
   await captureEvidence(citizen, "UA-8-rejected-with-reason.png");
   await citizen.setInputFiles("#proof", { name: "bill.png", mimeType: "image/png", buffer: PNG });
   await citizen.getByRole("button", { name: "Send proof" }).click();
-  await citizen.waitForURL(/my-reports/);
+  await expectProofAccepted(citizen);
+});
+
+test("UA-8: an administrator accepts the new proof; the citizen is a verified resident", async ({ browser }) => {
+  const admin = await (await browser.newContext()).newPage();
+  await signIn(admin, USERS.admin, FIXTURE_PASSWORD);
+  await admin.goto("/admin/users");
+  await admin.selectOption("#residency-filter", "pending");
+  const row = admin.locator("tr", { hasText: NEW });
+  await row.getByRole("button", { name: /Review/ }).click();
+  await admin.getByRole("button", { name: "Open proof" }).click();
+  await expect(admin.getByAltText("Proof of residency uploaded by Ana Reyes")).toBeVisible();
+  await admin.getByRole("button", { name: "Accept as resident" }).click();
+  await expect(admin.getByText("Ana Reyes is now a verified resident.")).toBeVisible();
+  await admin.close();
+
+  await citizen.goto("/notifications");
+  await expect(citizen.getByText("Your proof of residency was accepted")).toBeVisible();
+  await citizen.goto("/account");
+  await expect(citizen.getByText("Verified resident", { exact: true }).first()).toBeVisible();
+  await captureEvidence(citizen, "UA-8-approved.png");
+
+  // A verified resident has nothing more to upload, even by a direct request.
+  const upload = await citizen.evaluate(async () => {
+    const response = await fetch("/api/auth/me/residency-proof", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${localStorage.getItem("kamoti.token")}` },
+      body: new FormData(),
+    });
+    return { status: response.status, error: ((await response.json()) as { error: string }).error };
+  });
+  expect(upload).toEqual({ status: 400, error: "Your residency is already confirmed. There is nothing more to upload." });
 });
 
 test("UA-5: signing in before confirming switches to the code step", async ({ browser }) => {
@@ -115,10 +157,18 @@ test("UA-12: a password reset by emailed code works and signs out the other sess
   const since = Date.now();
   await page.getByRole("button", { name: "Send reset code" }).click();
   await page.locator("#reset-code").waitFor();
-  await page.fill("#reset-code", await latestCode(NEW, since, "password reset code"));
+  const code = await latestCode(NEW, since, "password reset code");
+
+  await page.fill("#reset-code", "000000");
+  await page.fill("#new-password", "N3w!password");
+  await page.getByRole("button", { name: "Change password" }).click();
+  await expect(page.getByText(CODE_REFUSED)).toBeVisible();
+
+  await page.fill("#reset-code", code);
   await page.fill("#new-password", "N3w!password");
   await page.getByRole("button", { name: "Change password" }).click();
   await expect(page.getByText("Password changed")).toBeVisible();
+  await expectCodeUsedUp(page, "/api/auth/reset-password", { email: NEW, token: code, password: "An0ther!pass" });
   await page.fill("#password", "N3w!password");
   await page.click('button[type="submit"]');
   await page.waitForURL(/my-reports/);
