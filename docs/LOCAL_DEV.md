@@ -383,6 +383,7 @@ names the shared project, so point every process at the local stack instead.
    bun run seed:generate --seed 42 --as-of 2026-09-27
    bun run seed:plan --target local
    bun run seed:apply --target local
+   bun run seed:routing apply --target local
    ```
 
 4. From the same shell, start `bun run dev`. Run both browser commands with
@@ -490,10 +491,23 @@ Reports. Titles are stable and start with `[FIXTURE]`:
 | `[FIXTURE] Overflowing drainage canal on Test Street` | citizen-2 | `pending` | none |
 | `[FIXTURE] Pothole cluster on Demo Boulevard` | citizen-1 | `under_review` | staff-1 |
 
+Staff routing (SW-1). The fixture adds or re-enables these rows and leaves any
+others an administrator added:
+
+| Staff | Categories | Barangays |
+| :--- | :--- | :--- |
+| staff-1 | Road, Streetlight | San Lorenzo, Bel-Air |
+| staff-2 | Drainage | Poblacion |
+
+The Assign dialog therefore suggests staff 1 under "Streetlight in Bel-Air" for
+the streetlight report.
+
 This data supports the standard verification checks without manual repair:
-citizen owner access, other-citizen denial, assigned-Staff access,
-unassigned-Staff denial, Administrator access, owner editing while a report is
-pending, and rejection after a report leaves pending.
+- citizen owner access and other-citizen denial
+- assigned-Staff access and unassigned-Staff denial
+- Administrator access
+- owner editing while a report is pending, and rejection after it leaves pending
+- staff suggestions by category and barangay
 
 ### Rerun behavior
 
@@ -561,6 +575,19 @@ is rejected. A fingerprint covers the manifest and image bytes. Auth account
 metadata records the fingerprint so an existing dataset cannot be reused with
 different generation settings or assets by accident. To reproduce a run, retain
 the generator version, image files, random seed, and reference date.
+
+Staff routing (SW-1) is a separate step, so the fingerprinted manifest stays
+unchanged. It gives each `demo-makati-staff-*` account the categories and
+barangays of the reports assigned to it. It only adds or re-enables rows, so it
+is safe to repeat:
+
+```bash
+bun run seed:routing plan --target chqyxlyrmudmkanqmpil
+# After reviewing the counts:
+bun run seed:routing apply --target chqyxlyrmudmkanqmpil
+```
+
+A second `plan` must show `missingSpecializations: 0` and `missingAreas: 0`.
 
 The plan checks active categories, the photo bucket, the migrated public view,
 account ownership, and existing records. It reports missing records without
