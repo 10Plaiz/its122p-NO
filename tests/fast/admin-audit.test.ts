@@ -109,6 +109,39 @@ test("role changes pass the authenticated actor to the transaction and strip pri
   } }]);
   expect(await response.text()).not.toContain("residency_proof_path");
 });
+// #54 review: the login is created before its profile transaction. When that
+// transaction fails, the login must go too, or the address can never be reused.
+test("a failed profile transaction removes the login it was created for", async () => {
+  const NEW_LOGIN = "c0000000-0000-4000-8000-000000000020";
+  const removed: string[] = [];
+  const admin = db.auth.admin as unknown as { createUser: unknown; deleteUser: unknown };
+  const saved = { createUser: admin.createUser, deleteUser: admin.deleteUser };
+  admin.createUser = async () => ({ data: { user: { id: NEW_LOGIN } }, error: null });
+  admin.deleteUser = async (id: string) => { removed.push(id); return { data: {}, error: null }; };
+  rpcFails = true;
+  try {
+    const response = await fetch(`${base}/api/admin/users`, {
+      method: "POST", headers: { Authorization: "Bearer synthetic-admin", "Content-Type": "application/json" },
+      body: JSON.stringify({ first_name: "New", last_name: "Staff", email: "new-staff@kamoti.invalid", password: "Str0ng!pass", role: "staff" }),
+    });
+    expect(response.status).toBe(500);
+    expect(removed).toEqual([NEW_LOGIN]);
+  } finally {
+    Object.assign(admin, saved);
+  }
+});
+
+test("a middle name or suffix alone is refused instead of silently dropped", async () => {
+  for (const body of [{ suffix: "Jr." }, { middle_name: "Santos" }]) {
+    const response = await fetch(`${base}/api/admin/users/${CITIZEN}`, {
+      method: "PATCH", headers: { Authorization: "Bearer synthetic-admin", "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    expect(response.status).toBe(400);
+  }
+  expect(rpcCalls).toHaveLength(0);
+});
+
 test("a failed required audit in the role transaction produces a failed HTTP response", async () => {
   rpcFails = true;
   const response = await fetch(`${base}/api/admin/users/${CITIZEN}`, {

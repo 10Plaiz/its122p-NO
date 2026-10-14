@@ -41,6 +41,10 @@ export const updateUserSchema = z
   .refine((input) => (input.first_name === undefined) === (input.last_name === undefined), {
     path: ["last_name"],
     message: "Send the first and last name together.",
+  })
+  .refine((input) => input.first_name !== undefined || (input.middle_name === undefined && input.suffix === undefined), {
+    path: ["first_name"],
+    message: "Send the middle name and suffix with the first and last name.",
   });
 
 export const RESIDENCY_NOTE_ERROR = "Say why the proof was not accepted, so the citizen knows what to upload instead.";
@@ -98,19 +102,28 @@ router.post("/users", async (req, res) => {
   });
   if (error) throw accountError(error, "That account could not be created. Check the details and try again.");
 
-  const user = await createAccountProfile({
-    actorId: currentUser(req).id, userId: data.user.id, ip: req.ip,
-    input: {
-        name: composeName(input),
-        first_name: input.first_name,
-        middle_name: input.middle_name ?? null,
-        last_name: input.last_name,
-        suffix: input.suffix ?? null,
-        email: input.email,
-        role: input.role,
-        contact_number: input.contact_number ?? null,
-    },
-  });
+  let user;
+  try {
+    user = await createAccountProfile({
+      actorId: currentUser(req).id, userId: data.user.id, ip: req.ip,
+      input: {
+          name: composeName(input),
+          first_name: input.first_name,
+          middle_name: input.middle_name ?? null,
+          last_name: input.last_name,
+          suffix: input.suffix ?? null,
+          email: input.email,
+          role: input.role,
+          contact_number: input.contact_number ?? null,
+      },
+    });
+  } catch (profileError) {
+    // The transaction saved no profile, so the login has nothing to protect. Left
+    // behind, it would block this address for good ("already exists").
+    const { error: removeError } = await db.auth.admin.deleteUser(data.user.id);
+    if (removeError) console.error("Could not remove a login whose profile failed:", removeError.message);
+    throw profileError;
+  }
   res.status(201).json({ user });
 });
 
