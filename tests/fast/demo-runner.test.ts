@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { checkTarget, digest, missingRows, validateManifest } from "../../scripts/demo/seed.js";
+import { checkTarget, digest, missingRows, unconfirmedDemoCitizens, validateManifest } from "../../scripts/demo/seed.js";
 import { generateSeed } from "../../scripts/demo/generate_seed.js";
 
 describe("demo seed application boundaries", () => {
@@ -9,6 +9,16 @@ describe("demo seed application boundaries", () => {
     expect(() => checkTarget("https://other.supabase.co", "demo")).toThrow();
     expect(() => checkTarget("https://demo.supabase.co.attacker.invalid", "demo")).toThrow();
     expect(() => checkTarget("http://demo.supabase.co", "demo")).toThrow();
+  });
+
+  it("confirms demo citizens the accounts migration locked, and respects real decisions", () => {
+    expect(unconfirmedDemoCitizens([
+      { id: "seeded-before-ua8", residency_status: null, residency_proof_path: null },
+      { id: "reset-by-migration", residency_status: "pending", residency_proof_path: null },
+      { id: "sent-a-proof", residency_status: "pending", residency_proof_path: "u/proof.pdf" },
+      { id: "rejected", residency_status: "rejected", residency_proof_path: "u/proof.pdf" },
+      { id: "already-verified", residency_status: "verified", residency_proof_path: null },
+    ])).toEqual(["seeded-before-ua8", "reset-by-migration"]);
   });
 
   it("accepts the local stack only as the explicit local target", () => {

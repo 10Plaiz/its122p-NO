@@ -576,6 +576,13 @@ metadata records the fingerprint so an existing dataset cannot be reused with
 different generation settings or assets by accident. To reproduce a run, retain
 the generator version, image files, random seed, and reference date.
 
+Demo citizens are confirmed residents. The accounts migration reset every
+existing citizen to `pending` without a proof, which locks a citizen to the
+proof step. Apply re-confirms demo citizens left in that state, or with no
+status, after its unchanged-rows check. It leaves rejected citizens, and
+citizens who uploaded a proof, as they are. `plan` reports the number as
+`confirmCitizens`, and `verify` fails while any remain.
+
 Staff routing (SW-1) is a separate step, so the fingerprinted manifest stays
 unchanged. It gives each `demo-makati-staff-*` account the categories and
 barangays of the reports assigned to it. It only adds or re-enables rows, so it

@@ -60,6 +60,30 @@ The review scope was `git diff 3ac34c9 origin/main -- src/server supabase/migrat
 - **Browser:** the Assign dialog lists Fixture Staff One under "Streetlight in
   Bel-Air" (`ADMIN-assign-suggestion.png`).
 
+## KI-05 follow-up (live check, 15 October 2026)
+
+**Result:** signing in on the live site as `demo-makati-citizen-1` opened the
+proof-upload step, so KI-05 **failed**.
+
+**Cause:** the demo seed reached live before the accounts migration.
+- `20261003000200_accounts.sql:58` then set every existing citizen to `pending`
+  without a proof.
+- The seed's confirmation step only matched citizens with no status at all, so a
+  re-run would not have helped.
+
+**Fix:**
+- `seed:apply` now confirms demo citizens that are `pending` with no proof, or
+  that have no status. It does this after its unchanged-rows check.
+- `seed:plan` reports the number as `confirmCitizens`.
+- `seed:verify` fails while any remain.
+- A fast test covers the rule: it leaves rejected citizens and citizens who
+  uploaded a proof unchanged.
+
+**Local reproduction:** all 30 demo citizens were set to `pending`.
+1. `verify` failed: "30 demo citizens are not confirmed residents".
+2. `apply` confirmed 30, after checking that 1,886 existing rows were unchanged.
+3. A second `apply` confirmed 0, and `verify` passed.
+
 ## Limitations
 
 - B5's move of the users page to DataTable and B10's type-file merge were

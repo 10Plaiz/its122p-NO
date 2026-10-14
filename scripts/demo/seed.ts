@@ -86,6 +86,26 @@ function assertPreserved(before: Map<string, string>, after: Map<string, string>
   console.log(`Verified ${before.size} existing application rows remained unchanged.`);
 }
 
+// UA-8: demo citizens are confirmed residents. One still needs confirming when it
+// has no status (seeded before UA-8) or is pending with no proof, which is what the
+// accounts migration left every existing citizen as. A rejection or an uploaded
+// proof is somebody's decision, so those are left alone.
+type ResidencyRow = { id: string; residency_status: string | null; residency_proof_path: string | null };
+export function unconfirmedDemoCitizens(rows: ResidencyRow[]): string[] {
+  return rows
+    .filter(row => row.residency_status === null || (row.residency_status === "pending" && !row.residency_proof_path))
+    .map(row => row.id);
+}
+
+async function demoCitizenResidency(db: Client, manifest: Manifest, state: State): Promise<string[]> {
+  const ids = manifest.accounts.filter(account => account.role === "citizen" && state.accountIds.has(account.key))
+    .map(account => accountId(state, account.key));
+  if (ids.length === 0) return [];
+  const result = await db.from("profiles").select("id, residency_status, residency_proof_path").in("id", ids);
+  fail(result.error);
+  return unconfirmedDemoCitizens(z.array(z.object({ id: z.string(), residency_status: z.string().nullable(), residency_proof_path: z.string().nullable() })).parse(result.data));
+}
+
 export function missingRows(planned: Row[], existing: Row[]): Row[] {
   const ids = new Set(existing.map(row => String(row.id)));
   return planned.filter(row => !ids.has(String(row.id)));
@@ -258,9 +278,6 @@ async function apply(db: Client, manifest: Manifest, state: State, fingerprint: 
   const profiles = manifest.accounts.map(account => ({ id: accountId(state, account.key), email: account.email, name: account.name, ...nameParts(account.name), role: account.role, contact_number: null,
     residency_status: account.role === "citizen" ? "verified" : null, created_at: account.created_at, updated_at: account.created_at }));
   await insertMissing(db, "profiles", missingRows(profiles, state.profiles));
-  // Demo citizens seeded before UA-8 existed are confirmed too.
-  const citizenIds = manifest.accounts.filter(account => account.role === "citizen").map(account => accountId(state, account.key));
-  fail((await db.from("profiles").update({ residency_status: "verified" }).in("id", citizenIds).is("residency_status", null)).error);
   await uploadAssets(db, files);
   // RS-4: each category's first active problem type, the seed's most common one.
   const problemRows = await db.from("problem_types").select("id, category_id").eq("is_active", true).order("id");
@@ -303,6 +320,8 @@ async function apply(db: Client, manifest: Manifest, state: State, fingerprint: 
 async function verify(db: Client, manifest: Manifest, state: State, files: Map<string, Buffer>) {
   const pending = summary(manifest, state);
   if (Object.entries(pending).some(([key, value]) => key.startsWith("create") && value !== 0)) throw new Error(`Incomplete seed: ${JSON.stringify(pending)}`);
+  const locked = await demoCitizenResidency(db, manifest, state);
+  if (locked.length > 0) throw new Error(`${locked.length} demo citizens are not confirmed residents and would be locked to the proof step. Run apply.`);
   const ids = new Set(manifest.reports.map(report => report.id));
   const publicRows = await selected(db, "public_reports", [...ids]);
   const publicIds = new Set(publicRows.map(row => row.id));
@@ -345,13 +364,19 @@ async function main() {
   const lock = command === "apply" ? await open(lockPath, "wx", 0o600) : null;
   try {
     const state = await preflight(db, manifest, fingerprint);
-    console.log(JSON.stringify({ target, fingerprint, ...summary(manifest, state) }, null, 2));
+    console.log(JSON.stringify({ target, fingerprint, ...summary(manifest, state), confirmCitizens: (await demoCitizenResidency(db, manifest, state)).length }, null, 2));
     if (command === "plan") return;
     if (command === "apply") {
       const before = await snapshot(db);
       await writeFile(resolve(directory, `before-${target}.json`), JSON.stringify(Object.fromEntries(before), null, 2) + "\n", { mode: 0o600 });
       await apply(db, manifest, state, fingerprint, files, target);
       assertPreserved(before, await snapshot(db));
+      // The one deliberate change to existing rows, made after the check above so
+      // it cannot hide anything else: confirm demo citizens seeded before UA-8, or
+      // reset to pending by its migration.
+      const unconfirmed = await demoCitizenResidency(db, manifest, state);
+      if (unconfirmed.length > 0) fail((await db.from("profiles").update({ residency_status: "verified" }).in("id", unconfirmed)).error);
+      console.log(`Confirmed ${unconfirmed.length} demo citizens as residents.`);
     }
     await verify(db, manifest, command === "apply" ? await preflight(db, manifest, fingerprint) : state, files);
   } finally {
