@@ -13,6 +13,7 @@
     "seed:plan": "bun scripts/demo/seed.ts plan",
     "seed:apply": "bun scripts/demo/seed.ts apply",
     "seed:verify": "bun scripts/demo/seed.ts verify",
+    "seed:routing": "bun scripts/demo/routing.ts",
     "seed:assets": "bun scripts/demo/render-assets.ts",
     "test": "bun test",
     "test:browser": "playwright test",

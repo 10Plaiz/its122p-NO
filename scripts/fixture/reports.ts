@@ -52,3 +52,12 @@ export const REPORTS: ReportSpec[] = [
     longitude: 121.0198,
   },
 ];
+
+// SW-1: the fixture staff handle the categories and barangays of the reports
+// above, so the assignment dialog has a suggestion to rank for each of them.
+export type RoutingSpec = { staff: string; categories: string[]; barangays: string[] };
+
+export const ROUTING: RoutingSpec[] = [
+  { staff: "staff-1", categories: ["Road", "Streetlight"], barangays: ["San Lorenzo", "Bel-Air"] },
+  { staff: "staff-2", categories: ["Drainage"], barangays: ["Poblacion"] },
+];

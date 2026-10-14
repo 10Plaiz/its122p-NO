@@ -189,4 +189,20 @@ test.describe("Administrator features (FUNC-09 and FUNC-10)", () => {
     await expect(dialog).toBeHidden();
     await expect(trigger).toBeFocused();
   });
+
+  test("SW-1: Assign suggests the staff member who handles the category in the report's barangay", async ({ page }) => {
+    // The fixture gives staff 1 Streetlight in Bel-Air, where this fixture report is.
+    await page.goto("/admin/reports");
+    await page.getByRole("searchbox").fill("[FIXTURE] Broken streetlight");
+    const row = page.locator("tr", { hasText: "[FIXTURE] Broken streetlight" });
+    await row.getByRole("button", { name: "Assign" }).click();
+    const dialog = page.getByRole("dialog", { name: "Assign this report" });
+    const suggested = dialog.locator('#staff optgroup[label="Streetlight in Bel-Air"]');
+    await expect(suggested.locator("option", { hasText: "Fixture Staff One" })).toHaveCount(1);
+    await captureEvidence(page, "ADMIN-assign-suggestion.png");
+
+    // Closed without assigning, so the fixture report stays unassigned.
+    await dialog.getByRole("button", { name: "Cancel" }).click();
+    await expect(dialog).toBeHidden();
+  });
 });

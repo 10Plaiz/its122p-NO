@@ -20,7 +20,7 @@ import { createClient } from "@supabase/supabase-js";
 import { createInterface } from "node:readline";
 import { writeSync } from "node:fs";
 import { exit, stdin } from "node:process";
-import { REPORTS } from "./reports.js";
+import { REPORTS, ROUTING } from "./reports.js";
 
 const CONFIRM_PHRASE = "KAMOTI-APPLY-FIXTURE";
 
@@ -364,10 +364,34 @@ async function main(): Promise<void> {
     }
   }
 
+  // ----------------------------------------------------------------- routing
+
+  // Adds or re-enables each fixture staff member's categories and barangays.
+  // Rows an administrator added stay as they are.
+  const routingLines: string[] = [];
+  for (const spec of ROUTING) {
+    const staffId = accountId.get(spec.staff)!;
+    const categoryIds = spec.categories.map((name) => {
+      const match = categoryList.find((c) => c.name === name);
+      if (!match) throw new Error(`Category "${name}" was not found. Apply the migrations first (see docs/API.md).`);
+      return match.id;
+    });
+    const specializations = await db
+      .from("staff_specializations")
+      .upsert(categoryIds.map((category_id) => ({ staff_id: staffId, category_id, is_active: true })), { onConflict: "staff_id,category_id" });
+    if (specializations.error) throw new Error(specializations.error.message);
+    const areas = await db
+      .from("staff_areas")
+      .upsert(spec.barangays.map((barangay) => ({ staff_id: staffId, barangay, is_active: true })), { onConflict: "staff_id,barangay" });
+    if (areas.error) throw new Error(areas.error.message);
+    routingLines.push(`  [ready]   ${spec.staff}  categories=${spec.categories.join(", ")}  barangays=${spec.barangays.join(", ")}`);
+  }
+
   // ----------------------------------------------------------------- summary
 
   out(`\nFixture ready on project ${configured}.\n\nAccounts:\n${accountLines.join("\n")}\n\n`);
   out(`Reports:\n${reportLines.join("\n")}\n\n`);
+  out(`Staff routing:\n${routingLines.join("\n")}\n\n`);
   out(
     "The fixture password is the one you typed in this run; this command never stores, prints, or logs it.\n",
   );
