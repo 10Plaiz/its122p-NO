@@ -1,10 +1,11 @@
 // KAMOTI Phase 4 Security Integration Test Suite
 //
-// Verifies real Express API routes against the linked development Supabase project
-// using synthetic fixture accounts (fixture-*@kamoti.invalid).
+// Verifies real Express API routes against the local Supabase stack using synthetic
+// fixture accounts (fixture-*@kamoti.invalid) and one new security-* citizen per run.
 //
 // Safety contract:
 // - Refuses to run unless --target names the configured Supabase project.
+// - Refuses any project but the local stack (127.0.0.1 or localhost).
 // - Requires fixture password via --password, FIXTURE_PASSWORD env, or piped stdin / prompt.
 // - Never prints secrets, access tokens, or credentials.
 // - Restores fixture report states and cleans up temporary test records.
@@ -13,6 +14,7 @@ import "dotenv/config";
 import type { Server } from "node:http";
 import { createInterface } from "node:readline";
 import { stdin, exit } from "node:process";
+import { randomUUID } from "node:crypto";
 import { createClient } from "@supabase/supabase-js";
 import { app } from "../../src/server/app.js";
 import { db } from "../../src/server/config/supabase.js";
@@ -138,6 +140,16 @@ async function main(): Promise<void> {
     exit(1);
   }
 
+  // This suite deletes the records it creates and leaves synthetic accounts
+  // behind, so it runs only against the disposable local stack (#53).
+  if (!["127.0.0.1", "localhost"].includes(new URL(supabaseUrl).hostname)) {
+    console.error(
+      "Refused: this suite writes and deletes records, so it runs only against the local " +
+        "Supabase stack (SUPABASE_URL=http://127.0.0.1:54321). See docs/LOCAL_DEV.md.",
+    );
+    exit(1);
+  }
+
   let fixturePassword = explicitPassword;
   if (!fixturePassword) {
     const piped = await readPipedLines();
@@ -208,6 +220,11 @@ async function main(): Promise<void> {
     }
 
     const testCategory = activeCategories[0]!;
+
+    // Citizen quotas count every attempt for an hour, so a rerun would hit 429
+    // where a case expects 400. The stack is local (guarded above): start clean.
+    const ledger = await db.from("citizen_submission_events").delete().gte("id", 0);
+    if (ledger.error) throw new Error(`Could not clear the local submission ledger: ${ledger.error.message}`);
     const originalCategoryDesc = testCategory.description ?? null;
 
     // Helper request wrapper
@@ -766,6 +783,175 @@ async function main(): Promise<void> {
         const { data: log } = await db.from("activity_logs").select("metadata").eq("action", "user.updated").eq("entity_id", before!.id).order("created_at", { ascending: false }).limit(1).single();
         const logged = (log?.metadata as { contact_number?: { from: string; to: string } } | null)?.contact_number;
         if (logged?.from !== "09171234567" || logged?.to !== "09181234567") throw new Error("The old and new number were not logged");
+      } finally {
+        await restore();
+      }
+    });
+
+    // ------------------------------------------------------------------ Section J: Account and residency protections (#53)
+    // One new synthetic citizen per run, kept afterwards like every account (DM-1):
+    // it uploads a real proof, is approved, files and rates a report, and is
+    // finally deactivated. The local-only guard above is what makes that safe.
+    console.log("\n--- Section J: Account and Residency Protections ---");
+
+    // A real 1x1 PNG, accepted both as a proof of residency and as a report photo.
+    const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", "base64");
+    const bearer = (token: string) => ({ Authorization: `Bearer ${token}` });
+    const multipart = (path: string, token: string, form: FormData) =>
+      fetch(`${baseUrl}${path}`, { method: "POST", headers: bearer(token), body: form });
+    const pngForm = (field: string, extra: Record<string, string> = {}) => {
+      const form = new FormData();
+      form.append(field, new Blob([PNG], { type: "image/png" }), "evidence.png");
+      for (const [key, value] of Object.entries(extra)) form.append(key, value);
+      return form;
+    };
+    const count = async (table: string, column: string, value: string) => {
+      const { count: total, error } = await db.from(table).select("*", { count: "exact", head: true }).eq(column, value);
+      if (error) throw new Error(`Could not count ${table}: ${error.message}`);
+      return total ?? 0;
+    };
+
+    const securityEmail = `security-${Date.now()}@kamoti.invalid`;
+    const securityPassword = `S3curity!${Date.now()}`;
+    let securityToken = "";
+    let securityRefresh = "";
+    let securityId = "";
+
+    await runCase("IMP-12", "Residency Proofs", "an administrator gets a working, audited 5-minute proof link through the API; a stale version gets 409", async () => {
+      const created = await db.auth.admin.createUser({
+        email: securityEmail,
+        password: securityPassword,
+        email_confirm: true,
+        user_metadata: { first_name: "Security", last_name: "Check", barangay: "Poblacion", address_line: "1 Test Street", privacy_consent_at: new Date().toISOString() },
+      });
+      if (created.error) throw new Error(`Could not create the synthetic citizen: ${created.error.message}`);
+      const session = await api("/api/auth/login", { method: "POST", body: JSON.stringify({ email: securityEmail, password: securityPassword }) });
+      if (session.status !== 200) throw new Error(`Synthetic citizen sign-in: expected 200, got ${session.status}`);
+      securityToken = session.body.access_token;
+      securityRefresh = session.body.refresh_token;
+      securityId = session.body.user.id;
+
+      const submissionId = randomUUID();
+      const upload = await multipart(`/api/auth/me/residency-proof?submission_id=${submissionId}`, securityToken,
+        pngForm("proof", { submission_id: submissionId, expected_version: session.body.user.residency_review_version }));
+      if (upload.status !== 200) throw new Error(`Proof upload: expected 200, got ${upload.status} ${await upload.text()}`);
+
+      const { data: profile } = await db.from("profiles").select("residency_review_version").eq("id", securityId).single();
+      const version = profile!.residency_review_version as string;
+      const auditsBefore = await db.from("activity_logs").select("*", { count: "exact", head: true }).eq("action", "residency.proof_viewed").eq("entity_id", securityId);
+
+      const link = await api(`/api/admin/users/${securityId}/residency-proof?expected_version=${version}`, { headers: bearer(adminToken) });
+      if (link.status !== 200) throw new Error(`Administrator proof link: expected 200, got ${link.status} ${link.body?.error ?? ""}`);
+      if (link.body.expires_in !== 300 || link.body.kind !== "image") throw new Error(`Unexpected link details: ${JSON.stringify({ expires_in: link.body.expires_in, kind: link.body.kind })}`);
+      const file = await fetch(link.body.url);
+      if (!file.ok || !Buffer.from(await file.arrayBuffer()).equals(PNG)) throw new Error("The signed link did not return the uploaded proof");
+      const auditsAfter = await db.from("activity_logs").select("*", { count: "exact", head: true }).eq("action", "residency.proof_viewed").eq("entity_id", securityId);
+      if ((auditsAfter.count ?? 0) !== (auditsBefore.count ?? 0) + 1) throw new Error("Opening the proof did not add exactly one residency.proof_viewed audit");
+
+      const stale = await api(`/api/admin/users/${securityId}/residency-proof?expected_version=${randomUUID()}`, { headers: bearer(adminToken) });
+      if (stale.status !== 409) throw new Error(`A stale review version: expected 409, got ${stale.status}`);
+
+      // Approve, so the next case runs as a verified resident under any reporting rule.
+      const approved = await api(`/api/admin/users/${securityId}/residency`, {
+        method: "PATCH",
+        headers: bearer(adminToken),
+        body: JSON.stringify({ decision: "verified", expected_version: version }),
+      });
+      if (approved.status !== 200) throw new Error(`Approval: expected 200, got ${approved.status} ${approved.body?.error ?? ""}`);
+    });
+
+    await runCase("IMP-13", "Feedback Rules", "a resolved report takes one rating: two at once give 201 and 409, a third gives 409", async () => {
+      if (!securityToken) throw new Error("IMP-12 did not create the synthetic citizen");
+      const groups = (await api("/api/reports/meta/problem-types", { headers: bearer(securityToken) })).body.groups as { category_id: number; problem_types: { id: number }[] }[];
+      const problem = groups.find((group) => group.category_id === testCategory.id)?.problem_types[0];
+      if (!problem) throw new Error(`No problem type for category ${testCategory.id}`);
+      const created = await api("/api/reports", {
+        method: "POST",
+        headers: bearer(securityToken),
+        body: JSON.stringify({ title: "[TEST] Security feedback check", description: "A report that is resolved to test one rating per report.", category_id: testCategory.id, primary_problem_id: problem.id, latitude: 14.5547, longitude: 121.0244 }),
+      });
+      if (created.status !== 201) throw new Error(`Report: expected 201, got ${created.status} ${created.body?.error ?? ""}`);
+      const reportId = created.body.report.id as string;
+
+      const { data: staff } = await db.from("profiles").select("id").eq("email", "fixture-staff-1@kamoti.invalid").single();
+      for (const [path, body] of [
+        [`/api/reports/${reportId}/assign`, { staff_id: staff!.id, details: "Security check crew." }],
+        [`/api/reports/${reportId}/status`, { status: "under_review", details: "Checked the report." }],
+        [`/api/reports/${reportId}/status`, { status: "in_progress", details: "Crew sent." }],
+      ] as const) {
+        const step = await api(path, { method: "PATCH", headers: bearer(adminToken), body: JSON.stringify(body) });
+        if (!step.ok) throw new Error(`${path}: expected success, got ${step.status} ${step.body?.error ?? ""}`);
+      }
+      const photo = await multipart(`/api/reports/${reportId}/photos`, staff1Token, pngForm("photo"));
+      if (photo.status !== 201) throw new Error(`Repair photo: expected 201, got ${photo.status}`);
+      const request = await api(`/api/reports/${reportId}/closure-request`, {
+        method: "POST",
+        headers: bearer(staff1Token),
+        body: JSON.stringify({ outcome: "resolved", details: "Repaired for the security check." }),
+      });
+      if (request.status !== 201) throw new Error(`Closure request: expected 201, got ${request.status} ${request.body?.error ?? ""}`);
+      const workflow = await api(`/api/reports/${reportId}/workflow`, { headers: bearer(adminToken) });
+      const review = await api(`/api/reports/${reportId}/closure-review`, {
+        method: "POST",
+        headers: bearer(adminToken),
+        body: JSON.stringify({ decision: "approve", details: "Repair verified.", requested_at: workflow.body.workflow.closure.requested_at }),
+      });
+      if (review.status !== 200) throw new Error(`Closure approval: expected 200, got ${review.status} ${review.body?.error ?? ""}`);
+
+      const rate = () => api(`/api/feedback/${reportId}`, { method: "POST", headers: bearer(securityToken), body: JSON.stringify({ rating: 5 }) });
+      const both = (await Promise.all([rate(), rate()])).map((res) => res.status).sort();
+      if (both.join() !== "201,409") throw new Error(`Two ratings at once: expected 201 and 409, got ${both.join(" and ")}`);
+      const third = await rate();
+      if (third.status !== 409) throw new Error(`A repeated rating: expected 409, got ${third.status}`);
+      const saved = await count("report_feedback", "report_id", reportId);
+      if (saved !== 1) throw new Error(`Expected one saved rating, found ${saved}`);
+    });
+
+    await runCase("IMP-14", "Session Handling", "a deactivated citizen is refused with an old token, at sign-in, and on refresh", async () => {
+      if (!securityToken) throw new Error("IMP-12 did not create the synthetic citizen");
+      const off = await api(`/api/admin/users/${securityId}`, { method: "PATCH", headers: bearer(adminToken), body: JSON.stringify({ is_active: false }) });
+      if (off.status !== 200) throw new Error(`Deactivation: expected 200, got ${off.status} ${off.body?.error ?? ""}`);
+      for (const path of ["/api/auth/me", "/api/reports"]) {
+        const res = await api(path, { headers: bearer(securityToken) });
+        if (res.status !== 403) throw new Error(`${path} with the old token: expected 403, got ${res.status}`);
+      }
+      const login = await api("/api/auth/login", { method: "POST", body: JSON.stringify({ email: securityEmail, password: securityPassword }) });
+      if (login.status !== 403) throw new Error(`Sign-in: expected 403, got ${login.status}`);
+      const refresh = await api("/api/auth/refresh", { method: "POST", body: JSON.stringify({ refresh_token: securityRefresh }) });
+      if (refresh.ok) throw new Error(`Refresh still worked for a deactivated account (${refresh.status})`);
+    });
+
+    await runCase("IMP-15", "Residency Lock", "refused citizen writes save no report, photo, file, or notification", async () => {
+      // Lock fixture citizen 2 as IMP-01 does; restored at once and in cleanup.
+      const { data: profile } = await db.from("profiles").select("id, residency_status").eq("email", "fixture-citizen-2@kamoti.invalid").single();
+      const original = profile!.residency_status as string | null;
+      const restore = async () => {
+        await db.from("profiles").update({ residency_status: original }).eq("id", profile!.id);
+      };
+      cleanups.push(restore);
+      const ownReport = reportPendingCitizen2!.id;
+      const snapshot = async () => ({
+        reports: await count("reports", "citizen_id", profile!.id),
+        photos: await count("report_photos", "report_id", ownReport),
+        files: ((await db.storage.from("report-photos").list(ownReport)).data ?? []).length,
+        notifications: (await db.from("notifications").select("*", { count: "exact", head: true })).count ?? 0,
+      });
+      await db.from("profiles").update({ residency_status: null }).eq("id", profile!.id);
+      try {
+        const token = await login("fixture-citizen-2@kamoti.invalid");
+        const before = await snapshot();
+        const report = await api("/api/reports", {
+          method: "POST",
+          headers: bearer(token),
+          body: JSON.stringify({ title: "[TEST] Refused while locked", description: "This report must not be saved.", category_id: testCategory.id, primary_problem_id: 1, latitude: 14.5547, longitude: 121.0244 }),
+        });
+        if (report.status !== 403) throw new Error(`New report while locked: expected 403, got ${report.status}`);
+        const photo = await multipart(`/api/reports/${ownReport}/photos`, token, pngForm("photo"));
+        if (photo.status !== 403) throw new Error(`Photo while locked: expected 403, got ${photo.status}`);
+        const after = await snapshot();
+        if (JSON.stringify(after) !== JSON.stringify(before)) {
+          throw new Error(`Refused writes changed saved records: ${JSON.stringify(before)} -> ${JSON.stringify(after)}`);
+        }
       } finally {
         await restore();
       }
