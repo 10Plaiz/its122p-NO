@@ -84,6 +84,14 @@ proof-upload step, so KI-05 **failed**.
 2. `apply` confirmed 30, after checking that 1,886 existing rows were unchanged.
 3. A second `apply` confirmed 0, and `verify` passed.
 
+**On live, `seed:apply` is the wrong tool.** The live PR 43 dataset predates the
+current generator. `seed:plan` on live refused with "Account collision or changed
+dataset configuration", and changed nothing, as `docs/LOCAL_DEV.md` describes.
+
+The live fix is the one-time `scripts/demo/confirm_demo_residency.sql`, run in the
+SQL editor. Local results: the first run updated 30 to `verified`, and a second
+run updated 0.
+
 ## Limitations
 
 - B5's move of the users page to DataTable and B10's type-file merge were

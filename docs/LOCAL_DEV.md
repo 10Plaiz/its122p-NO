@@ -581,7 +581,10 @@ existing citizen to `pending` without a proof, which locks a citizen to the
 proof step. Apply re-confirms demo citizens left in that state, or with no
 status, after its unchanged-rows check. It leaves rejected citizens, and
 citizens who uploaded a proof, as they are. `plan` reports the number as
-`confirmCitizens`, and `verify` fails while any remain.
+`confirmCitizens`, and `verify` fails while any remain. That applies to datasets
+created by the current generator. Fix the older PR 43 dataset on the shared
+project with the SQL in
+[Confirm demo citizens in the existing presentation seed](#confirm-demo-citizens-in-the-existing-presentation-seed).
 
 Staff routing (SW-1) is a separate step, so the fingerprinted manifest stays
 unchanged. It gives each `demo-makati-staff-*` account the categories and
@@ -664,6 +667,28 @@ After taking a database backup, run the refresh SQL once in that SQL editor.
 Its transaction rolls back on an error. Check a sample of public board cards,
 timelines, and notifications afterward. The PNG illustrations still carry their
 visible illustration labels.
+
+### Confirm demo citizens in the existing presentation seed
+
+The PR 43 demo citizens predate UA-8. The accounts migration set them to
+`pending` without a proof, which locks them to the proof step (KI-05).
+`seed:apply` cannot fix them, because of the fingerprint check above. Preview
+them read-only in the SQL editor:
+
+```sql
+select p.residency_status, p.residency_proof_path is not null as has_proof, count(*)
+from auth.users u join profiles p on p.id = u.id
+where u.raw_app_meta_data->>'demo_dataset' = 'makati-demo-v1' and p.role = 'citizen'
+group by 1, 2;
+```
+
+Then run [confirm_demo_residency.sql](../scripts/demo/confirm_demo_residency.sql)
+once in the same editor.
+- It requires exactly 30 marked demo citizens; otherwise it refuses and changes
+  nothing.
+- It confirms only citizens with no status, or pending without a proof.
+- It ends by showing `verified | 30`.
+- A second run changes nothing.
 
 ### Verification and images
 
