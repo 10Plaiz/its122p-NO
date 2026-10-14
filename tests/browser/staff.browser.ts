@@ -161,7 +161,7 @@ test.describe("Staff functional workflows (FUNC-02, FUNC-03, FUNC-06, FUNC-07)",
     // Verify task card elements: Reference Code, Category badge, Status badge, Assignment, Inspect report button
     const firstCard = cards.first();
     await expect(firstCard.locator(".tag").first()).toBeVisible();
-    await expect(firstCard.locator(".tag").nth(1)).toBeVisible();
+    await expect(firstCard.locator(".status-pill")).toBeVisible();
     await expect(firstCard).toContainText("Assignment:");
     const inspectBtn = firstCard.locator('a:has-text("Inspect report")');
     await expect(inspectBtn).toBeVisible();

@@ -117,6 +117,9 @@ test.describe("Citizen functional workflows (FUNC-01, FUNC-04, FUNC-05)", () => 
     await captureEvidence(page, "FUNC-05a-cancel-confirm.png");
 
     await page.click('button:has-text("Yes, cancel")');
+    // My reports opens on Pending, so the withdrawn report is under Cancelled.
+    await expect(row).toBeHidden({ timeout: 15000 });
+    await page.locator("#status").selectOption("cancelled");
     await expect(row).toContainText("Cancelled", { timeout: 15000 });
     await captureEvidence(page, "FUNC-05b-cancelled-report.png");
   });
