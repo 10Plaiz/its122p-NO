@@ -308,6 +308,9 @@ Configuration and runtime parameters:
   `bun run dev` first). Set it to `https://kamoti-chi.vercel.app` to test the deployed site.
 - `EVIDENCE_DIR`: Folder for evidence screenshots (defaults to `tests/evidence`).
 - `FIXTURE_PASSWORD`: Fixture account password (defaults to `Password123!`).
+- `DEMO_PASSWORD`: Password of the `demo-makati-*` accounts that the filter and
+  pill tests sign in with (defaults to `FIXTURE_PASSWORD`). The demo seed
+  requires at least 16 characters.
 - `SESSION_TEST_EMAIL` and `SESSION_TEST_PASSWORD`: Optional synthetic Citizen
   account for the independent refresh and idle/draft tests. Otherwise they use
   Citizen 1. Keep real recipient addresses and passwords outside Git.
@@ -323,6 +326,62 @@ start with locked Citizens and test that process themselves. After applying an
 accounts migration to older fixtures, check these preconditions before running
 reporting tests. Prepare only the affected synthetic accounts through the
 application. Do not reset all fixture passwords or reseed the shared project.
+
+`bun run test:browser` leaves out `residency-review.browser.ts`. That file needs
+full Chromium on its own origin, so run it with `bun run test:browser:residency`.
+
+### Run the browser suite on local Supabase and Mailpit
+
+The browser suite writes `[TEST]` reports, accounts, and proofs. `.env` usually
+names the shared project, so point every process at the local stack instead.
+`dotenv` keeps variables that are already set, so set them in the shell.
+
+1. Start Docker, then the stack from the repository root. A stack that was
+   already running keeps its old migrations and configuration, so list them:
+
+   ```bash
+   bunx supabase start
+   bunx supabase migration list --local
+   ```
+
+   Apply missing ones with `bunx supabase migration up --local`. After a CLI
+   or image update, if uploads fail with `42P10`, rebuild the local database
+   with `bunx supabase db reset --local`. Both commands change only the local
+   stack.
+2. In one shell, set `SUPABASE_URL=http://127.0.0.1:54321`, plus the
+   `PUBLISHABLE_KEY` and `SECRET_KEY` values from `bunx supabase status -o env`
+   as `SUPABASE_PUBLISHABLE_KEY` and `SUPABASE_SECRET_KEY`. Keep those values out
+   of the repository.
+3. Load the fixture and the demo seed. The fixture target is the first part of
+   the hostname, `127`. Its prompts may hide typed input in some terminals, so
+   pipe both answers, one per line. The demo seed accepts the local stack only
+   as `--target local`:
+
+   ```bash
+   printf 'KAMOTI-APPLY-FIXTURE\nPassword123!\n' | bun run fixture -- --target 127
+   export DEMO_PASSWORD='<16 or more characters>'
+   bun run seed:generate --seed 42 --as-of 2026-09-27
+   bun run seed:plan --target local
+   bun run seed:apply --target local
+   ```
+
+4. From the same shell, start `bun run dev`. Run both browser commands with
+   `EVIDENCE_DIR` set to a scratch folder, and `--retries=0` when you are
+   recording a result.
+
+Each run registers two accounts and makes four deliberate code failures. The
+API allows five sign-ups an hour and ten failed codes per 15 minutes from one
+address. It keeps those limits in memory, so restart `bun run dev` between
+repeated runs. Citizen report quotas are stored in the database. On the local
+database only, clear them before a rerun within the hour:
+
+```bash
+psql postgresql://postgres:postgres@127.0.0.1:54322/postgres \
+  -c "delete from public.citizen_submission_events"
+```
+
+These runs prove the application and Mailpit flow. They do not prove hosted
+email delivery. Stop the stack with `bunx supabase stop`.
 
 ## Hosted account configuration
 
@@ -486,7 +545,8 @@ the generator version, image files, random seed, and reference date.
 The plan checks active categories, the photo bucket, the migrated public view,
 account ownership, and existing records. It reports missing records without
 writing to Supabase. Apply requires an explicit target matching the configured
-HTTPS project URL. Seeding is never part of Vercel builds or schema migrations.
+HTTPS project URL. The only exception is `--target local`, which accepts just
+the default local stack at `http://127.0.0.1:54321` or `http://localhost:54321`. Seeding is never part of Vercel builds or schema migrations.
 
 ### Passwords and reruns
 
