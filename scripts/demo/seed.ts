@@ -32,8 +32,14 @@ export function digest(value: unknown): string {
   return createHash("sha256").update(JSON.stringify(canonical(value))).digest("hex");
 }
 
+// `local` names the default `supabase start` API, so browser suites can run on
+// disposable demo data. Every hosted target still needs its exact HTTPS origin.
+const LOCAL_ORIGINS = ["http://127.0.0.1:54321", "http://localhost:54321"];
+
 export function checkTarget(url: string, target: string | undefined): void {
-  if (!target || new URL(url).origin !== `https://${target}.supabase.co`) {
+  const origin = new URL(url).origin;
+  const matches = target === "local" ? LOCAL_ORIGINS.includes(origin) : origin === `https://${target}.supabase.co`;
+  if (!target || !matches) {
     throw new Error("--target must match the project in SUPABASE_URL exactly.");
   }
 }

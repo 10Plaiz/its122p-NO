@@ -11,6 +11,15 @@ describe("demo seed application boundaries", () => {
     expect(() => checkTarget("http://demo.supabase.co", "demo")).toThrow();
   });
 
+  it("accepts the local stack only as the explicit local target", () => {
+    expect(() => checkTarget("http://127.0.0.1:54321", "local")).not.toThrow();
+    expect(() => checkTarget("http://localhost:54321", "local")).not.toThrow();
+    expect(() => checkTarget("http://127.0.0.1:54321", "127")).toThrow();
+    expect(() => checkTarget("http://127.0.0.1:9999", "local")).toThrow();
+    expect(() => checkTarget("https://demo.supabase.co", "local")).toThrow();
+    expect(() => checkTarget("http://local.supabase.co", "local")).toThrow();
+  });
+
   it("accepts a regenerated manifest but rejects injected records and changed ownership", () => {
     const original = generateSeed();
     expect(validateManifest(JSON.parse(JSON.stringify(original)))).toEqual(original);
