@@ -3,6 +3,8 @@ import { defineConfig, devices } from "@playwright/test";
 export default defineConfig({
   testDir: "./tests/browser",
   testMatch: "**/*.browser.ts",
+  // Needs full Chromium on its own origin; run it with `bun run test:browser:residency`.
+  testIgnore: "**/residency-review.browser.ts",
   outputDir: "./test-results",
   // Retains records unless cleanup.ts has an explicitly matched disposable target.
   globalTeardown: "./tests/browser/cleanup.ts",

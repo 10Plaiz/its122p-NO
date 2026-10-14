@@ -1,6 +1,8 @@
 import { expect, type APIRequestContext, type Page } from "@playwright/test";
 
 export const FIXTURE_PASSWORD = process.env.FIXTURE_PASSWORD ?? "Password123!";
+// demo-makati-* accounts come from the demo seed, which needs a 16+ character password.
+export const DEMO_PASSWORD = process.env.DEMO_PASSWORD ?? FIXTURE_PASSWORD;
 
 export const USERS = {
   admin: "fixture-admin@kamoti.invalid",
@@ -35,6 +37,9 @@ export async function signOut(page: Page) {
 // run against a different target can keep its set apart from the committed one.
 const EVIDENCE_DIR = process.env.EVIDENCE_DIR ?? "tests/evidence";
 
+// A suite's own dated folder, kept under EVIDENCE_DIR like every other screenshot.
+export const evidenceFolder = (name: string) => `${EVIDENCE_DIR}/${name}`;
+
 export async function captureEvidence(page: Page, filename: string) {
   await page.screenshot({
     path: `${EVIDENCE_DIR}/${filename}`,
@@ -59,6 +64,13 @@ export async function placePinByLocation(page: Page) {
 export async function mapAvailable(page: Page) {
   await page.waitForLoadState("networkidle");
   return (await page.getByTestId("map-unavailable").count()) === 0;
+}
+
+// UA-8: what a citizen sees once a proof is sent. A pending proof unlocks the app
+// today; #59 will keep the citizen waiting for approval, so it changes only this.
+export async function expectProofAccepted(page: Page) {
+  await page.waitForURL(/my-reports/);
+  await expect(page.locator('nav a[aria-disabled="true"]')).toHaveCount(0);
 }
 
 // A signed-in API session for set-up steps a test is not about.

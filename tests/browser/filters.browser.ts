@@ -1,9 +1,9 @@
 import { expect, test } from "@playwright/test";
 import type { Locator, Page } from "@playwright/test";
-import { signIn } from "./helpers.js";
+import { DEMO_PASSWORD, evidenceFolder, signIn } from "./helpers.js";
 import type { Profile } from "../../src/web/lib/types.js";
 
-const evidence = "tests/evidence/filters-2026-10-05";
+const evidence = evidenceFolder("filters-2026-10-05");
 const adminEmail = process.env.UI_AUDIT_ADMIN_EMAIL ?? "fixture-admin@kamoti.invalid";
 const pageErrors: string[] = [];
 
@@ -258,7 +258,7 @@ test("A new search cancels obsolete count requests and ignores late responses", 
 });
 
 test("Staff queue uses Under review initially and its scoped filter counts match the API", async ({ page }) => {
-  await signIn(page, "demo-makati-staff-2@kamoti.invalid");
+  await signIn(page, "demo-makati-staff-2@kamoti.invalid", DEMO_PASSWORD);
   await page.goto("/staff/queue");
   await expect(page.locator("#status")).toHaveValue("under_review");
   await expectCount(page, "#status", "", await apiTotal(page, "/reports"));

@@ -2,7 +2,7 @@ import { expect, test, type Page } from "@playwright/test";
 import { z } from "zod";
 import { jsPDF } from "jspdf";
 import type { Profile } from "../../src/web/lib/types.js";
-import { signIn } from "./helpers.js";
+import { evidenceFolder, signIn } from "./helpers.js";
 
 const VERSION_A = "11111111-1111-4111-8111-111111111111";
 const VERSION_B = "22222222-2222-4222-8222-222222222222";
@@ -201,7 +201,7 @@ async function evidence(page: Page, filename: string, fullPage = true) {
     label.id = "simulation-evidence-label";
     document.body.append(label);
   });
-  await page.screenshot({ path: `tests/evidence/issue61/${filename}`, fullPage });
+  await page.screenshot({ path: `${evidenceFolder("issue61")}/${filename}`, fullPage });
   await page.locator("#simulation-evidence-label").evaluate((element) => element.remove());
 }
 

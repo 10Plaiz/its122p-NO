@@ -1,9 +1,9 @@
 import { expect, test } from "@playwright/test";
 import type { Locator, Page } from "@playwright/test";
-import { signIn } from "./helpers.js";
+import { DEMO_PASSWORD, evidenceFolder, signIn } from "./helpers.js";
 import type { Profile } from "../../src/web/lib/types.js";
 
-const evidence = "tests/evidence/pills-users-toolbar-2026-10-04";
+const evidence = evidenceFolder("pills-users-toolbar-2026-10-04");
 const adminEmail = process.env.UI_AUDIT_ADMIN_EMAIL ?? "fixture-admin@kamoti.invalid";
 const staffEmail = "demo-makati-staff-2@kamoti.invalid";
 const pageErrors: string[] = [];
@@ -356,7 +356,7 @@ test("Admin search rows and other status consumers use the shared conventions", 
 });
 
 test("Staff queue uses the same pills and search order on desktop and phones", async ({ page }) => {
-  await signIn(page, staffEmail);
+  await signIn(page, staffEmail, DEMO_PASSWORD);
   await page.goto("/staff/queue");
   await expect(page.locator("main .status-pill:visible").first()).toBeVisible();
   await rightmostSearch(page.getByRole("searchbox"));
