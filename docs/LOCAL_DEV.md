@@ -55,7 +55,7 @@ database migration operation.
 | `bun run dev:api` | Run only the Express API in watch mode |
 | `bun run typecheck` | Check frontend, API, and deployment TypeScript |
 | `bun run test` | Run the fast test suite in `tests/fast/` |
-| `bun run test:security -- --target REF` | Run the security integration test suite against Express and Supabase |
+| `bun run test:security -- --target 127` | Run the security integration suite against the local Supabase stack |
 | `bun run test:submission-limits` | Verify shared quotas through local Supabase and independent API processes |
 | `bun run test:submission-browser` | Verify quota errors and form state in Chromium against local servers |
 | `bun run test:smoke` | Run deployed smoke verification against the test site |
@@ -74,7 +74,7 @@ change and the others only when their environment is ready.
 | Suite | Command | Needs |
 | :--- | :--- | :--- |
 | Fast | `bun run test` | Nothing beyond `bun install` |
-| Security integration | `bun run test:security -- --target YOUR_PROJECT_REF` | A running Express API and linked Supabase project with synthetic fixture accounts |
+| Security integration | `bun run test:security -- --target 127` | The local Supabase stack with all migrations and the fixture; refuses any other target |
 | Database access | `psql` command below | A disposable database with every migration applied |
 | Submission limits | `bun run test:submission-limits` | An exclusive local Supabase CLI stack with all migrations and the disposable marker |
 | Submission browser | `bun run test:submission-browser` | The same local stack, running API and Vite servers, and Playwright Chromium |
@@ -91,27 +91,47 @@ a database, a deployed site, or a browser belongs in another suite, not in
 `tests/fast/`. `bun run typecheck` checks tests via `typecheck:test` alongside
 application sources.
 
-The security integration suite lives in `tests/integration/security.ts` and
-verifies the live Express API and Supabase database against the Phase 4 security
-matrix: authentication workflows, role-based endpoint access, search parameter
-SQL injection resilience, XSS plain-data storage, and error masking. It runs
-with:
+The security integration suite lives in `tests/integration/security.ts`. It
+starts the Express API in-process and checks it against the Phase 4 security
+matrix:
+- authentication workflows
+- role-based endpoint access
+- search parameter SQL injection resilience
+- XSS plain-data storage
+- error masking
+
+It also covers the account and residency protections from #53:
+- the residency lock, including refused writes that leave no report, photo,
+  file, or notification
+- private proofs, with a working, audited, five-minute Administrator link
+- one rating per resolved report, including two sent at once
+- deactivated accounts
+
+It runs only against the local stack, after the fixture. It refuses any other
+`SUPABASE_URL` before sending a request. Set the local values in the shell as
+described in
+[Run the browser suite on local Supabase and Mailpit](#run-the-browser-suite-on-local-supabase-and-mailpit),
+then run:
 
 ```bash
-bun run test:security -- --target YOUR_PROJECT_REF
+bun run test:security -- --target 127
 ```
 
 Required runtime inputs:
-1. `--target YOUR_PROJECT_REF`: Must match the project ref in `SUPABASE_URL`.
+1. `--target 127`: Must match the first part of the `SUPABASE_URL` host.
 2. Fixture password: Provided through `--password <password>`, the `FIXTURE_PASSWORD`
    environment variable, or piped stdin/interactive prompt.
 
-The integration suite is safe to rerun: it restores any fixture report titles
-it modifies, deletes temporary test records, and never mutates ordinary user
-accounts or reports. Tokens and credentials are suppressed from logs. Its cleanup
-deletes synthetic data. Do not run this suite against a shared project where
-deletion is prohibited. A read-only or record-retaining release check must
-preserve its assertions and record its differences from this suite.
+The suite is safe to rerun on the local stack:
+- It clears the local citizen quota ledger at the start.
+- It restores fixture accounts and reports, and deletes its temporary records.
+- It keeps one new deactivated `security-*@kamoti.invalid` citizen per run, with
+  that citizen's proof, rated report, and audit rows, because accounts and proof
+  versions are never deleted.
+
+Tokens and credentials are suppressed from logs. Hosted release checks stay
+separate and must not delete records. They must keep this suite's assertions
+and record how they differ from it.
 
 ### Verify submission limits with an isolated local stack
 
