@@ -16,9 +16,10 @@ documented Vercel request path backed by an approved test Supabase project.
 | :--- | :--- | :--- |
 | **Stable test URL** | `https://kamoti-chi.vercel.app` | Public production deployment on Vercel |
 | **Baseline commit SHA** | `ccad629` | Remote `origin/main` Phase 4 baseline |
+| **Last verified application** | `20a50ed` | 15 October 2026 ([#64 report](../tests/evidence/issue64/report.md)): hosted checks while production served `df8ee38`; local suites again on `20a50ed`, which adds only web edit-form drafts (#69). The #64 commits change only tests and documentation |
 | **Hosting platform** | Vercel | Vite frontend static assets with serverless Node.js API functions |
 | **Serverless region** | Singapore (`sin1`) | Co-located with Supabase cluster to minimize query roundtrips |
-| **Database target** | Supabase (`chqyxlyrmudmkanqmpil`) | Dedicated development/test project containing synthetic data only |
+| **Database target** | Supabase (`chqyxlyrmudmkanqmpil`) | Dedicated development/test project. Intended for synthetic data, but anyone can register on the live site: on 15 October 2026 it held 24 accounts with real addresses, 5 with uploaded proofs (#74) |
 | **Environment purpose** | Phase 4 verification | Functional testing, security checks, and peer usability testing |
 | **Configuration owner** | Project Lead / Deployment Owner | Owns Vercel environment variables and Supabase credentials |
 
@@ -37,8 +38,12 @@ The repository owns the deployment specification in [`vercel.json`](../vercel.js
 
 ## Database migrations status
 
-The target Supabase project is confirmed to have applied all current schema
-migrations up to the Phase 4 baseline:
+On 15 October 2026 the migration owner confirmed all 23 files in
+[`supabase/migrations/`](../supabase/migrations/) applied, ending with
+`20261015000200_residency_review_evidence.sql`. Check the current state with
+`bunx supabase migration list`; see [API.md](API.md#database-migrations).
+
+The Phase 4 baseline had the first six:
 
 1. `20260918000001_schema.sql` (Core schema, tables, foreign keys, and indexes)
 2. `20260918000002_rls.sql` (Row Level Security policies)

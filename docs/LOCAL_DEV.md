@@ -134,8 +134,9 @@ The suite is safe to rerun on the local stack:
 - It clears the local citizen quota ledger at the start.
 - It restores fixture accounts and reports, and deletes its temporary records.
 - It keeps one new deactivated `security-*@kamoti.invalid` citizen per run, with
-  that citizen's proof, rated report, and audit rows, because accounts and proof
-  versions are never deleted.
+  that citizen's proofs, audit rows, and `[TEST]` reports: two resolved and rated,
+  one withdrawn, with their comments. Accounts, proof versions, reports, and
+  ratings are never deleted.
 
 Tokens and credentials are suppressed from logs. Hosted release checks stay
 separate and must not delete records. They must keep this suite's assertions

@@ -41,7 +41,7 @@ Evidence labels:
 | Record checks: Citizens see their own reports, Staff their assigned ones, Administrators all | `src/server/services/reports.access.ts` | Local (AUTHZ-06 to AUTHZ-15) |
 | Role scope is applied before any filter, so a filter can only narrow results | `scopeReportQuery`, also in exports | Source |
 | Locked Citizens (no proof, or rejected) get `403 residency_required` | `requireResidency` | Local (IMP-01, IMP-15) |
-| Citizens whose proof awaits review get `403 residency_pending` on new reports and report photos, before the quota is spent | `requireApprovedResidency`, `assertResidencyApproved` | Local (IMP-17); Source (`tests/fast/residency-approval.test.ts`) |
+| Citizens whose proof awaits review get `403 residency_pending` on new reports and report photos, before the quota is spent; they keep every action on reports filed earlier | `requireApprovedResidency`, `assertResidencyApproved` | Local (IMP-17, IMP-18); Source (`tests/fast/residency-approval.test.ts`) |
 | Closure approval needs a different account from the requester | `review_report_closure` | Local (`tests/database/atomic-actions.sql`) |
 
 ### Database
@@ -59,8 +59,8 @@ Evidence labels:
 
 | Control | Where | Evidence |
 | :--- | :--- | :--- |
-| Proofs go to the private `residency-proofs` bucket; responses carry only a proof-present flag | `src/server/lib/residency.ts` | Local (IMP-02) |
-| An Administrator opens a proof through a five-minute signed link, and the access audit is saved before the link is returned | `GET /api/admin/users/:id/residency-proof` | Local (IMP-03, IMP-12) |
+| Proofs go to the private `residency-proofs` bucket; responses carry only a proof-present flag | `src/server/lib/residency.ts` | Local (IMP-02); Hosted (#64: anonymous and Citizen tokens refused) |
+| An Administrator opens a proof through a five-minute signed link, and the access audit is saved before the link is returned | `GET /api/admin/users/:id/residency-proof` | Local (IMP-03, IMP-12); Hosted (#64: `401`, `403`, stale `409` without an audit, one audit per link) |
 | An approval records its basis: the uploaded document after four checks, or the no-document exception with a reason (#63) | `admin_change_profile`, migration `20261015000200` | Local (`tests/database/residency-review.sql`, security IMP-12) |
 | A residency decision is bound to the proof and address version the Administrator saw | `residency_review_version`, `residency_proof_versions` | Local (`tests/evidence/issue61/verification.md`) |
 | Proofs: JPG, PNG, WebP, or PDF up to 5 MB. Images fully decoded within 40 megapixels; PDFs need a complete trailer, open with PDF.js within 20 pages, and carry no password, scripts, or attachments; 5 s limit (libvips stops itself; PDF steps stop at the deadline); refused before storage | `proof-files.ts`, `residency.ts` | Local (IMP-17); Source (`tests/fast/proof-files.test.ts`, `tests/fast/residency-http.test.ts`) |
@@ -105,19 +105,20 @@ Its pull request updates this table.
 | Phone numbers are confirmed by hand (KI-11) | No proof that a Citizen owns their number | No SMS budget (owner, 3 October and 15 October 2026). My account shows "Confirmed by staff" | Add a Philippine gateway to `PROVIDERS` if a budget appears |
 | Earlier rejection notes are replaced on re-upload (KI-17) | The profile shows only the latest note | Owner accepted on 15 October 2026: the audit log keeps every decision and note | None planned |
 | Replaced proofs are kept with no retention rule | Private personal documents stay in Storage | The owner has not decided a period; 30 days after replacement is proposed | Owner decision, then a purge like photo retention (#70) |
+| The test project holds real people's accounts and 5 uploaded proofs | It is documented as synthetic only, yet may hold real residency documents | Found during #64; awaiting the owner. Meanwhile the proofs stay private (Administrators only, through an audited link), and the write-heavy test runners refuse any non-local target | Owner decision (#74), with retention (#70) |
 | A name correction drops verified residency | A Citizen verified without a proof file gets locked | Found during #54 | #67 |
-| Pending Citizens can file reports | Reports from unconfirmed residents reach Staff | Earlier owner rule; replaced by an approved rule not yet built | #59 |
 | Leaked-password checking is off | Known-breached passwords are accepted | The team's free-plan choice (#50) | Turn it on if the plan changes |
 
 ## Not yet verified
 
-- The combined residency hardening (#64).
+- Hosted proof upload, decisions, quota exhaustion, races, and fault injection. #64 ran them on local services only, by design.
 - A real phone or microphone: speech-to-text runs only where the browser offers it.
 
 ## Evidence
 
 - [Local security run, 15 October 2026](../tests/evidence/security-local-2026-10-15/report.md): 43/43.
 - [Shared limits and cookie sessions, 15 October 2026](../tests/evidence/auth-limits-local-2026-10-15/report.md): 44/44, plus the limiter SQL suite and two API processes.
+- [Combined residency verification, 15 October 2026](../tests/evidence/issue64/report.md): #59 to #63 on one revision; security 46/46, browser 67/67, hosted storage and proof-link checks.
 - [Release verification, 4 October 2026](../tests/evidence/release-15a7597-20261004/VERIFICATION.md): hosted Auth, Storage, and RLS.
 - [Residency version verification](../tests/evidence/issue61/verification.md).
 - `tests/database/atomic-actions.sql` and `supabase/tests/api_access.sql`. Run them only on a database marked
