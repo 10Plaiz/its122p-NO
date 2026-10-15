@@ -82,6 +82,13 @@ test("UA-8: until a proof is sent the citizen is locked: greyed menu, redirect, 
   await citizen.setInputFiles("#proof", { name: "bill.pdf", mimeType: "application/pdf", buffer: PDF });
   await citizen.getByRole("button", { name: "Send proof" }).click();
   await expectAwaitingApproval(citizen);
+
+  // #59, #64: the report form waits for approval, and Check again says so.
+  await citizen.goto("/report/new");
+  await expect(citizen.getByText("Waiting for approval")).toBeVisible();
+  await citizen.getByRole("button", { name: "Check again" }).click();
+  await expect(citizen.getByRole("status").filter({ hasText: "Still awaiting review." })).toBeVisible();
+  await captureEvidence(citizen, "UA-8-awaiting-approval.png");
 });
 
 test("UA-8: an administrator rejects the proof with a reason; the citizen sees it and sends another", async ({ browser }) => {
