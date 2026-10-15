@@ -76,6 +76,7 @@ change cannot skip them. The tables are drawn in the
 | Privileged account changes are audited atomically | `admin_create_profile()` and `admin_change_profile()` | `20261004000200`, `20261006000100` |
 | Residency decisions bind to what was reviewed | `profiles_version_residency_review` trigger; immutable `residency_proof_versions` | `20261006000100_residency_review_versions.sql` |
 | Shared Citizen quotas | `admit_citizen_operation()` over `citizen_submission_events`; `purge_citizen_submission_events()` for idle cleanup | `20261005000100`, `20261006000200` |
+| Shared account rate limits | `auth_rate_limit()` takes or releases hits on hashed `auth_rate_counters` keys, so every API instance counts together | `20261015000100_auth_rate_limits.sql` |
 | Staff rating summaries | `feedback_summary()` | `20261003000500_feedback.sql` |
 
 These functions run only as `service_role`, through the API. The

@@ -287,6 +287,32 @@ still reset the password by code. Code requests (`/resend-code`,
 address it recently sent to, so the answer never reveals whether an account
 exists.
 
+### Account rate limits
+
+| Route | Limit | Counts |
+| :--- | :--- | :--- |
+| `/login` | 30 per client, 10 per address and client, 20 per address, in 15 minutes | Failures |
+| `/verify-email`, `/reset-password` | 10 per client in 15 minutes | Failures |
+| `/register` | 5 per client an hour | Every request |
+| `/resend-code`, `/forgot-password` | 5 per client in 15 minutes | Every request |
+| `/refresh`, `/logout` | 60 per client in 15 minutes | Every request |
+| `/reports/:id/remarks` | 10 per Citizen an hour; Staff and Administrators are not limited | Every request |
+
+Every API instance counts in the same database table, `auth_rate_counters`,
+through the service-only `auth_rate_limit()` function. Keys are SHA-256 hashes
+of the limit and its subject, so the table holds no email or address in the
+clear. Each attempt is counted before the route runs, so a burst of parallel
+guesses is counted in full. Where only failures count, a success, a server
+fault, or a Supabase `429` gives its hit back before the response is sent.
+A limited request answers `429` with `Retry-After`. If the database cannot be
+reached, the request answers `503` with `Retry-After: 60` and
+`code: rate_limit_unavailable`, and the route does not run.
+
+Deploy `20261015000100_auth_rate_limits.sql` before the API that uses it. The
+earlier API ignores the new table. Without the migration, the new API answers
+`503` on every limited route, including sign-in. To roll back the API alone,
+redeploy the earlier build; the table can stay.
+
 ## Residency reviews
 
 Each profile has a `residency_review_version` UUID. Each proof has an immutable
@@ -367,6 +393,9 @@ The migration owner applies these files in order after review:
 
 1. `20261006000100_residency_review_versions.sql`
 2. `20261006000200_proof_retry_admission.sql`
+
+`20261015000100_auth_rate_limits.sql` follows its own order; see
+[Account rate limits](#account-rate-limits).
 
 Pause proof uploads and account writes before migration. Let current requests
 finish. Apply both migrations, deploy the matching API and web build, then
