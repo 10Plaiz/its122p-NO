@@ -5,6 +5,7 @@ import { parse } from "../lib/validate.js";
 import { requireAuth, requireRole } from "../middleware/auth.js";
 import { logActivity } from "../lib/activity.js";
 import { purgeCancelledPhotos } from "../lib/retention.js";
+import { purgeExpiredProofs } from "../lib/proof-retention.js";
 
 // Admin maintenance tasks. Nothing here deletes a database row (DM-1): the retention
 // purge removes stored files only and marks their photo rows as purged.
@@ -27,6 +28,23 @@ router.post("/purge-cancelled-photos", async (req: Request, res: Response) => {
 
   if (result.error) {
     throw new ApiError(500, "Some photo files could not be removed. Run the purge again to finish.", result);
+  }
+  res.json({ result });
+});
+
+// POST /api/maintenance/purge-expired-proofs — removes residency proof files 30
+// days after they stopped being current (#70). The database decides which files
+// qualify; an account's current proof is never one of them. `dry_run: true` only
+// counts. Safe to run again: recorded removals are skipped.
+router.post("/purge-expired-proofs", async (req: Request, res: Response) => {
+  const { dry_run } = parse(purgeSchema, req.body ?? {});
+  const result = await purgeExpiredProofs({ dryRun: dry_run ?? false });
+
+  // Required, and logged even when a batch failed, so every removal is on the record.
+  await logActivity(req, "maintenance.proofs_purged", { entityType: "residency_proof", metadata: { ...result }, required: true });
+
+  if (result.error) {
+    throw new ApiError(500, "Some proof files could not be removed. Run the cleanup again to finish.", result);
   }
   res.json({ result });
 });
