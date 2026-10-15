@@ -6,9 +6,9 @@ Supabase-managed `auth.users` table that every `profiles` row extends. Checked
 against those migrations on 2026-10-15: every table and column below is created
 there, and nothing else is.
 
-The shared project records the first 18 migrations (#49). The owner reports
-`20261005000100` to `20261006000200` are applied there too.
-`20261015000100_auth_rate_limits.sql` waits for its pull request.
+All 22 migrations are applied on the shared project: on 15 October 2026 a
+dry run listed only `20261015000100_auth_rate_limits.sql`, which was then
+pushed.
 
 For the app's own tables only, see [ERD_without_auth.md](ERD_without_auth.md).
 

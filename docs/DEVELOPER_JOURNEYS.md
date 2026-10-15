@@ -26,6 +26,9 @@ The system defines four user roles:
 3. Staff Member: A municipal field worker who repairs assigned problems.
 4. Administrator: A city official who manages reports, accounts, and categories.
 
+The [API guide](API.md#roles-and-permissions) is the single reference for what
+each role may do, including the Citizen residency lock.
+
 ---
 
 ## 2. Report Lifecycle State Machine
@@ -80,6 +83,9 @@ stateDiagram-v2
 | `resolved` | Visible without citizen identity | Administrator approves the current resolution request from a different account | Terminal state. Assigned Staff must upload repair proof before requesting closure. |
 | `rejected` | Visible with its reason, without citizen identity | Administrator approves the current rejection request from a different account | Terminal state. The report remains available on the public board. |
 | `cancelled` | Hidden | Citizen owner only | Terminal state. System retains database row for audit integrity. |
+
+In every status, the reporting Citizen can also comment on their own report
+(RS-6). The [API guide](API.md#roles-and-permissions) lists the full permissions.
 
 ---
 

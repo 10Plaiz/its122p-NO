@@ -27,6 +27,12 @@ only the documents relevant to the task.
   skill `/verify-kamoti` in `.agents/skills/verify-kamoti/`.
 - Validate every completion criterion in the linked issue, when there is one,
   and run the relevant checks from [README.md](README.md). Report the results.
+- When a change completes or alters a requirement, update its Status in
+  [IMPROVEMENT_REQUIREMENTS.md](docs/updates/IMPROVEMENT_REQUIREMENTS.md). When
+  it changes a permission, a security control, or an accepted risk, update the
+  [permissions table](docs/API.md#roles-and-permissions) or
+  [SECURITY.md](docs/SECURITY.md). Track open work in GitHub Issues, not in
+  repository planning files.
 - The team allows a direct push to `main` when all of these hold:
   - the new commits apply to the current `origin/main` as a fast-forward, with
     no merge conflicts;

@@ -88,19 +88,21 @@ Evidence labels:
 
 ## Accepted risks
 
+KI numbers refer to the known-issues list that #55 retired; Git history keeps it.
+
 Each risk is known, documented, and has a fix path. A fix is a separate issue.
 Its pull request updates this table.
 
 | Risk | Impact | Why accepted | Fix path |
 | :--- | :--- | :--- | :--- |
 | The access token sits in `localStorage` | An injected script could use it until it expires, within the hour | The CSP limits script sources; React escapes rendered text; XSS-01 to XSS-04 pass | Keep it in memory only, at the cost of a refresh on every reload |
-| `/refresh` still accepts a body token | Only for moving sessions stored before the cookie | It is spent on first use and the browser deletes its copy | Remove the fallback after 7 days in production |
+| `/refresh` still accepts a body token | Only for moving sessions stored before the cookie | It is spent on first use and the browser deletes its copy | Remove it on or after 22 October 2026 (#71) |
 | Registration reveals existing accounts | Signing up with a used address answers `409` | The screen tells the person to sign in instead, which helps people who forgot they registered | Answer as if a code were sent |
 | A reset code is spent before the new password is saved (KI-16) | If Supabase refuses the password, the person must ask for a new code | The screen says so, and the send-a-new-code control sits below it | None planned |
 | A proof's PDF check reads only the header | A malformed PDF can be stored | Proofs are private and opened only by Administrators | #62 |
 | Phone numbers are confirmed by hand (KI-11) | No proof that a Citizen owns their number | No SMS budget (owner, 3 October and 15 October 2026). My account shows "Confirmed by staff" | Add a Philippine gateway to `PROVIDERS` if a budget appears |
 | Earlier rejection notes are replaced on re-upload (KI-17) | The profile shows only the latest note | Owner accepted on 15 October 2026: the audit log keeps every decision and note | None planned |
-| Replaced proofs are kept with no retention rule | Private personal documents stay in Storage | The owner has not decided a period; 30 days after replacement is proposed | Owner decision, then a purge like photo retention |
+| Replaced proofs are kept with no retention rule | Private personal documents stay in Storage | The owner has not decided a period; 30 days after replacement is proposed | Owner decision, then a purge like photo retention (#70) |
 | A name correction drops verified residency | A Citizen verified without a proof file gets locked | Found during #54 | #67 |
 | Pending Citizens can file reports | Reports from unconfirmed residents reach Staff | Earlier owner rule; replaced by an approved rule not yet built | #59 |
 | Leaked-password checking is off | Known-breached passwords are accepted | The team's free-plan choice (#50) | Turn it on if the plan changes |
@@ -108,9 +110,6 @@ Its pull request updates this table.
 ## Not yet verified
 
 - The combined residency hardening (#64).
-- The shared project records the first 18 migrations (#49). The owner reports the
-  three later ones, from `20261005000100` to `20261006000200`, are applied too
-  (15 October 2026); no migration list confirms it yet.
 - A real phone or microphone: speech-to-text runs only where the browser offers it.
 
 ## Evidence

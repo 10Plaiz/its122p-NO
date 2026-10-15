@@ -18,7 +18,10 @@ Use this page to find the document that owns the information you need.
 | [Usability testing protocol](Usability_Testing.md) | Session plan, task script, questionnaire, tester codes, and usability evidence rules |
 | [KAMOTI proposal](Final_Project.md) | Intended features, roles, architecture, and technology choices |
 | [Architecture](ARCHITECTURE.md) | Code boundaries, request path, and deployment layout |
-| [API guide](API.md) | API integrations, endpoint contracts, database migrations, access rules, and example requests |
+| [API guide](API.md) | API integrations, endpoint contracts, roles and permissions, rate limits, database migrations, and example requests |
+| [Security review](SECURITY.md) | Security controls, their evidence, and accepted risks (UA-10) |
+| [Entity relationship diagrams](erd/ERD_with_auth.md) | Every table, column, and relationship the migrations create, as DBML |
+| [Improvement requirements](updates/IMPROVEMENT_REQUIREMENTS.md) | Instructor review requirements, their current status, and the decisions behind them |
 | [API documentation](API_Documentation.md) | Frozen Phase 3 API submission snapshot |
 | [Developer journeys](DEVELOPER_JOURNEYS.md) | Technical persona journeys, report state machine, and verification matrix |
 | [Phase 4 member sections](Phase4_Member_Sections.md) | Per-member split of the Phase 4 test report and the latest QA run |

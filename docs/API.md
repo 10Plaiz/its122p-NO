@@ -681,7 +681,11 @@ for a future gateway:
 - Errors use the body shape Supabase expects:
   `{ "error": { "http_code", "message" } }`.
 
-The hook URL and secret are not set on the shared project.
+The hook URL and secret are not set on the shared project. Turning text
+codes on later needs a gateway in `PROVIDERS`, a phone-change start with the
+user's own token, `verifyOtp` with type `phone_change` (ending the extra
+session it opens), `[auth.sms] enable_confirmations`, and the hook URL and
+secret on the project.
 
 ## Quick check
 
@@ -734,3 +738,8 @@ After that, create staff accounts through `POST /api/admin/users`.
 - Inspection routes and screens for the `report_inspections` table
 - Phone codes by text message ([Send SMS Hook](#send-sms-hook) is dormant)
 - Administrator approval before reporting (#59)
+- Self-service email address changes, for any role
+- Self-service detail changes for Staff and Administrators; an Administrator edits them on Users
+- A screen to add or retire problem types; they are seeded by migration
+- Automatic assignment; the Assign dialog only ranks Staff
+- A scheduled photo purge; an Administrator starts it from the dashboard
