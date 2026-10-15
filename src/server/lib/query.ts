@@ -42,6 +42,15 @@ export function sortColumn(sort: Sort) {
   return { column: "submitted_at", ascending: false };
 }
 
+// Orders a report list by the chosen sort, then by id (#78). Rows that share a sort
+// value (every report of one status, or a seed's one timestamp) have no order of
+// their own, so without the id they can swap between pages: one repeats, another
+// never shows. The export uses it too, so a file lists what the screen shows.
+export function orderReports<Q extends { order(column: string, options: { ascending: boolean }): Q }>(query: Q, sort: Sort): Q {
+  const order = sortColumn(sort);
+  return query.order(order.column, { ascending: order.ascending }).order("id", { ascending: true });
+}
+
 // `to` arrives as a plain date but the column is a timestamp, so cover the whole day.
 export function endOfDay(date: string) {
   return `${date}T23:59:59.999Z`;
