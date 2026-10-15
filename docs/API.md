@@ -330,10 +330,21 @@ The review version changes when any of these values change:
 - The account role or active state.
 - The residency decision, note, reviewer, or review time.
 
-An identity or address change sends pending or verified residency back to
-pending. A rejected proof stays rejected until the Citizen submits a new proof.
-The database applies these rules to the current row. A profile pre-read cannot
-clear a newer decision. Contact-number changes still clear phone verification.
+A name or address change sends pending or verified residency back to pending,
+with one exception (#67, owner 2026-10-15): when an Administrator corrects only
+the name through `PATCH /api/admin/users/:id`, the decision stays as it is and
+the `user.updated` audit records `residency_kept: "verified"`. The Citizen's own
+name change still returns to review, because the approval checked the name on
+the document. A rejected proof stays rejected until the Citizen submits a new
+proof. The database applies these rules to the current row. A profile pre-read
+cannot clear a newer decision. Contact-number changes still clear phone
+verification.
+
+`admin_change_profile` marks its own update with the transaction-local setting
+`kamoti.residency_actor = 'admin'` and clears it right after; the
+`version_residency_review` trigger reads it. Apply
+`20261015000300_admin_name_corrections.sql` before or with the matching API;
+the API's request does not change, so either order is safe.
 
 `GET /api/admin/users/:id` returns the current account snapshot. Proof access
 requires its displayed version:

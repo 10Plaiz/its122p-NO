@@ -209,6 +209,7 @@ psql "$TEST_DATABASE_URL" -X -v ON_ERROR_STOP=1 -f tests/database/atomic-actions
 psql "$TEST_DATABASE_URL" -X -v ON_ERROR_STOP=1 -f tests/database/submission-limits.sql
 psql "$TEST_DATABASE_URL" -X -v ON_ERROR_STOP=1 -f tests/database/auth-rate-limits.sql
 psql "$TEST_DATABASE_URL" -X -v ON_ERROR_STOP=1 -f tests/database/residency-review.sql
+psql "$TEST_DATABASE_URL" -X -v ON_ERROR_STOP=1 -f tests/database/name-corrections.sql
 ```
 
 The fast suite never reaches a database. `bunfig.toml` preloads
@@ -253,6 +254,7 @@ psql "$TEST_DATABASE_URL" -X -v ON_ERROR_STOP=1 -f supabase/tests/api_access.sql
 psql "$TEST_DATABASE_URL" -X -v ON_ERROR_STOP=1 -f tests/database/atomic-actions.sql
 psql "$TEST_DATABASE_URL" -X -v ON_ERROR_STOP=1 -f tests/database/residency-reviews.sql
 psql "$TEST_DATABASE_URL" -X -v ON_ERROR_STOP=1 -f tests/database/residency-review.sql
+psql "$TEST_DATABASE_URL" -X -v ON_ERROR_STOP=1 -f tests/database/name-corrections.sql
 psql "$TEST_DATABASE_URL" -X -v ON_ERROR_STOP=1 -f tests/database/submission-limits.sql
 psql "$TEST_DATABASE_URL" -X -v ON_ERROR_STOP=1 -f tests/database/proof-retry-admission.sql
 psql "$TEST_DATABASE_URL" -X -v ON_ERROR_STOP=1 -f tests/database/auth-rate-limits.sql

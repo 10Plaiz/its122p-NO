@@ -18,7 +18,7 @@ important interface behavior. Use [API.md](API.md) for endpoint contracts and
 | `/my-reports` | Citizen | Search, filter, open, or cancel the Citizen's reports |
 | `/reports/:id` | Citizen, Staff, Administrator | Read a report and its history, subject to record-level server authorization (owning Citizen, assigned Staff, or Administrator). Owning citizens can edit pending reports inline. |
 | `/notifications` | Citizen, Staff, Administrator | Read and mark the signed-in user's notifications |
-| `/account` | Citizen | Update personal name, contact, barangay, and address details |
+| `/account` | Citizen | Update personal name, contact, barangay, and address details. Before saving, a changed name or address says it goes back to review, or that a proof is needed when none is on file (#67) |
 | `/staff/queue` | Staff | Search and filter reports assigned to the Staff member |
 | `/staff/reports/:id` | Staff, Administrator | Work a report, add remarks, advance status, and upload repair evidence, subject to record-level server authorization (assigned Staff or Administrator) |
 | `/admin` | Administrator | View system analytics |

@@ -59,7 +59,7 @@ Afonso (2017) notes that centralized web apps drastically lower the transaction 
 ### Citizen-Facing Features
 * Account registration and login
 * Prove Makati residency with one document: a utility bill from the last 3 months, a barangay certificate or clearance, a lease, or a government ID with a Makati address. New reports open once an administrator approves it; a rejection gives the reason and a way to upload again
-* Edit their own name, mobile number, barangay, and street on My account; a new number loses its verified mark, and a new address goes back to an administrator for review
+* Edit their own name, mobile number, barangay, and street on My account; a new number loses its verified mark, and a new name or address goes back to an administrator for review (an administrator's name correction keeps the residency decision)
 * Submit infrastructure reports (category, description, photo, map location inside Makati City)
 * Track status of submitted reports (Pending -> Under Review -> In Progress -> Resolved), or Rejected with the reason when a report cannot be fixed
 * View public transparency board of all community reports
