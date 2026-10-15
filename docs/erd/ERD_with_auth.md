@@ -1,6 +1,6 @@
 # KAMOTI ERD (with Supabase `auth.users`)
 
-The database as implemented by the 22 migrations in
+The database as implemented by the migrations in
 [`supabase/migrations/`](../../supabase/migrations/), including the
 Supabase-managed `auth.users` table that every `profiles` row extends. Checked
 against those migrations on 2026-10-15: every table and column below is created

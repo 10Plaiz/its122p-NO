@@ -73,7 +73,7 @@ change cannot skip them. The tables are drawn in the
 | A report's barangay comes from its pin | `reports_set_barangay` trigger calls `barangay_at()` over `barangays` boundaries | `20261003000800_area_routing.sql` |
 | Problem types match the report's category | Composite foreign keys to `problem_types (id, category_id)` | `20261003000300_problem_types.sql` |
 | Closures are atomic | `request_report_closure()` and `review_report_closure()` | `20261004000100_atomic_closure.sql` |
-| Privileged account changes are audited atomically | `admin_create_profile()` and `admin_change_profile()` | `20261004000200`, `20261006000100` |
+| Privileged account changes are audited atomically | `admin_create_profile()` and `admin_change_profile()` | `20261004000200`, `20261006000100`, `20261015000200` |
 | Residency decisions bind to what was reviewed | `profiles_version_residency_review` trigger; immutable `residency_proof_versions` | `20261006000100_residency_review_versions.sql` |
 | Shared Citizen quotas | `admit_citizen_operation()` over `citizen_submission_events`; `purge_citizen_submission_events()` for idle cleanup | `20261005000100`, `20261006000200` |
 | Shared account rate limits | `auth_rate_limit()` takes or releases hits on hashed `auth_rate_counters` keys, so every API instance counts together | `20261015000100_auth_rate_limits.sql` |

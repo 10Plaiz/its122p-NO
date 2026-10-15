@@ -141,6 +141,12 @@ are in the components cascade layer in `src/web/styles/ds.css`.
   decisions until **Refresh review** succeeds. Refresh loads the current address
   and version, then clears the previous proof preview and rejection reason.
   Only a successful decision shows a success message.
+- The review offers three paths (#63). **Accept the document** stays disabled
+  until the proof is open and all four checks are ticked: name, Makati address,
+  readable, and accepted type within its date rule. **Approve without a
+  document…** asks how the resident was confirmed; that reason goes to the
+  activity log, not to the Citizen. **Reject…** asks for the reason the Citizen
+  reads. The upload screen tells the Citizen what the Administrator checks.
 - An unsuccessful users request shows an alert with Try again. Empty results
   explain the active filters and offer Clear filters. Loading does not show
   outdated rows under newly selected filters.
@@ -243,7 +249,7 @@ above.
 | `PhotoRetention` | Check and remove expired photo files (DM-2) | Dashboard |
 | `ReportMap` | Board map of report pins | Board |
 | `ResidencyProofStep` | Proof upload and review state (UA-8) | Register, My account |
-| `ResidencyReview` | Administrator proof review with version checks | Users |
+| `ResidencyReview` | Administrator proof review: version checks, the document checklist, and the no-document exception | Users |
 | `SpecializationEditor` | Categories a Staff member handles (SW-1) | Users |
 | `StatusPin` | Map pin in its status color | `LocationMap`, `ReportMap` |
 | `Toast` | Success messages | App shell and forms that save |

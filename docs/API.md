@@ -347,12 +347,29 @@ and review version. The required access audit identifies that exact proof and
 version. An older version receives `409` and no signed URL.
 
 `PATCH /api/admin/users/:id/residency` requires `expected_version` with the
-decision and optional note. Approval without a document still requires that
-version. The database locks the profile before it compares the version. It
-saves one decision, one notification, and the required audit in one transaction.
-The audit records the inspected version, proof identity, and relevant account
-details. A stale or repeated request receives `409` with a refresh instruction.
-It changes no residency state and adds no decision audit or notification.
+decision. An approval names its basis (#63, owner decisions 2026-10-15):
+
+| Decision | Body | Rule |
+| :--- | :--- | :--- |
+| Accept the document | `decision: "verified"`, `method: "document"`, `checks: ["name", "address", "readable", "document"]` | A current proof exists, and all four checks are present: the name matches, the address is in Makati and matches the account, the document is readable, and it is an accepted document within its date rule. No `note` |
+| Approve without a document | `decision: "verified"`, `method: "no_document"`, `note` of 5 to 500 characters | The recorded exception, with or without an uploaded proof. The reason stays in the audit; the Citizen never sees it. No `checks` |
+| Reject | `decision: "rejected"`, `note` of 5 to 500 characters | Needs a proof. The Citizen reads the reason. No `method` or `checks` |
+
+Accepted documents: a utility bill from the last 3 months, a barangay
+certificate or clearance, a lease, or a government ID with a Makati address.
+An approval with no basis, or a body that breaks these rules, receives `400`
+and changes nothing. The API and the database function both enforce the rules.
+
+The database locks the profile before it compares the version. It saves one
+decision, one notification, and the required audit in one transaction. The audit
+records the inspected version, proof identity, relevant account details, and
+the decision basis: `method`, `checks`, and `exception_reason`. A stale or
+repeated request receives `409` with a refresh instruction. It changes no
+residency state and adds no decision audit or notification.
+
+Apply `20261015000200_residency_review_evidence.sql` right before deploying the
+matching API. Until that API is live, approvals from the earlier API, which
+sends no `method`, receive `400`; rejections keep working.
 
 Before anything is stored, the server checks the whole file
 (`src/server/lib/proof-files.ts`, #62). It refuses a bad file with `400` on the

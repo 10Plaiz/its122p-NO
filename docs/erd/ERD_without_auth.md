@@ -1,6 +1,6 @@
 # KAMOTI ERD (app tables only)
 
-The database as implemented by the 22 migrations in
+The database as implemented by the migrations in
 [`supabase/migrations/`](../../supabase/migrations/): the app's own tables in
 the `public` schema. Supabase's `auth.users` table, which every `profiles` row
 extends, is left out. Checked against those migrations on 2026-10-15: every
