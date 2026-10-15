@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "@playwright/test";
 import { z } from "zod";
 import { jsPDF } from "jspdf";
 import type { Profile } from "../../src/web/lib/types.js";
@@ -36,11 +36,14 @@ const admin = {
   residency_proof_id: null,
 } satisfies Profile;
 
+// #63: the body names its basis; strict, so an unexpected field fails the test.
 const decisionSchema = z.object({
   decision: z.enum(["verified", "rejected"]),
   expected_version: z.uuid(),
+  method: z.enum(["document", "no_document"]).optional(),
+  checks: z.array(z.string()).optional(),
   note: z.string().optional(),
-});
+}).strict();
 type Decision = z.infer<typeof decisionSchema>;
 type Simulation = {
   current: Profile;
@@ -64,6 +67,24 @@ function simulation(): Simulation {
     commitLostUpload: false,
     uploads: [],
   };
+}
+
+const ALL_CHECKS = ["name", "address", "readable", "document"];
+const EXCEPTION_REASON = "Saw the original barangay certificate at the barangay hall.";
+const documentApproval = (expected_version: string) => ({ decision: "verified", expected_version, method: "document", checks: ALL_CHECKS });
+const exceptionApproval = (expected_version: string) => ({ decision: "verified", expected_version, method: "no_document", note: EXCEPTION_REASON });
+
+// #63: tick the four checks (the proof must already be open), then accept it.
+async function acceptDocument(scope: Page | Locator) {
+  for (const box of await scope.getByRole("checkbox").all()) await box.check();
+  await scope.getByRole("button", { name: "Accept the document", exact: true }).click();
+}
+
+// #63: the recorded exception, with a reason.
+async function approveWithoutDocument(scope: Page | Locator) {
+  await scope.getByRole("button", { name: "Approve without a document…", exact: true }).click();
+  await scope.getByRole("textbox", { name: "How you confirmed this resident" }).fill(EXCEPTION_REASON);
+  await scope.getByRole("button", { name: "Approve without a document", exact: true }).click();
 }
 
 const proofUrl = (id: string, kind: Simulation["kind"]) => `/simulated-proofs/${id}.${kind === "pdf" ? "pdf" : "png"}`;
@@ -124,7 +145,7 @@ async function adaptApi(page: Page, state: Simulation, persona: "admin" | "citiz
       state.current = {
         ...state.current,
         residency_status: body.decision,
-        residency_note: body.note ?? null,
+        residency_note: body.decision === "rejected" ? body.note ?? null : null,
         residency_review_version: VERSION_C,
         residency_reviewed_at: "2026-10-05T04:00:00Z",
         reviewer: { id: admin.id, name: admin.name },
@@ -225,11 +246,13 @@ test.describe("Residency review with simulated local API responses", () => {
     await openReview(page, state);
     await page.getByRole("button", { name: "Open proof", exact: true }).click();
     await expect(page.getByRole("img", { name: "Proof of residency uploaded by Local Citizen" })).toHaveAttribute("src", proofUrl(PROOF_A, "image"));
-    await page.getByRole("button", { name: "Accept as resident" }).click();
+    const accept = page.getByRole("button", { name: "Accept the document", exact: true });
+    await expect(accept).toBeDisabled();
+    await acceptDocument(page.getByRole("dialog"));
     await expect(page.getByRole("dialog")).toBeHidden();
     await expect(page.getByText("Local Citizen is now a verified resident.", { exact: true })).toBeVisible();
     expect(state.proofVersions).toEqual([VERSION_A]);
-    expect(state.decisions).toEqual([{ decision: "verified", expected_version: VERSION_A }]);
+    expect(state.decisions).toEqual([documentApproval(VERSION_A)]);
   });
 
   for (const decision of ["verified", "rejected"] as const) {
@@ -244,10 +267,11 @@ test.describe("Residency review with simulated local API responses", () => {
         await dialog.getByRole("textbox", { name: "Reason" }).fill("The original address is not clear.");
       }
       replaceProof(state);
-      await dialog.getByRole("button", { name: decision === "verified" ? "Accept as resident" : "Reject and ask again" }).click();
+      if (decision === "verified") await acceptDocument(dialog);
+      else await dialog.getByRole("button", { name: "Reject and ask again" }).click();
       await expect(dialog.getByRole("button", { name: "Refresh review", exact: true })).toBeVisible();
       await expect(dialog.getByRole("img")).toBeHidden();
-      await expect(dialog.getByRole("button", { name: decision === "verified" ? "Accept as resident" : "Reject and ask again" })).toBeDisabled();
+      await expect(dialog.getByRole("button", { name: decision === "verified" ? "Accept the document" : "Reject and ask again" })).toBeDisabled();
       await expect(dialog).toContainText("10 Original Street");
       await expect(page.getByText(/is now a verified resident|was asked for a new proof/)).toHaveCount(0);
       if (decision === "verified") await evidence(page, "simulated-approval-conflict-desktop.png");
@@ -262,7 +286,7 @@ test.describe("Residency review with simulated local API responses", () => {
       if (decision === "verified") await evidence(page, "simulated-refreshed-review-desktop.png");
       await dialog.getByRole("button", { name: "Open proof", exact: true }).click();
       await expect(dialog.getByRole("img")).toHaveAttribute("src", proofUrl(PROOF_B, "image"));
-      await dialog.getByRole("button", { name: "Accept as resident" }).click();
+      await acceptDocument(dialog);
       await expect(dialog).toBeHidden();
       expect(state.proofVersions).toEqual([VERSION_A, VERSION_B]);
       expect(state.decisions.map(({ expected_version }) => expected_version)).toEqual([VERSION_A, VERSION_B]);
@@ -278,12 +302,12 @@ test.describe("Residency review with simulated local API responses", () => {
     await dialog.getByRole("button", { name: "Open proof", exact: true }).click();
     await dialog.getByRole("button", { name: "Refresh review", exact: true }).click();
     await expect(dialog).toContainText("Could not refresh the review");
-    await expect(dialog.getByRole("button", { name: "Accept as resident" })).toBeDisabled();
+    await expect(dialog.getByRole("button", { name: "Approve without a document…" })).toBeDisabled();
     await expect(dialog).toContainText("10 Original Street");
     await expect(dialog.getByRole("img")).toBeHidden();
     await dialog.getByRole("button", { name: "Refresh review", exact: true }).click();
     await expect(dialog).toContainText("22 Current Street");
-    await expect(dialog.getByRole("button", { name: "Accept as resident" })).toBeEnabled();
+    await expect(dialog.getByRole("button", { name: "Approve without a document…" })).toBeEnabled();
     expect(state.decisions).toEqual([]);
     expect(state.proofVersions).toEqual([VERSION_A]);
   });
@@ -307,7 +331,7 @@ test.describe("Residency review with simulated local API responses", () => {
     await dialog.getByRole("button", { name: "Open proof", exact: true }).click();
     await expect(dialog.getByRole("button", { name: "Opening...", exact: true })).toBeVisible();
     replaceProof(state);
-    await dialog.getByRole("button", { name: "Accept as resident" }).click();
+    await approveWithoutDocument(dialog);
     await dialog.getByRole("button", { name: "Refresh review", exact: true }).click();
     await expect(dialog).toContainText("22 Current Street");
     const oldResponse = page.waitForResponse((response) => response.url().includes("residency-proof"));
@@ -326,14 +350,14 @@ test.describe("Residency review with simulated local API responses", () => {
     await openReview(page, state);
     replaceProof(state);
     const dialog = page.getByRole("dialog");
-    await dialog.getByRole("button", { name: "Accept as resident" }).click();
+    await approveWithoutDocument(dialog);
     await expect(dialog.getByRole("button", { name: "Refresh review", exact: true })).toBeInViewport();
-    await expect(dialog.getByRole("button", { name: "Accept as resident" })).toBeDisabled();
+    await expect(dialog.getByRole("button", { name: "Approve without a document", exact: true })).toBeDisabled();
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
     await evidence(page, "simulated-approval-conflict-mobile.png", false);
     await dialog.getByRole("button", { name: "Refresh review", exact: true }).click();
     await expect(dialog).toContainText("22 Current Street");
-    await expect(dialog.getByRole("button", { name: "Accept as resident" })).toBeEnabled();
+    await expect(dialog.getByRole("button", { name: "Approve without a document…" })).toBeEnabled();
   });
 
   test("shows the first reviewer's decision when a second reviewer refreshes", async ({ page, browser }) => {
@@ -343,31 +367,61 @@ test.describe("Residency review with simulated local API responses", () => {
     const second = await secondContext.newPage();
     try {
       await openReview(second, state);
-      await page.getByRole("button", { name: "Accept as resident" }).click();
+      await page.getByRole("button", { name: "Open proof", exact: true }).click();
+      await acceptDocument(page.getByRole("dialog"));
       await expect(page.getByRole("dialog")).toBeHidden();
-      await second.getByRole("button", { name: "Accept as resident" }).click();
+      await approveWithoutDocument(second.getByRole("dialog"));
       await expect(second.getByRole("dialog")).toContainText("Refresh review");
       await second.getByRole("button", { name: "Refresh review", exact: true }).click();
       await expect(second.getByRole("dialog")).toContainText("Verified resident");
       await expect(second.getByRole("dialog")).toContainText("by Local Administrator");
-      await expect(second.getByRole("button", { name: "Accept as resident" })).toBeHidden();
-      expect(state.decisions).toEqual([
-        { decision: "verified", expected_version: VERSION_A },
-        { decision: "verified", expected_version: VERSION_A },
-      ]);
+      await expect(second.getByRole("button", { name: "Accept the document" })).toBeHidden();
+      await expect(second.getByRole("button", { name: "Approve without a document…" })).toBeHidden();
+      expect(state.decisions).toEqual([documentApproval(VERSION_A), exceptionApproval(VERSION_A)]);
     } finally {
       await secondContext.close();
     }
   });
 
-  test("accepts a known resident without a document using the displayed version", async ({ page }) => {
+  test("fits the document checklist on a 320 px phone and works it by keyboard", async ({ page }) => {
+    await page.setViewportSize({ width: 320, height: 720 });
+    const state = simulation();
+    await openReview(page, state);
+    const dialog = page.getByRole("dialog");
+    await expect(dialog.getByRole("checkbox").first()).toBeDisabled();
+    await dialog.getByRole("button", { name: "Open proof", exact: true }).click();
+    await expect(dialog.getByRole("img")).toBeVisible();
+    const boxes = await dialog.getByRole("checkbox").all();
+    expect(boxes).toHaveLength(4);
+    for (const box of boxes) {
+      await box.focus();
+      await page.keyboard.press("Space");
+      await expect(box).toBeChecked();
+    }
+    const accept = dialog.getByRole("button", { name: "Accept the document", exact: true });
+    await expect(accept).toBeEnabled();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+    await evidence(page, "review-document-checklist-320.png", false);
+    await accept.focus();
+    await page.keyboard.press("Enter");
+    await expect(dialog).toBeHidden();
+    expect(state.decisions).toEqual([documentApproval(VERSION_A)]);
+  });
+
+  test("approves a known resident without a document only with a reason", async ({ page }) => {
     const state = simulation();
     state.current = { ...state.current, has_residency_proof: false, residency_proof_id: null };
     await openReview(page, state);
-    await expect(page.getByRole("dialog")).toContainText("No proof uploaded yet");
-    await page.getByRole("button", { name: "Accept as resident" }).click();
-    await expect(page.getByRole("dialog")).toBeHidden();
-    expect(state.decisions).toEqual([{ decision: "verified", expected_version: VERSION_A }]);
+    const dialog = page.getByRole("dialog");
+    await expect(dialog).toContainText("No proof uploaded yet");
+    await expect(dialog.getByRole("button", { name: "Accept the document" })).toHaveCount(0);
+    await dialog.getByRole("button", { name: "Approve without a document…", exact: true }).click();
+    await expect(dialog.getByRole("button", { name: "Approve without a document", exact: true })).toBeDisabled();
+    await evidence(page, "review-exception-reason-desktop.png");
+    await dialog.getByRole("textbox", { name: "How you confirmed this resident" }).fill(EXCEPTION_REASON);
+    await dialog.getByRole("button", { name: "Approve without a document", exact: true }).click();
+    await expect(dialog).toBeHidden();
+    expect(state.decisions).toEqual([exceptionApproval(VERSION_A)]);
     expect(state.proofVersions).toEqual([]);
   });
 
@@ -387,7 +441,7 @@ test.describe("Residency review with simulated local API responses", () => {
       await expect(oldDocument).toHaveURL(`http://127.0.0.1:5174${proofUrl(PROOF_A, kind)}`);
       replaceProof(state);
       await expect(oldLink).toHaveAttribute("href", proofUrl(PROOF_A, kind));
-      await dialog.getByRole("button", { name: "Accept as resident" }).click();
+      await acceptDocument(dialog);
       await dialog.getByRole("button", { name: "Refresh review", exact: true }).click();
       await dialog.getByRole("button", { name: "Open proof", exact: true }).click();
       await expect(dialog.locator(`a[href='${proofUrl(PROOF_B, kind)}']`)).toBeVisible();

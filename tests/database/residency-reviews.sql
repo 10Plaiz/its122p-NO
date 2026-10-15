@@ -45,6 +45,15 @@ begin
 end $$;
 create function pg_temp.fail_write() returns trigger language plpgsql as $$
 begin raise sqlstate 'ZZ061' using message = 'Required write failed.'; end $$;
+-- #63: an approval names its basis, so each approval below fails only for the
+-- reason its label gives. A proof is accepted after the four checks; an account
+-- without one is approved through the recorded exception.
+create function pg_temp.document_basis() returns jsonb language sql as $$
+    select '{"method":"document","checks":["name","address","readable","document"]}'::jsonb
+$$;
+create function pg_temp.exception_basis() returns jsonb language sql as $$
+    select '{"method":"no_document","note":"Known resident, seen at the barangay hall."}'::jsonb
+$$;
 
 select pg_temp.check_that((select count(*) = 3 from public.profiles p
     join public.residency_proof_versions v on v.id = p.residency_proof_id and v.user_id = p.id and v.object_path = p.residency_proof_path
@@ -103,9 +112,10 @@ begin
         and result->>'residency_status' = 'pending' and result->>'has_residency_proof' = 'true' and not result ? 'residency_proof_path',
         'first upload returns proof identity and changed review version without private path');
     perform pg_temp.must_fail(format('select public.admin_change_profile(%L,%L,%L,%L::jsonb)', admin, citizen, 'residency.reviewed',
-        jsonb_build_object('decision', 'verified', 'expected_version', old_version)), 'PT409', 'upload first rejects review of earlier account');
+        jsonb_build_object('decision', 'verified', 'expected_version', old_version) || pg_temp.document_basis()), 'PT409', 'upload first rejects review of earlier account');
     review_version := (result->>'residency_review_version')::uuid;
-    result := public.admin_change_profile(admin, citizen, 'residency.reviewed', jsonb_build_object('decision', 'verified', 'expected_version', review_version));
+    result := public.admin_change_profile(admin, citizen, 'residency.reviewed',
+        jsonb_build_object('decision', 'verified', 'expected_version', review_version) || pg_temp.document_basis());
     perform pg_temp.check_that(result->>'residency_status' = 'verified' and result->>'residency_proof_id' = proof1::text
         and result->>'residency_review_version' <> review_version::text and not result ? 'residency_proof_path', 'current proof review succeeds and returns both identities');
     perform pg_temp.must_fail(format('select public.admin_change_profile(%L,%L,%L,%L::jsonb)', admin, citizen, 'residency.reviewed',
@@ -125,15 +135,15 @@ begin
         from public.activity_logs where actor_id = admin and action = 'residency.reviewed' and entity_id = citizen::text),
         'decision audit identifies the inspected proof and account details');
     result := public.admin_change_profile(admin, citizen, 'residency.reviewed', jsonb_build_object('decision', 'verified',
-        'expected_version', (result->>'residency_review_version')::uuid));
+        'expected_version', (result->>'residency_review_version')::uuid) || pg_temp.document_basis());
     perform pg_temp.check_that(result->>'residency_status' = 'verified' and result->>'residency_review_version' <> review_version::text,
         'a refreshed version allows an intentional later decision');
     perform pg_temp.must_fail(format('select public.complete_residency_proof(%L,%L,%L,%L,%L)', citizen, proof1, path1, repeat('b', 64), old_version),
         'PT409', 'submission identity cannot be reused for different content');
-    perform pg_temp.must_fail(format('select public.admin_change_profile(%L,%L,%L,%L::jsonb)', admin, citizen, 'residency.reviewed', '{"decision":"verified"}'),
-        'PT400', 'review requires expected version');
-    perform pg_temp.must_fail(format('select public.admin_change_profile(%L,%L,%L,%L::jsonb)', admin, citizen, 'residency.reviewed', '{"decision":"verified","expected_version":"bad"}'),
-        'PT400', 'review rejects malformed expected version');
+    perform pg_temp.must_fail(format('select public.admin_change_profile(%L,%L,%L,%L::jsonb)', admin, citizen, 'residency.reviewed',
+        '{"decision":"verified"}'::jsonb || pg_temp.document_basis()), 'PT400', 'review requires expected version');
+    perform pg_temp.must_fail(format('select public.admin_change_profile(%L,%L,%L,%L::jsonb)', admin, citizen, 'residency.reviewed',
+        '{"decision":"verified","expected_version":"bad"}'::jsonb || pg_temp.document_basis()), 'PT400', 'review rejects malformed expected version');
 
     select * into before from public.profiles where id = citizen;
     result := public.update_own_profile(citizen, '{"first_name":"Changed","name":"Changed Citizen"}');
@@ -141,7 +151,8 @@ begin
         and result->>'residency_reviewed_by' is null and result->>'residency_review_version' <> before.residency_review_version::text,
         'self name change resets the current verified decision');
     perform pg_temp.must_fail(format('select public.admin_change_profile(%L,%L,%L,%L::jsonb)', admin, citizen, 'residency.reviewed',
-        jsonb_build_object('decision', 'verified', 'expected_version', before.residency_review_version)), 'PT409', 'name change invalidates the earlier proof review');
+        jsonb_build_object('decision', 'verified', 'expected_version', before.residency_review_version) || pg_temp.document_basis()),
+        'PT409', 'name change invalidates the earlier proof review');
     foreach field in array array['middle_name', 'last_name', 'suffix', 'barangay', 'address_line'] loop
         select * into before from public.profiles where id = citizen;
         result := public.update_own_profile(citizen, jsonb_build_object(field, case field when 'suffix' then 'Jr.' when 'barangay' then 'Bangkal' else 'Changed' end));
@@ -160,20 +171,22 @@ begin
     result := public.complete_residency_proof(citizen, proof1, path1, hash, old_version);
     perform pg_temp.check_that(result->>'residency_proof_id' = proof2::text, 'retry of a superseded submission returns the current proof');
     perform pg_temp.must_fail(format('select public.admin_change_profile(%L,%L,%L,%L::jsonb)', admin, citizen, 'residency.reviewed',
-        jsonb_build_object('decision', 'verified', 'expected_version', old_version)), 'PT409', 'same extension replacement invalidates earlier review');
+        jsonb_build_object('decision', 'verified', 'expected_version', old_version) || pg_temp.document_basis()), 'PT409', 'same extension replacement invalidates earlier review');
     old_version := (result->>'residency_review_version')::uuid;
     result := public.complete_residency_proof(citizen, proof3, path3, hash, old_version);
     perform pg_temp.must_fail(format('select public.admin_change_profile(%L,%L,%L,%L::jsonb)', admin, citizen, 'residency.reviewed',
-        jsonb_build_object('decision', 'verified', 'expected_version', old_version)), 'PT409', 'different extension replacement invalidates earlier review');
+        jsonb_build_object('decision', 'verified', 'expected_version', old_version) || pg_temp.document_basis()), 'PT409', 'different extension replacement invalidates earlier review');
     perform pg_temp.check_that((select count(*) = 3 from storage.objects where bucket_id = 'residency-proofs' and name in (path1, path2, path3)),
         'all replacement objects remain present');
 
     select * into before from public.profiles where id = none;
-    result := public.admin_change_profile(admin, none, 'residency.reviewed', jsonb_build_object('decision', 'verified', 'expected_version', before.residency_review_version));
+    result := public.admin_change_profile(admin, none, 'residency.reviewed',
+        jsonb_build_object('decision', 'verified', 'expected_version', before.residency_review_version) || pg_temp.exception_basis());
     perform pg_temp.check_that(result->>'residency_status' = 'verified' and result->>'has_residency_proof' = 'false'
         and result->>'residency_proof_id' is null, 'current no-proof approval is allowed');
     perform pg_temp.must_fail(format('select public.admin_change_profile(%L,%L,%L,%L::jsonb)', admin, none, 'residency.reviewed',
-        jsonb_build_object('decision', 'verified', 'expected_version', before.residency_review_version)), 'PT409', 'no-proof approval also invalidates repeated review');
+        jsonb_build_object('decision', 'verified', 'expected_version', before.residency_review_version) || pg_temp.exception_basis()),
+        'PT409', 'no-proof approval also invalidates repeated review');
     select * into before from public.profiles where id = none;
     result := public.update_own_profile(none, '{"address_line":"Changed no-proof address"}');
     perform pg_temp.check_that(result->>'residency_status' = 'pending' and result->>'residency_reviewed_at' is null
@@ -244,7 +257,8 @@ begin
     select * into before from public.profiles where id = citizen;
     select count(*) into notices from public.notifications;
     perform pg_temp.must_fail(format('select public.admin_change_profile(%L,%L,%L,%L::jsonb)', admin, citizen, 'residency.reviewed',
-        jsonb_build_object('decision', 'verified', 'expected_version', before.residency_review_version)), 'ZZ061', 'decision propagates required audit failure');
+        jsonb_build_object('decision', 'verified', 'expected_version', before.residency_review_version) || pg_temp.document_basis()),
+        'ZZ061', 'decision propagates required audit failure');
     select * into after from public.profiles where id = citizen;
     perform pg_temp.check_that(to_jsonb(after) = to_jsonb(before) and (select count(*) = notices from public.notifications), 'audit failure rolls back decision version and notification');
     perform pg_temp.must_fail(format('select public.complete_residency_proof(%L,%L,%L,%L,%L)', citizen, proof, path, repeat('a',64), before.residency_review_version),
@@ -266,7 +280,8 @@ begin
     select * into before from public.profiles where id = 'd0000000-0000-4000-8000-000000000005';
     select count(*) into audits from public.activity_logs;
     perform pg_temp.must_fail(format('select public.admin_change_profile(%L,%L,%L,%L::jsonb)', 'd0000000-0000-4000-8000-000000000001', before.id, 'residency.reviewed',
-        jsonb_build_object('decision', 'verified', 'expected_version', before.residency_review_version)), 'ZZ061', 'decision propagates required notification failure');
+        jsonb_build_object('decision', 'verified', 'expected_version', before.residency_review_version) || pg_temp.document_basis()),
+        'ZZ061', 'decision propagates required notification failure');
     select * into after from public.profiles where id = before.id;
     perform pg_temp.check_that(to_jsonb(after) = to_jsonb(before) and (select count(*) = audits from public.activity_logs),
         'notification failure rolls back decision and audit');
@@ -291,7 +306,8 @@ begin
         'd0000000-0000-4000-8000-000000000005/e0000000-0000-4000-8000-000000000004.pdf', repeat('a',64),
         (result->>'residency_review_version')::uuid);
     result := public.admin_change_profile('d0000000-0000-4000-8000-000000000001', 'd0000000-0000-4000-8000-000000000005', 'residency.reviewed',
-        jsonb_build_object('decision', 'verified', 'expected_version', result->>'residency_review_version'));
+        jsonb_build_object('decision', 'verified', 'expected_version', result->>'residency_review_version', 'method', 'document',
+            'checks', '["name","address","readable","document"]'::jsonb));
     if result->>'residency_status' is distinct from 'verified' then raise exception 'Server role decision failed.'; end if;
 end $$;
 reset role;

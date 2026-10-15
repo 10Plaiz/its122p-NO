@@ -207,6 +207,7 @@ psql "$TEST_DATABASE_URL" -X -v ON_ERROR_STOP=1 -f supabase/tests/api_access.sql
 psql "$TEST_DATABASE_URL" -X -v ON_ERROR_STOP=1 -f tests/database/atomic-actions.sql
 psql "$TEST_DATABASE_URL" -X -v ON_ERROR_STOP=1 -f tests/database/submission-limits.sql
 psql "$TEST_DATABASE_URL" -X -v ON_ERROR_STOP=1 -f tests/database/auth-rate-limits.sql
+psql "$TEST_DATABASE_URL" -X -v ON_ERROR_STOP=1 -f tests/database/residency-review.sql
 ```
 
 The fast suite never reaches a database. `bunfig.toml` preloads
@@ -250,8 +251,10 @@ done
 psql "$TEST_DATABASE_URL" -X -v ON_ERROR_STOP=1 -f supabase/tests/api_access.sql
 psql "$TEST_DATABASE_URL" -X -v ON_ERROR_STOP=1 -f tests/database/atomic-actions.sql
 psql "$TEST_DATABASE_URL" -X -v ON_ERROR_STOP=1 -f tests/database/residency-reviews.sql
+psql "$TEST_DATABASE_URL" -X -v ON_ERROR_STOP=1 -f tests/database/residency-review.sql
 psql "$TEST_DATABASE_URL" -X -v ON_ERROR_STOP=1 -f tests/database/submission-limits.sql
 psql "$TEST_DATABASE_URL" -X -v ON_ERROR_STOP=1 -f tests/database/proof-retry-admission.sql
+psql "$TEST_DATABASE_URL" -X -v ON_ERROR_STOP=1 -f tests/database/auth-rate-limits.sql
 bun tests/database/residency-concurrency.ts
 ```
 
@@ -407,19 +410,24 @@ names the shared project, so point every process at the local stack instead.
    bun run seed:routing apply --target local
    ```
 
+   If the stack was seeded without `DEMO_PASSWORD`, the seed chose one and kept
+   it as `password` in `~/.local/share/kamoti/demo-seeds/credentials-local.json`.
+   Export that value before running the browser suite; otherwise the Staff
+   filter and pill tests stop at sign-in.
 4. From the same shell, start `bun run dev`. Run both browser commands with
    `EVIDENCE_DIR` set to a scratch folder, and `--retries=0` when you are
    recording a result.
 
 Each run registers two accounts and makes four deliberate code failures. The
 API allows five sign-ups an hour and ten failed codes per 15 minutes from one
-address. It keeps those limits in memory, so restart `bun run dev` between
-repeated runs. Citizen report quotas are stored in the database. On the local
-database only, clear them before a rerun within the hour:
+address. Those limits and the Citizen report quotas are stored in the database
+(KI-14), so restarting `bun run dev` does not reset them. On the local database
+only, clear both before a rerun within the hour:
 
 ```bash
 psql postgresql://postgres:postgres@127.0.0.1:54322/postgres \
-  -c "delete from public.citizen_submission_events"
+  -c "delete from public.citizen_submission_events" \
+  -c "delete from public.auth_rate_counters"
 ```
 
 These runs prove the application and Mailpit flow. They do not prove hosted

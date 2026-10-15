@@ -58,6 +58,7 @@ Afonso (2017) notes that centralized web apps drastically lower the transaction 
 
 ### Citizen-Facing Features
 * Account registration and login
+* Prove Makati residency with one document: a utility bill from the last 3 months, a barangay certificate or clearance, a lease, or a government ID with a Makati address. New reports open once an administrator approves it; a rejection gives the reason and a way to upload again
 * Edit their own name, mobile number, barangay, and street on My account; a new number loses its verified mark, and a new address goes back to an administrator for review
 * Submit infrastructure reports (category, description, photo, map location inside Makati City)
 * Track status of submitted reports (Pending -> Under Review -> In Progress -> Resolved), or Rejected with the reason when a report cannot be fixed
@@ -76,6 +77,7 @@ Afonso (2017) notes that centralized web apps drastically lower the transaction 
 
 ### Administrator-Facing Features
 * Manage user accounts (citizens and staff), including each staff member's specializations (categories) and areas (barangays)
+* Review each citizen's proof of residency: accept the document after confirming the name, the Makati address, that it is readable, and that it is an accepted document within its date rule; approve without a document only as a recorded exception with a reason; or reject it with a reason the citizen reads
 * Manage infrastructure categories (roads, streetlights, drainage, signs, etc.)
 * Manage and oversee all submitted records/reports
 * Assign staff to reports, with staff who handle the report's category and cover its barangay listed first (the barangay comes from the report's pin)
@@ -218,7 +220,7 @@ erDiagram
 
 | Application table | Purpose |
 | :--- | :--- |
-| profiles | Role and contact details linked to Supabase Auth accounts |
+| profiles | Role, contact details, and residency review state linked to Supabase Auth accounts |
 | categories | Infrastructure issue types |
 | reports | Submissions, locations (with the barangay derived from the pin), assignments, and current status |
 | barangays | Makati's 23 barangays and their boundaries, used to place each report |
@@ -227,7 +229,7 @@ erDiagram
 | report_updates | Report history, status changes, assignments, and remarks |
 | report_inspections | Staff assessments, findings, and severity for a report |
 | notifications | In-app messages for users |
-| activity_logs | System-wide administrative activity |
+| activity_logs | System-wide administrative activity, including the basis of each residency decision |
 
 Supabase owns auth.users, shown above to explain its relationship with
 profiles. The application schema now contains eight related tables. Inspection

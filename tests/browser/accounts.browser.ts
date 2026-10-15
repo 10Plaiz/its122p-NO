@@ -1,5 +1,6 @@
 import { test, expect, type Browser, type Page } from "@playwright/test";
-import { captureEvidence, expectProofAccepted, FIXTURE_PASSWORD, latestCode, mailpitAvailable, signIn, USERS } from "./helpers.js";
+import { jsPDF } from "jspdf";
+import { captureEvidence, expectAwaitingApproval, FIXTURE_PASSWORD, latestCode, mailpitAvailable, signIn, USERS } from "./helpers.js";
 
 // Account flows (UA-5, UA-8, UA-9, UA-12) end to end. They create real accounts and
 // read the emailed codes from Mailpit, so they run only against a local Supabase
@@ -15,9 +16,10 @@ const stamp = Date.now();
 const NEW = `test-account-${stamp}@kamoti.invalid`;
 const UNCONFIRMED = `test-unconfirmed-${stamp}@kamoti.invalid`;
 
-// A real 1x1 PNG and a minimal PDF, both accepted proofs of residency.
+// A real 1x1 PNG and a complete PDF, both accepted proofs of residency. #62 checks
+// the whole file, so a PDF that only starts like one is refused.
 const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", "base64");
-const PDF = Buffer.from("%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF\n");
+const PDF = Buffer.from(new jsPDF().text("Synthetic proof of residency", 10, 10).output("arraybuffer"));
 
 async function fillRegister(page: Page, email: string) {
   await page.goto("/register");
@@ -79,7 +81,7 @@ test("UA-8: until a proof is sent the citizen is locked: greyed menu, redirect, 
 
   await citizen.setInputFiles("#proof", { name: "bill.pdf", mimeType: "application/pdf", buffer: PDF });
   await citizen.getByRole("button", { name: "Send proof" }).click();
-  await expectProofAccepted(citizen);
+  await expectAwaitingApproval(citizen);
 });
 
 test("UA-8: an administrator rejects the proof with a reason; the citizen sees it and sends another", async ({ browser }) => {
@@ -103,7 +105,7 @@ test("UA-8: an administrator rejects the proof with a reason; the citizen sees i
   await captureEvidence(citizen, "UA-8-rejected-with-reason.png");
   await citizen.setInputFiles("#proof", { name: "bill.png", mimeType: "image/png", buffer: PNG });
   await citizen.getByRole("button", { name: "Send proof" }).click();
-  await expectProofAccepted(citizen);
+  await expectAwaitingApproval(citizen);
 });
 
 test("UA-8: an administrator accepts the new proof; the citizen is a verified resident", async ({ browser }) => {
@@ -115,7 +117,11 @@ test("UA-8: an administrator accepts the new proof; the citizen is a verified re
   await row.getByRole("button", { name: /Review/ }).click();
   await admin.getByRole("button", { name: "Open proof" }).click();
   await expect(admin.getByAltText("Proof of residency uploaded by Ana Reyes")).toBeVisible();
-  await admin.getByRole("button", { name: "Accept as resident" }).click();
+  // #63: all four checks before the document can be accepted.
+  const accept = admin.getByRole("button", { name: "Accept the document" });
+  await expect(accept).toBeDisabled();
+  for (const box of await admin.getByRole("checkbox").all()) await box.check();
+  await accept.click();
   await expect(admin.getByText("Ana Reyes is now a verified resident.")).toBeVisible();
   await admin.close();
 
@@ -123,6 +129,8 @@ test("UA-8: an administrator accepts the new proof; the citizen is a verified re
   await expect(citizen.getByText("Your proof of residency was accepted")).toBeVisible();
   await citizen.goto("/account");
   await expect(citizen.getByText("Verified resident", { exact: true }).first()).toBeVisible();
+  // #59: approval opens reporting, so nothing in the menu stays locked.
+  await expect(citizen.locator('nav a[aria-disabled="true"]')).toHaveCount(0);
   await captureEvidence(citizen, "UA-8-approved.png");
 
   // A verified resident has nothing more to upload, even by a direct request.

@@ -44,7 +44,10 @@ async function upload(sql: SQL, userId: string, proof: Awaited<ReturnType<typeof
 }
 
 async function decide(sql: SQL, adminId: string, userId: string, version: string, decision: "verified" | "rejected") {
-  const input = { decision, expected_version: version, note: decision === "rejected" ? "Address does not match." : null };
+  // #63: every fixture holds a proof, so an approval accepts it after the four checks.
+  const input = decision === "rejected"
+    ? { decision, expected_version: version, note: "Address does not match." }
+    : { decision, expected_version: version, method: "document", checks: ["name", "address", "readable", "document"] };
   const rows = await sql`select public.admin_change_profile(${adminId}::uuid, ${userId}::uuid,
     'residency.reviewed', ${input}::jsonb, null::inet) as result`;
   return resultSchema.parse(rows)[0].result;

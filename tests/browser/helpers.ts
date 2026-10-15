@@ -66,11 +66,14 @@ export async function mapAvailable(page: Page) {
   return (await page.getByTestId("map-unavailable").count()) === 0;
 }
 
-// UA-8: what a citizen sees once a proof is sent. A pending proof unlocks the app
-// today; #59 will keep the citizen waiting for approval, so it changes only this.
-export async function expectProofAccepted(page: Page) {
+// UA-8 and #59: what a citizen sees once a proof is sent. They land on My reports,
+// and only "Report an issue" stays locked until an administrator approves.
+export async function expectAwaitingApproval(page: Page) {
   await page.waitForURL(/my-reports/);
-  await expect(page.locator('nav a[aria-disabled="true"]')).toHaveCount(0);
+  const locked = page.locator('nav a[aria-disabled="true"]');
+  await expect(locked).toHaveCount(1);
+  await expect(locked).toContainText("Report an issue");
+  await expect(locked).toHaveAttribute("title", /administrator approves/);
 }
 
 // A signed-in API session for set-up steps a test is not about.
