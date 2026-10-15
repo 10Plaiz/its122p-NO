@@ -62,6 +62,7 @@ Evidence labels:
 | Proofs go to the private `residency-proofs` bucket; responses carry only a proof-present flag | `src/server/lib/residency.ts` | Local (IMP-02); Hosted (#64: anonymous and Citizen tokens refused) |
 | An Administrator opens a proof through a five-minute signed link, and the access audit is saved before the link is returned | `GET /api/admin/users/:id/residency-proof` | Local (IMP-03, IMP-12); Hosted (#64: `401`, `403`, stale `409` without an audit, one audit per link) |
 | An approval records its basis: the uploaded document after four checks, or the no-document exception with a reason (#63) | `admin_change_profile`, migration `20261015000200` | Local (`tests/database/residency-review.sql`, security IMP-12) |
+| A name or address change returns residency to review, except an Administrator's name-only correction, which keeps the decision and records `residency_kept` (#67) | `version_residency_review`, `admin_change_profile`, migration `20261015000300` | Local (`tests/database/name-corrections.sql`, security IMP-19) |
 | A residency decision is bound to the proof and address version the Administrator saw | `residency_review_version`, `residency_proof_versions` | Local (`tests/evidence/issue61/verification.md`) |
 | Proofs: JPG, PNG, WebP, or PDF up to 5 MB. Images fully decoded within 40 megapixels; PDFs need a complete trailer, open with PDF.js within 20 pages, and carry no password, scripts, or attachments; 5 s limit (libvips stops itself; PDF steps stop at the deadline); refused before storage | `proof-files.ts`, `residency.ts` | Local (IMP-17); Source (`tests/fast/proof-files.test.ts`, `tests/fast/residency-http.test.ts`) |
 | Report photos: JPG, PNG, or WebP up to 3 MB, with the same first-byte check, before the report is saved | `checkPhoto` in `src/server/lib/photos.ts` | Source (`tests/fast/photos.test.ts`) |
@@ -106,7 +107,6 @@ Its pull request updates this table.
 | Earlier rejection notes are replaced on re-upload (KI-17) | The profile shows only the latest note | Owner accepted on 15 October 2026: the audit log keeps every decision and note | None planned |
 | Replaced proofs are kept with no retention rule | Private personal documents stay in Storage | The owner has not decided a period; 30 days after replacement is proposed | Owner decision, then a purge like photo retention (#70) |
 | The test project holds real people's accounts and 5 uploaded proofs | It is documented as synthetic only, yet may hold real residency documents | Found during #64; awaiting the owner. Meanwhile the proofs stay private (Administrators only, through an audited link), and the write-heavy test runners refuse any non-local target | Owner decision (#74), with retention (#70) |
-| A name correction drops verified residency | A Citizen verified without a proof file gets locked | Found during #54 | #67 |
 | Leaked-password checking is off | Known-breached passwords are accepted | The team's free-plan choice (#50) | Turn it on if the plan changes |
 
 ## Not yet verified
