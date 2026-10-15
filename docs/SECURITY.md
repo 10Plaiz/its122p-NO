@@ -62,7 +62,7 @@ Evidence labels:
 | Proofs go to the private `residency-proofs` bucket; responses carry only a proof-present flag | `src/server/lib/residency.ts` | Local (IMP-02) |
 | An Administrator opens a proof through a five-minute signed link, and the access audit is saved before the link is returned | `GET /api/admin/users/:id/residency-proof` | Local (IMP-03, IMP-12) |
 | A residency decision is bound to the proof and address version the Administrator saw | `residency_review_version`, `residency_proof_versions` | Local (`tests/evidence/issue61/verification.md`) |
-| Proofs: JPG, PNG, WebP, or PDF up to 5 MB. Images fully decoded within 40 megapixels; PDFs need a complete trailer, open with PDF.js within 20 pages, and carry no password, scripts, or attachments; 5 s per check; refused before storage | `proof-files.ts`, `residency.ts` | Local (IMP-17); Source (`tests/fast/proof-files.test.ts`, `tests/fast/residency-http.test.ts`) |
+| Proofs: JPG, PNG, WebP, or PDF up to 5 MB. Images fully decoded within 40 megapixels; PDFs need a complete trailer, open with PDF.js within 20 pages, and carry no password, scripts, or attachments; 5 s limit (libvips stops itself; PDF steps stop at the deadline); refused before storage | `proof-files.ts`, `residency.ts` | Local (IMP-17); Source (`tests/fast/proof-files.test.ts`, `tests/fast/residency-http.test.ts`) |
 | Report photos: JPG, PNG, or WebP up to 3 MB, with the same first-byte check, before the report is saved | `checkPhoto` in `src/server/lib/photos.ts` | Source (`tests/fast/photos.test.ts`) |
 
 ### Abuse limits

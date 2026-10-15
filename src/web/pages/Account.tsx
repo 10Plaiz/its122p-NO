@@ -264,7 +264,7 @@ function EditDetails({
         <p role="status" className="text-[13px] border-l-2 border-warning-700 pl-3 !m-0">
           {noProofOnFile
             ? "A new address needs a proof of residency, and there is none on your account yet. After saving, you will be asked to upload one before you can continue."
-            : 'A new address goes back to an administrator for review. You can keep using KAMOTI; your reports show "Unverified resident" until a proof for the new address is accepted.'}
+            : "A new address goes back to an administrator for review. Until they approve it, you cannot file new reports or add photos. Your existing reports stay open to you, and you can send a proof for the new address below."}
         </p>
       )}
 

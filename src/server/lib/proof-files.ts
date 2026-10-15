@@ -33,14 +33,15 @@ export class ProofFileError extends Error {}
 
 const IMAGE_FORMATS = { "image/jpeg": "jpeg", "image/png": "png", "image/webp": "webp" } as const;
 
-export async function inspectProofFile(buffer: Buffer, mimetype: string): Promise<void> {
-  if (mimetype === "application/pdf") return inspectPdf(buffer);
+// timeoutMs exists for tests; uploads always use PROOF_CHECK_MS.
+export async function inspectProofFile(buffer: Buffer, mimetype: string, { timeoutMs = PROOF_CHECK_MS } = {}): Promise<void> {
+  if (mimetype === "application/pdf") return inspectPdf(buffer, timeoutMs);
   const format = IMAGE_FORMATS[mimetype as keyof typeof IMAGE_FORMATS];
   if (!format) throw new ProofFileError(PROOF_DAMAGED_ERROR);
-  return inspectImage(buffer, format);
+  return inspectImage(buffer, format, timeoutMs);
 }
 
-async function inspectImage(buffer: Buffer, format: string) {
+async function inspectImage(buffer: Buffer, format: string, timeoutMs: number) {
   // The header first: it is cheap, and the size is known before any decoding.
   let width = 0;
   let height = 0;
@@ -58,10 +59,15 @@ async function inspectImage(buffer: Buffer, format: string) {
 
   // Then every pixel of the first frame, failing on a truncated or corrupt image.
   // stats() streams through the image, so memory stays well under a full copy.
+  // sharp's timeout (whole seconds) stops libvips itself, so nothing runs on after
+  // the answer. Under 5 MB and 40 megapixels a check measured about 0.4 s, so the
+  // limit is a backstop.
   try {
-    await withTimeout(sharp(buffer, { failOn: "error", limitInputPixels: PROOF_MAX_PIXELS }).stats(), () => {});
+    await sharp(buffer, { failOn: "error", limitInputPixels: PROOF_MAX_PIXELS })
+      .timeout({ seconds: Math.max(1, Math.ceil(timeoutMs / 1000)) })
+      .stats();
   } catch (error) {
-    if (error instanceof ProofFileError) throw error;
+    if (/timeout/i.test((error as Error)?.message ?? "")) throw new ProofFileError(PROOF_SLOW_ERROR);
     throw new ProofFileError(PROOF_DAMAGED_ERROR);
   }
 }
@@ -83,7 +89,7 @@ export function hasCompleteTrailer(buffer: Buffer): boolean {
 // found again through PDF.js below; this also catches them in plain dictionaries.
 const ACTIVE_NAMES = /\/(?:JavaScript|JS|Launch|EmbeddedFile|RichMedia|XFA|Encrypt)(?![A-Za-z0-9])/;
 
-async function inspectPdf(buffer: Buffer) {
+async function inspectPdf(buffer: Buffer, timeoutMs: number) {
   if (!hasCompleteTrailer(buffer)) throw new ProofFileError(PROOF_DAMAGED_ERROR);
   if (ACTIVE_NAMES.test(buffer.toString("latin1"))) throw new ProofFileError(PROOF_ACTIVE_ERROR);
 
@@ -96,22 +102,30 @@ async function inspectPdf(buffer: Buffer) {
     enableXfa: false,
     verbosity: 0,
   });
+  // PDF.js parses on this thread in one chain of promises, so a timer could not
+  // fire until it finished. The deadline is checked between steps instead: once
+  // it passes, no further step starts. Each step is bounded by the 5 MB and
+  // 20-page limits.
+  const deadline = performance.now() + timeoutMs;
+  const inTime = () => {
+    if (performance.now() > deadline) throw new ProofFileError(PROOF_SLOW_ERROR);
+  };
   try {
-    await withTimeout((async () => {
-      const pdf = await task.promise;
-      if (pdf.numPages < 1) throw new ProofFileError(PROOF_DAMAGED_ERROR);
-      if (pdf.numPages > PROOF_MAX_PAGES) throw new ProofFileError(PROOF_PAGES_ERROR);
-      const [scripts, attachments] = await Promise.all([pdf.getJSActions(), pdf.getAttachments()]);
-      if (scripts || attachments) throw new ProofFileError(PROOF_ACTIVE_ERROR);
-      for (let number = 1; number <= pdf.numPages; number++) {
-        const page = await pdf.getPage(number);
-        const [pageScripts, annotations] = await Promise.all([page.getJSActions(), page.getAnnotations()]);
-        if (pageScripts) throw new ProofFileError(PROOF_ACTIVE_ERROR);
-        for (const annotation of annotations as Array<{ actions?: unknown; attachment?: unknown }>) {
-          if (annotation.actions || annotation.attachment) throw new ProofFileError(PROOF_ACTIVE_ERROR);
-        }
+    const pdf = await task.promise;
+    inTime();
+    if (pdf.numPages < 1) throw new ProofFileError(PROOF_DAMAGED_ERROR);
+    if (pdf.numPages > PROOF_MAX_PAGES) throw new ProofFileError(PROOF_PAGES_ERROR);
+    const [scripts, attachments] = await Promise.all([pdf.getJSActions(), pdf.getAttachments()]);
+    if (scripts || attachments) throw new ProofFileError(PROOF_ACTIVE_ERROR);
+    for (let number = 1; number <= pdf.numPages; number++) {
+      inTime();
+      const page = await pdf.getPage(number);
+      const [pageScripts, annotations] = await Promise.all([page.getJSActions(), page.getAnnotations()]);
+      if (pageScripts) throw new ProofFileError(PROOF_ACTIVE_ERROR);
+      for (const annotation of annotations as Array<{ actions?: unknown; attachment?: unknown }>) {
+        if (annotation.actions || annotation.attachment) throw new ProofFileError(PROOF_ACTIVE_ERROR);
       }
-    })(), () => void task.destroy());
+    }
   } catch (error) {
     if (error instanceof ProofFileError) throw error;
     // PDF.js asks for a password through its own exception.
@@ -119,20 +133,5 @@ async function inspectPdf(buffer: Buffer) {
     throw new ProofFileError(PROOF_DAMAGED_ERROR);
   } finally {
     await task.destroy();
-  }
-}
-
-async function withTimeout<T>(work: Promise<T>, onTimeout: () => void): Promise<T> {
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  const timeout = new Promise<never>((_resolve, reject) => {
-    timer = setTimeout(() => {
-      onTimeout();
-      reject(new ProofFileError(PROOF_SLOW_ERROR));
-    }, PROOF_CHECK_MS);
-  });
-  try {
-    return await Promise.race([work, timeout]);
-  } finally {
-    clearTimeout(timer);
   }
 }

@@ -366,7 +366,16 @@ Before anything is stored, the server checks the whole file
   Password-protected PDFs, and PDFs with JavaScript, embedded files, launch
   actions, rich media, or XFA forms, are refused, and the Citizen is asked for a
   plain scan or photo.
-- Each check stops after 5 seconds. The 5 MB upload limit is unchanged.
+- The time limit is 5 seconds. For images, `sharp` passes it to libvips, which
+  stops decoding itself. For PDFs, PDF.js parses on the API's own thread, so a
+  timer cannot interrupt it. The deadline is checked before each step instead,
+  and no step starts after it passes. Each step is bounded by the 5 MB and
+  20-page limits. A check of the largest image allowed took about 0.4 s
+  locally. The 5 MB upload limit is unchanged.
+- Tools (#62): `sharp` (Apache-2.0, libvips, supported on Vercel) and Mozilla's
+  `pdfjs-dist` (Apache-2.0), both maintained. `pdf-lib` was not used because it
+  has had no release since 2022. `mupdf` was not used because it is AGPL. Both
+  checks run inside the API; no document leaves it for an outside service.
 
 These checks establish only that the file is a complete image or a plain PDF.
 They are not a malware scan, and they do not show whose document it is or that
