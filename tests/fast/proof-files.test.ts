@@ -1,10 +1,12 @@
 import { describe, expect, test } from "bun:test";
 import sharp from "sharp";
+import { getDocument } from "pdfjs-dist/legacy/build/pdf.mjs";
 import {
   PROOF_ACTIVE_ERROR,
   PROOF_DAMAGED_ERROR,
   PROOF_PAGES_ERROR,
   PROOF_PIXELS_ERROR,
+  PROOF_SLOW_ERROR,
   hasCompleteTrailer,
   inspectProofFile,
 } from "../../src/server/lib/proof-files.js";
@@ -23,9 +25,9 @@ const oversized = await sharp({ create: { width: 6500, height: 6500, channels: 3
   .png({ compressionLevel: 9 })
   .toBuffer();
 
-async function refusal(buffer: Buffer, type: string) {
+async function refusal(buffer: Buffer, type: string, timeoutMs?: number) {
   try {
-    await inspectProofFile(buffer, type);
+    await inspectProofFile(buffer, type, timeoutMs === undefined ? {} : { timeoutMs });
     return "accepted";
   } catch (error) {
     return (error as Error).message;
@@ -69,6 +71,59 @@ describe("PRF-02 damaged or mismatched files are refused", () => {
     expect(hasCompleteTrailer(broken)).toBe(false);
     expect(await refusal(broken, "application/pdf")).toBe(PROOF_DAMAGED_ERROR);
   });
+});
+
+describe("PRF-05 a check that runs out of time is refused and stops", () => {
+  test("a PDF: once the deadline passes, no further page is read", async () => {
+    // Count page reads on PDF.js's document class, reached through one loaded file.
+    const probeTask = getDocument({ data: new Uint8Array(pdf()), verbosity: 0 });
+    const proto = Object.getPrototypeOf(await probeTask.promise) as { getPage: (n: number) => Promise<unknown> };
+    await probeTask.destroy();
+    const original = proto.getPage;
+    let reads = 0;
+    proto.getPage = function (this: unknown, n: number) {
+      reads++;
+      return original.call(this, n);
+    };
+    try {
+      const big = pdf({ pages: 20 });
+      expect(await refusal(big, "application/pdf")).toBe("accepted");
+      expect(reads).toBe(20);
+
+      reads = 0;
+      expect(await refusal(big, "application/pdf", 0)).toBe(PROOF_SLOW_ERROR);
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      expect(reads).toBe(0);
+    } finally {
+      proto.getPage = original;
+    }
+  });
+
+  test("an image: libvips is given the 5-second timeout, so it stops itself", async () => {
+    const proto = Object.getPrototypeOf(sharp(png)) as { timeout: (options: { seconds: number }) => unknown };
+    const original = proto.timeout;
+    const seen: number[] = [];
+    proto.timeout = function (this: unknown, options: { seconds: number }) {
+      seen.push(options.seconds);
+      return original.call(this, options);
+    };
+    try {
+      expect(await refusal(png, "image/png")).toBe("accepted");
+    } finally {
+      proto.timeout = original;
+    }
+    expect(seen).toEqual([5]);
+  });
+
+  test("the slowest image allowed, about 40 megapixels of noise under 5 MB, checks well within the limit", async () => {
+    const worst = await sharp({ create: { width: 6300, height: 6300, channels: 3, background: "#808080", noise: { type: "gaussian" as const, mean: 128, sigma: 60 } } })
+      .jpeg({ quality: 15 })
+      .toBuffer();
+    expect(worst.length).toBeLessThan(5 * 1024 * 1024);
+    const started = performance.now();
+    expect(await refusal(worst, "image/jpeg")).toBe("accepted");
+    expect(performance.now() - started).toBeLessThan(2500);
+  }, 30_000);
 });
 
 describe("PRF-03 resource limits hold before any decoding", () => {

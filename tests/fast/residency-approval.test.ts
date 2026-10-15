@@ -21,6 +21,7 @@ const original = { from: db.from, rpc: db.rpc, getUser: db.auth.getUser, storage
 type Profile = { residency_status: string | null; residency_proof_path: string | null; is_active: boolean };
 let profile: Profile;
 let admissions: number;
+let rejectedBeforeAdmission: boolean;
 let writes: string[];
 let uploads: string[];
 let server: Server;
@@ -43,6 +44,7 @@ afterAll(async () => {
 beforeEach(() => {
   profile = { residency_status: "pending", residency_proof_path: `${CITIZEN}/proof.pdf`, is_active: true };
   admissions = 0;
+  rejectedBeforeAdmission = false;
   writes = [];
   uploads = [];
   Object.assign(db.auth, { getUser: async () => ({ data: { user: { id: CITIZEN } }, error: null }) });
@@ -73,7 +75,11 @@ beforeEach(() => {
       admissions++;
       const builder = {
         retry: () => builder,
-        abortSignal: async () => ({ data: { kind: "allowed" }, error: null }),
+        // The database re-reads the profile under a row lock. A rejection that
+        // committed after requireAuth read it is seen here (PT403).
+        abortSignal: async () => (rejectedBeforeAdmission
+          ? { data: null, error: { code: "PT403", message: "Upload your proof of residency to continue." } }
+          : { data: { kind: "allowed" }, error: null }),
       };
       return builder;
     },
@@ -159,6 +165,19 @@ test("a re-upload or an address change that returns a verified citizen to pendin
   expect(await code(await fileReport())).toBe("residency_pending");
   expect(await code(await addPhoto())).toBe("residency_pending");
   expectNothingWritten();
+});
+
+test("a rejection that lands while a submission is in progress refuses it before anything is saved", async () => {
+  // requireAuth reads "verified"; the rejection commits before the admission check.
+  profile = { ...profile, residency_status: "verified" };
+  rejectedBeforeAdmission = true;
+  const report = await fileReport();
+  expect(report.status).toBe(403);
+  const photo = await addPhoto();
+  expect(photo.status).toBe(403);
+  expect(admissions).toBe(2);
+  expect(writes).toEqual([]);
+  expect(uploads).toEqual([]);
 });
 
 test("an inactive account stays blocked even when approved", async () => {

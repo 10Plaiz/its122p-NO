@@ -978,6 +978,15 @@ async function main(): Promise<void> {
       if (rejected.status !== 200) throw new Error(`Rejection: expected 200, got ${rejected.status} ${rejected.body?.error ?? ""}`);
       await expectRefused("residency_required", "After a rejection");
 
+      // #59 ordering. A submission that passed requireAuth before the rejection is
+      // re-checked by the database admission (profile read under a row lock), so it
+      // is refused before anything is saved. Called here directly, past the API.
+      const inFlight = await db.rpc("admit_citizen_operation", { p_actor_id: securityId, p_network_key: "198.51.100.59", p_action: "report.create.json" });
+      if (inFlight.error?.code !== "PT403") throw new Error(`Admission after a rejection: expected PT403, got ${JSON.stringify(inFlight.error ?? inFlight.data)}`);
+      // One that finished first keeps its report: the rejection removes nothing.
+      const { data: kept } = await db.from("reports").select("id").eq("id", securityReportId).maybeSingle();
+      if (!kept) throw new Error("A report filed before the rejection was removed");
+
       // #62: a damaged file is refused on the proof field and changes nothing.
       const { data: beforeDamaged } = await db.from("profiles").select("residency_status, residency_note, residency_proof_id, residency_proof_path").eq("id", securityId).single();
       const damagedId = randomUUID();
