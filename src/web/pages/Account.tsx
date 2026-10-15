@@ -145,9 +145,15 @@ function EditDetails({
   const invalid = Object.keys(errors).length > 0;
   const unchanged = (Object.keys(saved) as (keyof Values)[]).every((key) => saved[key].trim() === values[key].trim());
   const addressChanging = values.barangay !== saved.barangay || values.address.trim() !== saved.address.trim();
+  const nameChanging = (["first", "middle", "last", "suffix"] as const).some((key) => values[key].trim() !== saved[key].trim());
+  // A Citizen's own name change also returns the decision to review, because the
+  // approval checked the name on the document (#67, owner 2026-10-15). A rejection
+  // stays as it is.
+  const reviewChange = addressChanging || (nameChanging && account.residency_status !== "rejected");
+  const changing = addressChanging && nameChanging ? "name and address" : addressChanging ? "address" : "name";
   // An account an administrator verified without any upload has no proof to send
-  // back to review, so a new address needs one before KAMOTI opens again (UA-8,
-  // decision 2026-10-04).
+  // back to review, so a new address or name needs one before KAMOTI opens again
+  // (UA-8, decision 2026-10-04).
   const noProofOnFile = !account.has_residency_proof;
   const phoneChanging = values.contact.trim() !== saved.contact.trim();
   const shown = {
@@ -183,11 +189,11 @@ function EditDetails({
     if (!result) return;
     onSaved(result.user);
     toast(
-      !addressChanging
+      !reviewChange
         ? "Details saved."
         : noProofOnFile
-          ? "Details saved. Upload a proof for your new address to continue."
-          : "Details saved. Send a proof for your new address below.",
+          ? `Details saved. Upload a proof that shows your new ${changing} to continue.`
+          : `Details saved. Send a proof that shows your new ${changing} below.`,
     );
     onDone();
   }
@@ -260,11 +266,11 @@ function EditDetails({
       </fieldset>
 
       {/* Said before saving, not after: the consequence should not be a surprise. */}
-      {addressChanging && (
+      {reviewChange && (
         <p role="status" className="text-[13px] border-l-2 border-warning-700 pl-3 !m-0">
           {noProofOnFile
-            ? "A new address needs a proof of residency, and there is none on your account yet. After saving, you will be asked to upload one before you can continue."
-            : "A new address goes back to an administrator for review. Until they approve it, you cannot file new reports or add photos. Your existing reports stay open to you, and you can send a proof for the new address below."}
+            ? `A new ${changing} needs a proof of residency, and there is none on your account yet. After saving, you will be asked to upload one before you can continue.`
+            : `A new ${changing} goes back to an administrator for review. Until they approve it, you cannot file new reports or add photos. Your existing reports stay open to you, and you can send a proof that shows your new ${changing} below.`}
         </p>
       )}
 
