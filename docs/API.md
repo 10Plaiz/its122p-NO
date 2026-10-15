@@ -658,7 +658,9 @@ accepted risks.
 assigned reports, and Administrators see all. Query parameters are `q`, `status`,
 `category_id`, `barangay`, `from`, `to`, `sort`, `page`, and `per_page`. The public
 route accepts the same filters, with status limited to `under_review`,
-`in_progress`, `resolved`, and `rejected`.
+`in_progress`, `resolved`, and `rejected`. Both lists, and the report export,
+sort by report `id` after the chosen `sort`, so reports that share a time or
+status keep one order and no report repeats or goes missing across pages (#78).
 
 Protected report-detail access (`GET /api/reports/:id` and `GET /api/reports/:id/updates`) enforces record-level authorization: a Citizen may only view their own report, Staff may only view a report assigned to them, and an Administrator may view any report. Unpermitted requests receive `403 Forbidden` and disclose no report data or timeline history. This contrasts with the public transparency board (`GET /api/public/reports`), which requires no sign-in and displays reviewed reports without reporter identity, contact numbers, pending or cancelled reports, protected history, or operational notes.
 
