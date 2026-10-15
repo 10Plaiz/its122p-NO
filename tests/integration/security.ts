@@ -1027,7 +1027,13 @@ async function main(): Promise<void> {
       const approved = await api(`/api/admin/users/${securityId}/residency`, {
         method: "PATCH",
         headers: bearer(adminToken),
-        body: JSON.stringify({ decision: "verified", expected_version: (await version()).residency_review_version }),
+        // #63: an approval names its basis; the re-uploaded proof passes all four checks.
+        body: JSON.stringify({
+          decision: "verified",
+          expected_version: (await version()).residency_review_version,
+          method: "document",
+          checks: ["name", "address", "readable", "document"],
+        }),
       });
       if (approved.status !== 200) throw new Error(`Approval: expected 200, got ${approved.status} ${approved.body?.error ?? ""}`);
       // Past the gate: an empty report is refused for its fields, and a photo on the
