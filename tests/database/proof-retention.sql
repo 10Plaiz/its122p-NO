@@ -69,9 +69,34 @@ select pg_temp.check_that((select count(*) = 1 from listed where object_path = '
 select pg_temp.check_that(not exists (select 1 from listed where object_path = 'retention-test/other-bucket.png'), 'other buckets are ignored');
 select pg_temp.check_that((select count(*) = 0 from public.expired_residency_proof_files(0)), 'the limit is respected');
 
--- Recording a removal.
-update public.residency_proof_versions set file_removed_at = clock_timestamp() where id = 'e7000000-0000-4000-8000-000000000001';
+-- Recording a removal, in database time; a second call records nothing.
+select pg_temp.check_that(public.record_residency_proof_files_removed(array['e7000000-0000-4000-8000-000000000001'::uuid]) = 1,
+    'the recording function records a listed proof');
+select pg_temp.check_that(public.record_residency_proof_files_removed(array['e7000000-0000-4000-8000-000000000001'::uuid]) = 0,
+    'recording again changes nothing');
+select pg_temp.check_that(pg_temp.fails_with($$select public.record_residency_proof_files_removed(array['e7000000-0000-4000-8000-000000000004'::uuid])$$, 'PT400'),
+    'the recording function refuses an account''s current proof');
 select pg_temp.check_that(not exists (select 1 from listed where object_path = 'retention-test/expired.pdf'), 'a recorded file is not listed on the next run');
+
+-- A file the cleanup may list can never be attached: attaching stops at 29 days.
+insert into auth.users (id) values ('d7000000-0000-4000-8000-000000000003');
+insert into public.profiles (id, name, email, role, residency_status) values
+    ('d7000000-0000-4000-8000-000000000003', 'Retention Uploader', 'retention-3@kamoti.invalid', 'citizen', null);
+insert into storage.objects (bucket_id, name, created_at) values
+    ('residency-proofs', 'd7000000-0000-4000-8000-000000000003/e7000000-0000-4000-8000-000000000010.pdf', clock_timestamp() - interval '30 days'),
+    ('residency-proofs', 'd7000000-0000-4000-8000-000000000003/e7000000-0000-4000-8000-000000000011.pdf', clock_timestamp() - interval '1 hour');
+select pg_temp.check_that(pg_temp.fails_with(format('select public.complete_residency_proof(%L, %L, %L, %L, %L)',
+    'd7000000-0000-4000-8000-000000000003', 'e7000000-0000-4000-8000-000000000010',
+    'd7000000-0000-4000-8000-000000000003/e7000000-0000-4000-8000-000000000010.pdf', repeat('a', 64),
+    (select residency_review_version from public.profiles where id = 'd7000000-0000-4000-8000-000000000003')), 'PT409'),
+    'an upload stored 30 days ago cannot be attached');
+select pg_temp.check_that((select residency_proof_id is null from public.profiles where id = 'd7000000-0000-4000-8000-000000000003'),
+    'the refused attachment changes nothing');
+select public.complete_residency_proof('d7000000-0000-4000-8000-000000000003', 'e7000000-0000-4000-8000-000000000011',
+    'd7000000-0000-4000-8000-000000000003/e7000000-0000-4000-8000-000000000011.pdf', repeat('b', 64),
+    (select residency_review_version from public.profiles where id = 'd7000000-0000-4000-8000-000000000003'));
+select pg_temp.check_that((select residency_proof_id = 'e7000000-0000-4000-8000-000000000011' from public.profiles
+    where id = 'd7000000-0000-4000-8000-000000000003'), 'a recent upload still attaches');
 select pg_temp.check_that(pg_temp.fails_with($$update public.residency_proof_versions set file_removed_at = clock_timestamp()
     where id = 'e7000000-0000-4000-8000-000000000001'$$, 'PT400'), 'a removal is recorded only once');
 select pg_temp.check_that(pg_temp.fails_with($$update public.residency_proof_versions set file_removed_at = clock_timestamp()
@@ -90,8 +115,10 @@ select pg_temp.check_that(pg_temp.fails_with($$delete from public.residency_proo
 -- Access.
 select pg_temp.check_that(not has_function_privilege('authenticated', 'public.expired_residency_proof_files(integer)', 'execute')
     and not has_function_privilege('anon', 'public.expired_residency_proof_files(integer)', 'execute'), 'client roles cannot list expired files');
+select pg_temp.check_that(not has_function_privilege('authenticated', 'public.record_residency_proof_files_removed(uuid[])', 'execute'),
+    'client roles cannot record removals');
 select pg_temp.check_that(has_function_privilege('service_role', 'public.expired_residency_proof_files(integer)', 'execute')
-    and has_column_privilege('service_role', 'public.residency_proof_versions', 'file_removed_at', 'update'), 'the API role can list and record');
+    and has_function_privilege('service_role', 'public.record_residency_proof_files_removed(uuid[])', 'execute'), 'the API role can list and record');
 select pg_temp.check_that(not has_column_privilege('service_role', 'public.residency_proof_versions', 'object_path', 'update'),
     'the API role still cannot rewrite a proof path');
 
