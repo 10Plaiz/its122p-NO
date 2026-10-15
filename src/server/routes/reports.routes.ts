@@ -6,7 +6,7 @@ import { badRequest, forbidden, orThrow } from "../lib/errors.js";
 import { BARANGAYS, parse } from "../lib/validate.js";
 import { photoUpload, photoUrl, savePhoto } from "../lib/photos.js";
 import { citizenSubmissionLimit } from "../lib/submission-limits.js";
-import { endOfDay, pageFields, searchFields, searchFilter, sortColumn } from "../lib/query.js";
+import { endOfDay, orderReports, pageFields, searchFields, searchFilter } from "../lib/query.js";
 import { assertResidencyApproved, currentUser, requireAuth, requireResidency } from "../middleware/auth.js";
 import { findReport, present, type Report } from "../services/reports.common.js";
 import { REPORT_ROW_FIELDS } from "../services/reports.rows.js";
@@ -37,13 +37,10 @@ const listSchema = z.object({
 // Citizens see their own, staff see what is assigned to them, admins see all.
 router.get("/", async (req, res) => {
   const { status, category_id, barangay, q, from, to, sort, page, per_page } = parse(listSchema, req.query);
-  const order = sortColumn(sort);
-
-  let query = db
-    .from("reports")
-    .select(REPORT_ROW_FIELDS, { count: "exact" })
-    .order(order.column, { ascending: order.ascending })
-    .range((page - 1) * per_page, page * per_page - 1);
+  let query = orderReports(db.from("reports").select(REPORT_ROW_FIELDS, { count: "exact" }), sort).range(
+    (page - 1) * per_page,
+    page * per_page - 1,
+  );
 
   // The role scope is applied first and never from user input, so a search or filter
   // can only ever narrow what this caller was already allowed to see.

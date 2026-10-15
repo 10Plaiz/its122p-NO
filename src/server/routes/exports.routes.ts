@@ -10,9 +10,9 @@ import {
   EXPORT_LIMIT,
   endOfDay,
   exportRanges,
+  orderReports,
   searchFields,
   searchFilter,
-  sortColumn,
 } from "../lib/query.js";
 import { currentUser, requireAuth, requireResidency, requireRole } from "../middleware/auth.js";
 import { present, type Report } from "../services/reports.common.js";
@@ -67,16 +67,11 @@ async function readAll(build: () => RangeQuery, message: string) {
 router.get("/reports", async (req, res) => {
   const { status, category_id, barangay, q, from, to, sort, format } = parse(reportExportSchema, req.query);
   const user = currentUser(req);
-  const order = sortColumn(sort);
   const search = q && searchFilter(q);
 
   const build = () => {
-    let query = db
-      .from("reports")
-      .select(REPORT_ROW_FIELDS, { count: "exact" })
-      .order(order.column, { ascending: order.ascending })
-      // A tiebreaker, so rows that share a sort value cannot shift between chunks.
-      .order("id", { ascending: true });
+    // The id breaks ties, so rows that share a sort value cannot shift between chunks.
+    let query = orderReports(db.from("reports").select(REPORT_ROW_FIELDS, { count: "exact" }), sort);
 
     // The role scope comes first and never from user input, so a filter can only
     // narrow what this caller was already allowed to see.

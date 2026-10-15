@@ -26,7 +26,7 @@ const {
 
 const { categorySchema } = await import("../../src/server/routes/categories.routes.js");
 const { calculateAnalytics } = await import("../../src/server/lib/analytics.js");
-const { endOfDay, searchFilter, sortColumn } = await import("../../src/server/lib/query.js");
+const { endOfDay, orderReports, searchFilter, sortColumn } = await import("../../src/server/lib/query.js");
 const { getReportReturnTarget } = await import("../../src/web/lib/navigation.js");
 const { homePathFor } = await import("../../src/web/lib/auth.js");
 const { badRequest } = await import("../../src/server/lib/errors.js");
@@ -362,6 +362,25 @@ describe("FUNC-08 public transparency board visibility and query rules", () => {
     expect(sortColumn("newest")).toEqual({ column: "submitted_at", ascending: false });
     expect(sortColumn("oldest")).toEqual({ column: "submitted_at", ascending: true });
     expect(sortColumn("status")).toEqual({ column: "status", ascending: true });
+  });
+
+  // #78: rows that share a sort value would otherwise swap between pages.
+  it("breaks sort ties by id, so a report never shows on two pages", () => {
+    for (const sort of ["newest", "oldest", "status"] as const) {
+      const calls: Array<[string, { ascending: boolean }]> = [];
+      const query = {
+        order(column: string, options: { ascending: boolean }) {
+          calls.push([column, options]);
+          return query;
+        },
+      };
+      expect(orderReports(query, sort)).toBe(query);
+      const first = sortColumn(sort);
+      expect(calls).toEqual([
+        [first.column, { ascending: first.ascending }],
+        ["id", { ascending: true }],
+      ]);
+    }
   });
 
   it("expands single date filter to full day boundary", () => {
