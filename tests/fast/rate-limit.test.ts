@@ -75,9 +75,12 @@ describe("LIM-02 sign-in counts failures across clients (UA-10, decided 2026-10-
 
   afterEach(() => {
     server.close();
+    // Every test file shares this process, so leave a working store behind:
+    // the 503 case below installs one that always fails.
+    useLimitStore(memoryLimitStore());
   });
 
-  const login = (email: string, ip = "198.51.100.1") =>
+  const login =(email: string, ip = "198.51.100.1") =>
     fetch(`${base}/login`, {
       method: "POST",
       headers: { "Content-Type": "application/json", "X-Forwarded-For": ip },
