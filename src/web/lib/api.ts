@@ -9,7 +9,8 @@ import type { Session } from "./types.js";
 
 export const TOKEN_KEY = "kamoti.token";
 // Where refresh tokens were stored before KI-12 moved them to an HttpOnly cookie.
-// Read only to move an existing session over, then removed.
+// Never read or sent since #71; any leftover copy is removed when the app starts
+// and when a session ends.
 const LEGACY_REFRESH_KEY = "kamoti.refresh";
 export const EXPIRES_KEY = "kamoti.expires";
 // Sent on /auth/refresh so another site cannot trigger it (see session-cookie.ts).
@@ -118,13 +119,9 @@ export function getToken(): string | null {
   }
 }
 
-// KI-13: sign-out sends a legacy token, so the server can end that session even
-// when its access token has expired. Newer sessions use the cookie instead.
-export function getLegacyRefreshToken(): string | null {
-  return read(LEGACY_REFRESH_KEY);
-}
-
-function removeLegacyRefreshToken() {
+// #71: a browser without an access token never reaches clearSession, so an old
+// refresh token would stay in localStorage for good. The app drops it on start.
+export function forgetLegacyRefreshToken() {
   try {
     localStorage.removeItem(LEGACY_REFRESH_KEY);
   } catch {
@@ -206,23 +203,19 @@ async function runRefresh(before: string): Promise<boolean> {
   const current = getToken();
   if (current !== before) return current !== null;
 
-  // A session from before KI-12 hands its stored token over once; the answer sets
-  // the cookie, and the stored copy is dropped whatever the outcome.
-  const legacy = getLegacyRefreshToken();
-
+  // The refresh token is the HttpOnly cookie (KI-12); the page sends none (#71).
   let response: Response;
   try {
     response = await fetch("/api/auth/refresh", {
       method: "POST",
       credentials: "same-origin",
       headers: { "Content-Type": "application/json", [SESSION_HEADER]: "1" },
-      body: JSON.stringify(legacy ? { refresh_token: legacy } : {}),
+      body: "{}",
     });
   } catch {
     // Offline. Keep the session; the next request or timer tries again.
     return false;
   }
-  if (legacy && (response.ok || response.status === 401 || response.status === 403)) removeLegacyRefreshToken();
 
   if (!response.ok) {
     // The server refused the token itself (expired, revoked, deactivated). A

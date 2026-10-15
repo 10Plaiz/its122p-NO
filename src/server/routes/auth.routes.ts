@@ -57,11 +57,6 @@ export const loginSchema = z.object({
 export const emailSchema = z.object({ email });
 export const verifyEmailSchema = z.object({ email, token: verificationCode });
 export const resetPasswordSchema = z.object({ email, token: verificationCode, password: passwordRule });
-// KI-12: the token comes from the cookie. A body token is accepted only from a
-// browser that stored one before the cookie existed, once, to move it over.
-export const refreshSchema = z.object({
-  refresh_token: z.string().min(1, "Sign in again.").max(1024, "Sign in again.").optional(),
-});
 
 // Kept on the login as user_metadata. ensureProfile() builds the profile from it
 // once the code is confirmed, re-checking every field and never reading a role,
@@ -124,10 +119,10 @@ router.post("/reset-password", limits.verify, async (req, res) => {
 
 // UA-9: trades the refresh cookie for a new session before the access token
 // expires. Supabase rotates the token, so the cookie is replaced each time. A
-// refused token clears the cookie, as the browser clears its session.
+// refused token clears the cookie, as the browser clears its session. Only the
+// cookie counts: a refresh token in the body is ignored (KI-12, #71).
 router.post("/refresh", limits.refresh, requireSessionHeader, async (req, res) => {
-  const input = parse(refreshSchema, req.body ?? {});
-  const token = readRefreshCookie(req) ?? input.refresh_token;
+  const token = readRefreshCookie(req);
   try {
     if (!token) throw new ApiError(401, "Your session has expired. Sign in again.");
     res.json(issueSession(req, res, await refreshSession(token)));
@@ -220,16 +215,14 @@ router.post(
   },
 );
 
-const logoutSchema = z.object({ refresh_token: z.string().min(1).max(4096).optional() });
-
 // POST /api/auth/logout — ends this session on the server too, so a copied token
 // stops working (UA-10). A live access token is revoked as it is. If it has
-// already expired, the refresh cookie (or a legacy body token) stands in: it is
-// exchanged once for a fresh token, which is then revoked (KI-13). The cookie is
-// always cleared. Always 204: signing out never fails for the person, who is
+// already expired, the refresh cookie stands in: it is exchanged once for a fresh
+// token, which is then revoked (KI-13). A body token is ignored (#71). The cookie
+// is always cleared. Always 204: signing out never fails for the person, who is
 // signed out in the browser either way.
 router.post("/logout", limits.refresh, async (req, res) => {
-  const refresh_token = readRefreshCookie(req) ?? parse(logoutSchema, req.body ?? {}).refresh_token;
+  const refresh_token = readRefreshCookie(req);
   clearRefreshCookie(req, res);
   let token = bearerToken(req);
   let userId: string | null = null;

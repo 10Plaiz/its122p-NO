@@ -49,7 +49,7 @@ if (typeof globalThis.CustomEvent === "undefined") {
 
 const { db } = await import("../../src/server/config/supabase.js");
 const { requireAuth, requireRole } = await import("../../src/server/middleware/auth.js");
-const { api, ApiError: ClientApiError, refreshDelay } = await import("../../src/web/lib/api.js");
+const { api, ApiError: ClientApiError, forgetLegacyRefreshToken, refreshDelay } = await import("../../src/web/lib/api.js");
 
 function createMockReq(headers: Record<string, string> = {}, user?: unknown): Request {
   return {
@@ -336,7 +336,8 @@ describe("AUTH-04 an expired access token is refreshed and the request retried o
     expect(dispatchedEvents.map((event) => event.type)).toEqual(["kamoti:auth-expired"]);
   });
 
-  test("moves a session stored before KI-12 to the cookie once, then forgets the token", async () => {
+  // #71: a token stored before KI-12 is never read or sent; only the cookie counts.
+  test("never sends a refresh token stored before the cookie", async () => {
     storage["kamoti.refresh"] = "legacy-1";
     mockFetch({
       "/api/reports": [expired, () => json(200, { items: [] })],
@@ -344,16 +345,25 @@ describe("AUTH-04 an expired access token is refreshed and the request retried o
     });
 
     await api.get("/reports");
-    expect(sent[1]?.body).toEqual({ refresh_token: "legacy-1" });
+    expect(sent[1]?.body).toEqual({});
+  });
+
+  test("clearing the session still removes an old stored copy", async () => {
+    storage["kamoti.refresh"] = "legacy-1";
+    mockFetch({ "/api/reports": [expired], "/api/auth/refresh": [expired] });
+
+    await expect(api.get("/reports")).rejects.toBeInstanceOf(ClientApiError);
+    expect(sent[1]?.body).toEqual({});
     expect(storage["kamoti.refresh"]).toBeUndefined();
   });
 
-  test("keeps a legacy token through a throttle, so the move can be tried again", async () => {
+  test("startup drops an old stored copy even with no session to clear", () => {
+    delete storage["kamoti.token"];
     storage["kamoti.refresh"] = "legacy-1";
-    mockFetch({ "/api/reports": [expired], "/api/auth/refresh": [() => json(429, { error: "Too many attempts." })] });
 
-    await expect(api.get("/reports")).rejects.toBeInstanceOf(ClientApiError);
-    expect(storage["kamoti.refresh"]).toBe("legacy-1");
+    forgetLegacyRefreshToken();
+    expect(storage["kamoti.refresh"]).toBeUndefined();
+    expect(sent).toEqual([]);
   });
 
   test("retries only once: a second 401 ends the session without another refresh", async () => {

@@ -5,8 +5,8 @@ import {
   ApiError,
   clearSession,
   EXPIRES_KEY,
+  forgetLegacyRefreshToken,
   getExpiresAt,
-  getLegacyRefreshToken,
   getToken,
   refreshDelay,
   refreshSession,
@@ -115,9 +115,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // what matters, and it must happen even offline. The token is read when the
       // request starts, before clearSession() below.
       // The refresh cookie goes along, so the server can end the session even when
-      // the access token has already expired (KI-13). A session from before the
-      // cookie (KI-12) sends its stored token instead.
-      void api.post<void>("/auth/logout", { refresh_token: getLegacyRefreshToken() ?? undefined }).catch(() => undefined);
+      // the access token has already expired (KI-13).
+      void api.post<void>("/auth/logout", {}).catch(() => undefined);
 
       writeEndReason(reason);
       clearSession();
@@ -139,8 +138,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   // On boot, trade a stored token for the current profile. An expired access token
-  // is refreshed by api.ts first; anything still refused clears the session.
+  // is refreshed by api.ts first; anything still refused clears the session. A
+  // refresh token stored before the cookie is dropped first (#71).
   useEffect(() => {
+    forgetLegacyRefreshToken();
     if (!getToken()) {
       setLoading(false);
       return;

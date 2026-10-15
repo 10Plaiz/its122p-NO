@@ -276,9 +276,9 @@ token.
   missing or refused token answers `401` and clears the cookie.
 - `POST /api/auth/logout` reads the cookie, ends the session even when the
   access token has expired, and clears the cookie.
-- A browser that stored a refresh token before the cookie existed sends it once
-  in the body as `refresh_token`. The answer sets the cookie, and the browser
-  deletes its copy. Remove this fallback once those sessions have expired.
+- Only the cookie counts: a `refresh_token` in the body is ignored by both
+  routes (#71). A browser still holding a token stored before the cookie existed
+  signs in again; the page deletes that old copy when it loads.
 
 Sign-in failures are limited three ways in 15 minutes: 10 for one address from
 one client, 30 from one client, and 20 for one address from any client. The

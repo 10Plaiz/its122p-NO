@@ -23,7 +23,7 @@ const {
   sendPasswordResetCode,
   startSignUp,
 } = await import("../../src/server/lib/accounts-email.js");
-const { default: authRouter, refreshSchema, registerSchema, resetPasswordSchema, signUpMetadata, verifyEmailSchema } =
+const { default: authRouter, registerSchema, resetPasswordSchema, signUpMetadata, verifyEmailSchema } =
   await import("../../src/server/routes/auth.routes.js");
 const { ensureProfile } = await import("../../src/server/lib/accounts-profile.js");
 
@@ -251,11 +251,6 @@ describe("ACC-08 the code and refresh routes check their input (UA-5, UA-9, UA-1
     expect(resetPasswordSchema.safeParse({ email: "ana@example.com", token: "123456", password: "Str0ng!pass" }).success).toBe(true);
   });
 
-  it("takes no body token, but refuses an empty legacy one", () => {
-    expect(refreshSchema.safeParse({ refresh_token: "" }).success).toBe(false);
-    expect(refreshSchema.safeParse({}).success).toBe(true);
-  });
-
   it("mounts every route behind a throttle", () => {
     type Layer = { route?: { path: string; methods: Record<string, boolean>; stack: unknown[] } };
     const posts = (authRouter.stack as Layer[])
@@ -374,14 +369,37 @@ describe("ACC-13 the refresh token travels only as an HttpOnly cookie (KI-12)", 
     });
   });
 
-  it("moves a legacy body token over to the cookie", async () => {
+  // #71: from 22 October 2026 the move from localStorage is over; only the cookie counts.
+  it("ignores a refresh token in the body", async () => {
     stub(auth.auth, "refreshSession", { data: { user: USER, session: { ...SESSION, refresh_token: "refresh-2" } }, error: null });
     stubProfiles(PROFILE);
     await withApp(async (base) => {
       const res = await post(`${base}/api/auth/refresh`, { "X-KAMOTI-Session": "1" }, { refresh_token: "legacy-1" });
+      expect(res.status).toBe(401);
+      expect(calls.refreshSession).toBeUndefined();
+      expect(res.headers.get("set-cookie") ?? "").not.toContain("kamoti_refresh=refresh-2");
+    });
+  });
+
+  it("uses the cookie, not a body token, when both are sent", async () => {
+    stub(auth.auth, "refreshSession", { data: { user: USER, session: { ...SESSION, refresh_token: "refresh-2" } }, error: null });
+    stubProfiles(PROFILE);
+    await withApp(async (base) => {
+      const res = await post(`${base}/api/auth/refresh`, { Cookie: "kamoti_refresh=refresh-1", "X-KAMOTI-Session": "1" }, { refresh_token: "legacy-1" });
       expect(res.status).toBe(200);
-      expect(calls.refreshSession?.[0]).toEqual({ refresh_token: "legacy-1" });
-      expect(res.headers.get("set-cookie")).toContain("kamoti_refresh=refresh-2");
+      expect(calls.refreshSession?.[0]).toEqual({ refresh_token: "refresh-1" });
+    });
+  });
+
+  it("does not sign out with a body token", async () => {
+    stub(auth.auth, "refreshSession", { data: { user: USER, session: { ...SESSION, access_token: "access-9" } }, error: null });
+    stub(db.auth.admin, "signOut", { error: null });
+    stubFrom(() => ({ insert: async () => ({ error: null }) }));
+    await withApp(async (base) => {
+      const res = await post(`${base}/api/auth/logout`, {}, { refresh_token: "legacy-1" });
+      expect(res.status).toBe(204);
+      expect(calls.refreshSession).toBeUndefined();
+      expect(calls.signOut).toBeUndefined();
     });
   });
 
