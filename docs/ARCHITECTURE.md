@@ -10,6 +10,7 @@ API, and database have separate responsibilities while sharing a repository.
 | `src/server/middleware/` | Authentication and route-level role gates | `requireAuth`, `requireRole` |
 | `src/server/routes/` | HTTP inputs and responses | `/api/*` |
 | `src/server/services/` | Record permissions, status flow, history, and notifications | Service functions |
+| `src/server/lib/` | Validation, rate limits, residency proofs, photo retention, SMS gateways | Shared helpers |
 | `src/server/config/` | Environment and Supabase clients | `env`, `db`, `auth` |
 | `supabase/migrations/` | Database schema and database access boundaries | SQL migrations |
 | `supabase/tests/` | Regression checks for database exposure | `api_access.sql` |
@@ -58,9 +59,33 @@ uncertain attachments retain the uploaded object so they cannot remove a
 committed current proof. The [API guide](API.md#residency-reviews) owns
 the exact fields, retry rules, and retention proposal.
 
+## Database behavior
+
+The database enforces these rules itself, so a seed script or a direct SQL
+change cannot skip them. The tables are drawn in the
+[ERD](erd/ERD_with_auth.md).
+
+| Behavior | Mechanism | Migration |
+| :--- | :--- | :--- |
+| Rows are never deleted | Every foreign key restricts deletes; records are retired with `is_active` or `cancelled` | `20261003000100_no_delete.sql` |
+| Expired photo files go, rows stay | The purge removes files of reports cancelled over 90 days ago and stamps `report_photos.purged_at`. It is started by an Administrator | `20261003000100_no_delete.sql`, `src/server/lib/retention.ts` |
+| Report pins stay in Makati | `reports_within_makati_bbox` box check; the API applies the exact polygon | `20261003000600`, `20261004000300` |
+| A report's barangay comes from its pin | `reports_set_barangay` trigger calls `barangay_at()` over `barangays` boundaries | `20261003000800_area_routing.sql` |
+| Problem types match the report's category | Composite foreign keys to `problem_types (id, category_id)` | `20261003000300_problem_types.sql` |
+| Closures are atomic | `request_report_closure()` and `review_report_closure()` | `20261004000100_atomic_closure.sql` |
+| Privileged account changes are audited atomically | `admin_create_profile()` and `admin_change_profile()` | `20261004000200`, `20261006000100` |
+| Residency decisions bind to what was reviewed | `profiles_version_residency_review` trigger; immutable `residency_proof_versions` | `20261006000100_residency_review_versions.sql` |
+| Shared Citizen quotas | `admit_citizen_operation()` over `citizen_submission_events`; `purge_citizen_submission_events()` for idle cleanup | `20261005000100`, `20261006000200` |
+| Staff rating summaries | `feedback_summary()` | `20261003000500_feedback.sql` |
+
+These functions run only as `service_role`, through the API. The
+[security review](SECURITY.md) lists the controls and accepted risks, and
+[API.md](API.md#roles-and-permissions) lists who may do what.
+
 Use [Final_Project.md](Final_Project.md) for intended behavior and system
 diagrams, [FRONTEND.md](FRONTEND.md) for browser routes and page behavior,
 [API.md](API.md) for endpoint usage, [LOCAL_DEV.md](LOCAL_DEV.md) for local
 setup, and [Guide.md](Guide.md) for course requirements. The migrations own the
-current application schema. Supabase Auth's external `auth.users` table is
-separate from the application profiles.
+current application schema, drawn in the [ERD](erd/ERD_with_auth.md).
+Supabase Auth's external `auth.users` table is separate from the application
+profiles.

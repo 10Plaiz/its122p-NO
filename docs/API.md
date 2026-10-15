@@ -81,8 +81,9 @@ It includes only published reports and excludes cancelled reports. The
 application keeps pending reports unpublished. Report text remains user-entered
 content; the view does not remove personal information entered in that text.
 
-`POST /api/auth/login` returns the caller's profile plus `access_token`,
-`refresh_token` and `expires_at`. Failures share one shape:
+`POST /api/auth/login` returns the caller's profile plus `access_token` and
+`expires_at`, and sets the refresh token as a cookie (see
+[Sessions](#sessions)). Failures share one shape:
 
 ```json
 {
@@ -109,7 +110,8 @@ From **Nominatim**, KAMOTI reads exactly one field of the response,
   learns where the API is.
 - **Token, not password.** The `access_token` is read from `localStorage` per
   request; a `401` or a deactivation `403` clears it and ends the session. Role
-  and record ownership `403` responses keep the session active.
+  and record ownership `403` responses keep the session active. The refresh
+  token never reaches the page; it is an `HttpOnly` cookie.
 - **No page reloads.** Screens use `useApi` for reads, which tracks loading and
   error state and abandons superseded requests with `AbortController`. They use
   `useAction` for writes. Uploads send `FormData` with `Content-Type` left unset
@@ -187,8 +189,11 @@ Supabase Auth owns passwords and issues the JWT. The API verifies that token and
 
 1. `POST /api/auth/login` returns an `access_token`.
 2. Send it on every protected request: `Authorization: Bearer <access_token>`.
-3. `requireAuth` attaches `req.user = { id, name, email, role }`.
-4. `requireRole("admin")` gates whatever comes after it.
+3. `requireAuth` attaches `req.user = { id, name, email, role }` plus the
+   caller's residency facts, and refuses a deactivated account with `403`.
+4. `requireRole("admin")` gates whatever comes after it. `requireResidency`
+   refuses a locked Citizen. [Roles and permissions](#roles-and-permissions)
+   lists which gate protects each capability.
 
 Public registration collects name parts, email, password, barangay, address,
 optional contact number, and privacy consent. It always creates a Citizen.
@@ -255,6 +260,32 @@ psql "$TEST_DATABASE_URL" -X -v ON_ERROR_STOP=1 -f supabase/tests/api_access.sql
 ```
 
 The test uses synthetic records inside a transaction and rolls them back.
+
+### Sessions
+
+Sign-in, the signup code, and refresh set the refresh token as the
+`kamoti_refresh` cookie: `HttpOnly`, `SameSite=Strict`, `Path=/api/auth`,
+`Secure` over HTTPS, for 7 days. The JSON body carries `access_token` and
+`expires_at` only, so a script injected into the page cannot read the refresh
+token.
+
+- `POST /api/auth/refresh` reads the cookie and must carry the header
+  `X-KAMOTI-Session: 1`, which another site cannot send. It returns a new
+  session and replaces the cookie, because Supabase rotates refresh tokens. A
+  missing or refused token answers `401` and clears the cookie.
+- `POST /api/auth/logout` reads the cookie, ends the session even when the
+  access token has expired, and clears the cookie.
+- A browser that stored a refresh token before the cookie existed sends it once
+  in the body as `refresh_token`. The answer sets the cookie, and the browser
+  deletes its copy. Remove this fallback once those sessions have expired.
+
+Sign-in failures are limited three ways in 15 minutes: 10 for one address from
+one client, 30 from one client, and 20 for one address from any client. The
+last one lets a stranger lock an address for up to 15 minutes; the owner can
+still reset the password by code. Code requests (`/resend-code`,
+`/forgot-password`) answer `204` even when Supabase withholds the email for an
+address it recently sent to, so the answer never reveals whether an account
+exists.
 
 ## Residency reviews
 
@@ -423,6 +454,69 @@ quota functions. Each admission removes at most 256 expired events.
 idle database. It never removes live quota events or application records.
 Expired metadata remains until an admission or an owner-run cleanup occurs.
 
+## Roles and permissions
+
+This section is the single reference for what each role may do. Other guides
+link here instead of repeating it. Navigation only hides links; the server
+enforces every row below.
+
+| Role | Created by | Notes |
+| :--- | :--- | :--- |
+| Anonymous | — | Not signed in |
+| Citizen | Public registration and a six-digit email code | Residency decides whether the account is locked |
+| Staff | An Administrator | Works only on reports assigned to them |
+| Administrator | An Administrator, or the [one-time bootstrap](#making-the-first-admin) | Sees and manages everything |
+
+A Citizen is **locked** while they have no proof, or their proof was rejected.
+They are **unlocked** while a proof waits for review (pending) and after an
+Administrator verifies them. Staff and Administrators are never locked. A
+deactivated account of any role receives `403` on every protected route, and
+its next refresh ends the session.
+
+| Capability | Anonymous | Citizen, locked | Citizen, unlocked | Staff | Administrator | Enforced by |
+| :--- | :---: | :---: | :---: | :---: | :---: | :--- |
+| View the public board, stats, and categories | Yes | Yes | Yes | Yes | Yes | No guard; `public_reports` view |
+| Register, confirm email, request codes, reset password, sign in | Yes | — | — | — | — | Rate limits in `rate-limit.ts`; see [Sessions](#sessions) |
+| Refresh the session, sign out | — | Yes | Yes | Yes | Yes | Refresh cookie; `/refresh` also needs `X-KAMOTI-Session` |
+| Read own account | — | Yes | Yes | Yes | Yes | `requireAuth` |
+| Edit own name, number, and address | — | Yes | Yes | No | No | `requireRole("citizen")` |
+| Upload proof of residency | — | Yes | Pending only | No | No | `requireRole("citizen")`; verified accounts may only retry a committed upload |
+| File a report | — | No | Yes | No | No | `requireResidency`, `requireRole("citizen")`, shared quota |
+| List and view reports | — | No | Own | Assigned | All | `scopeReportQuery`, `assertCanView` |
+| Edit or cancel a report | — | No | Own, while pending | No | No | `assertCanEdit` |
+| Add a report photo | — | No | Own, while pending | Assigned | Any | Photo route, `assertCanUpdate`, shared quota |
+| Comment on a report | — | No | Own, 10 an hour | Assigned | Any | `requireRole`, `limits.citizenComment` |
+| Change status (up to `in_progress`) | — | No | No | Assigned | Any | `requireRole("admin", "staff")`, `assertCanUpdate` |
+| Assign a report | — | No | No | No | Yes | `requireRole("admin")` |
+| Request resolution or rejection | — | No | No | Assigned | No | `requireRole("staff")`, closure RPC |
+| Approve or return a closure request | — | No | No | No | Not their own request | `requireRole("admin")`, closure RPC |
+| Rate a resolved report | — | No | Own, once | No | No | `createFeedback` |
+| Read a report's rating | — | No | Own | Assigned | Any | `assertCanView` |
+| Read a Staff rating summary | — | No | No | Own | Any | `requireRole("staff", "admin")` |
+| Read notifications | — | No | Own | Own | Own | `requireResidency`, owner filter |
+| Export reports | — | No | Own | Assigned | All | `requireResidency`, `scopeReportQuery` |
+| Export the activity log | — | No | No | No | Yes | `requireRole("admin")` |
+| Manage accounts, review residency, verify phones, open proofs | — | No | No | No | Yes | `requireRole("admin")` on `/api/admin` |
+| Set Staff areas and specializations; see assignment suggestions | — | No | No | No | Yes | `requireRole("admin")` on `/api/staff` |
+| Manage categories | — | No | No | No | Yes | `requireRole("admin")` |
+| View analytics and the activity log | — | No | No | No | Yes | `requireRole("admin")` |
+| Purge expired photos of cancelled reports | — | No | No | No | Yes | `requireRole("admin")` on `/api/maintenance` |
+
+The Send SMS Hook is called by Supabase Auth, not by a user. Only a request
+signed with `SEND_SMS_HOOK_SECRET` gets past it.
+
+**Approved, not built (#59).** The owner approved requiring Administrator
+approval before a Citizen files reports or uploads report photos. Until #59 is
+verified, a pending Citizen can still do both, as the table shows.
+
+Accounts are closed, never deleted. Set `is_active = false` through
+`PATCH /api/admin/users/:id`. Deleting a user under Supabase Authentication now
+fails for anyone with a profile, because the foreign key from `profiles` to
+`auth.users` restricts deletes. That keeps their reports and audit trail.
+
+[SECURITY.md](SECURITY.md) describes the controls behind these rules and the
+accepted risks.
+
 ## API endpoints
 
 | Method | Route | Who can call it |
@@ -430,7 +524,7 @@ Expired metadata remains until an admission or an owner-run cleanup occurs.
 | `GET` | `/api/health` | anyone |
 | `POST` | `/api/auth/register` | anyone: always creates a **citizen** |
 | `POST` | `/api/auth/verify-email`, `/resend-code`, `/forgot-password`, `/reset-password` | anyone: validated, rate-limited account flows |
-| `POST` | `/api/auth/refresh` | holder of a valid refresh token |
+| `POST` | `/api/auth/refresh` | holder of the refresh cookie, with `X-KAMOTI-Session: 1`. See [Sessions](#sessions) |
 | `POST` | `/api/auth/login` | anyone |
 | `POST` | `/api/auth/logout` | signed in: records the sign-out in the activity log |
 | `GET` | `/api/auth/me` | signed in |
@@ -451,7 +545,7 @@ Expired metadata remains until an admission or an owner-run cleanup occurs.
 | `POST` | `/api/reports/:id/remarks` | reporting Citizen, assigned staff, admin |
 | `POST` | `/api/reports/:id/closure-request` | assigned Staff |
 | `POST` | `/api/reports/:id/closure-review` | admin; approval requires a different account from the requester |
-| `POST` | `/api/reports/:id/photos` | owner (initial), assigned staff (resolution) |
+| `POST` | `/api/reports/:id/photos` | owner while `pending` (initial); assigned staff or admin (resolution) |
 | `GET` | `/api/notifications` | signed in |
 | `PATCH` | `/api/notifications/:id/read`, `/read-all` | owner |
 | `GET` `POST` `PATCH` | `/api/admin/users[/:id]` | admin |
@@ -462,9 +556,11 @@ Expired metadata remains until an admission or an owner-run cleanup occurs.
 | `GET` `PUT` | `/api/staff/:id/areas`, `/api/staff/:id/specializations` | admin |
 | `GET` `POST` | `/api/feedback/:reportId` | authorized reader; only the reporting Citizen can rate a resolved report, once |
 | `GET` | `/api/feedback/summary/staff` | Staff's own summary; admin may select any Staff |
-| `GET` | `/api/exports/reports`, `/api/exports/logs` | role-scoped reports; admin-only logs |
+| `GET` | `/api/exports/reports`, `/api/exports/logs` | role-scoped reports; admin-only logs. See [Exports](#exports) |
 | `GET` | `/api/admin/analytics` | admin |
 | `GET` | `/api/admin/logs` | admin |
+| `POST` | `/api/maintenance/purge-cancelled-photos` | admin. See [Photo retention](#photo-retention) |
+| `POST` | `/api/hooks/send-sms` | Supabase Auth only, signed. Dormant. See [Send SMS Hook](#send-sms-hook) |
 | `GET` | `/api/public/reports` | **anyone, no login** |
 | `GET` | `/api/public/stats` | **anyone, no login**: counts above the board |
 
@@ -515,6 +611,49 @@ private. The public board does not expose citizen identities or private history.
 
 While a report is still `pending` its owner may edit it (`PATCH /api/reports/:id`) or cancel it (`POST /api/reports/:id/cancel`). Once staff have picked it up, it is out of the citizen's hands: staff may already be acting on what it says. A cancelled report is kept, never deleted, so its history survives, and it never appears on the public board.
 
+## Exports
+
+`GET /api/exports/reports` accepts the same filters as `GET /api/reports` plus
+`format` (`csv` or `pdf`), and applies the same role scope.
+`GET /api/exports/logs` accepts the activity-log filters and `format`. Both
+return JSON rows; the browser builds the CSV or PDF file. Each export reads at
+most 5,000 rows, in chunks of 1,000. The response carries `total`, `capped`, and
+`limit`, so the screen can say when rows were left out. Each export is recorded
+in the activity log.
+
+## Photo retention
+
+Rows are never deleted. Photo files of reports cancelled more than 90 days ago
+are removed from Storage, and their photo rows are stamped with `purged_at`.
+The report then shows that a photo was removed after the retention period.
+
+`POST /api/maintenance/purge-cancelled-photos` takes an optional
+`{ "dry_run": true }`. It returns `{ result }` with `dry_run`,
+`retention_days`, `cutoff`, `reports`, `photos`, `purged`, and `failed`. Files
+are removed in batches of 100. A failed batch returns `500` with the same
+counts. Run the purge again to finish; purged photos are skipped. Every run is
+recorded as `maintenance.photos_purged`. An Administrator starts it from the
+dashboard's Photo retention panel. No scheduled job runs it.
+
+## Send SMS Hook
+
+Phone verification by text message is deferred because there is no SMS
+budget. Administrators mark numbers verified instead. The hook remains in place
+for a future gateway:
+
+- Supabase Auth calls `POST /api/hooks/send-sms` with a Standard Webhooks
+  signature. The route reads the raw body before JSON parsing, because the
+  signature covers the exact bytes.
+- Without `SEND_SMS_HOOK_SECRET` it answers `500`. A missing or invalid
+  signature answers `401`. A payload with no phone or code answers `400`.
+- `SMS_PROVIDER` picks the gateway from `PROVIDERS` in `src/server/lib/sms.ts`.
+  Only `none` exists, which answers `501`. An unknown name answers `500`.
+  `SMS_API_KEY` is reserved for the future gateway.
+- Errors use the body shape Supabase expects:
+  `{ "error": { "http_code", "message" } }`.
+
+The hook URL and secret are not set on the shared project.
+
 ## Quick check
 
 ```bash
@@ -564,3 +703,5 @@ After that, create staff accounts through `POST /api/admin/users`.
 
 - Report-event email notifications (in-app only; Auth code emails are implemented)
 - Inspection routes and screens for the `report_inspections` table
+- Phone codes by text message ([Send SMS Hook](#send-sms-hook) is dormant)
+- Administrator approval before reporting (#59)

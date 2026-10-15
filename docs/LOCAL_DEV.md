@@ -42,6 +42,14 @@ Fill the ignored `.env` file with values from the linked Supabase project:
 | `SUPABASE_SECRET_KEY` | Server-only key used by Express for protected data access |
 | `VITE_GOOGLE_MAPS_API_KEY` | Browser Maps key, restricted to approved referrers and Maps APIs |
 | `VITE_GOOGLE_MAPS_MAP_ID` | Optional map ID; development defaults to `DEMO_MAP_ID` |
+| `SEND_SMS_HOOK_SECRET` | Optional. Secret (`v1,whsec_...`) that Supabase signs Send SMS Hook calls with. Leave empty; the hook is dormant ([API.md](API.md#send-sms-hook)) |
+| `SMS_PROVIDER` | Optional. SMS gateway name; unset means `none`, the only one built |
+| `SMS_API_KEY` | Optional. Reserved for a future SMS gateway; unused today |
+
+Vercel sets `VERCEL=1` on its runtime. Do not set it locally. With it, Express
+trusts one proxy hop (`trust proxy`), so the account rate limits and submission
+quotas key clients by the forwarded address. Without it, they use the socket
+address.
 
 Follow the reviewed procedure in [API.md](API.md#database-migrations) for any
 database migration operation.
@@ -334,6 +342,10 @@ Configuration and runtime parameters:
 - `SESSION_TEST_EMAIL` and `SESSION_TEST_PASSWORD`: Optional synthetic Citizen
   account for the independent refresh and idle/draft tests. Otherwise they use
   Citizen 1. Keep real recipient addresses and passwords outside Git.
+- `MAILPIT_URL`: Mailpit that the account-code tests read codes from (defaults to
+  `http://127.0.0.1:54324`, the local Supabase stack's Mailpit).
+- `UI_AUDIT_ADMIN_EMAIL`: Administrator that the design-system, filter, and pill
+  tests sign in as (defaults to the fixture Administrator).
 
 The account-code suite also needs a local Supabase Auth service and Mailpit.
 It skips those cases when Mailpit is unavailable. A native PostgreSQL instance
