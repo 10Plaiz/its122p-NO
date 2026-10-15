@@ -207,6 +207,7 @@ psql "$TEST_DATABASE_URL" -X -v ON_ERROR_STOP=1 -f supabase/tests/api_access.sql
 psql "$TEST_DATABASE_URL" -X -v ON_ERROR_STOP=1 -f tests/database/atomic-actions.sql
 psql "$TEST_DATABASE_URL" -X -v ON_ERROR_STOP=1 -f tests/database/submission-limits.sql
 psql "$TEST_DATABASE_URL" -X -v ON_ERROR_STOP=1 -f tests/database/auth-rate-limits.sql
+psql "$TEST_DATABASE_URL" -X -v ON_ERROR_STOP=1 -f tests/database/residency-review.sql
 ```
 
 The fast suite never reaches a database. `bunfig.toml` preloads
@@ -248,8 +249,10 @@ done
 psql "$TEST_DATABASE_URL" -X -v ON_ERROR_STOP=1 -f supabase/tests/api_access.sql
 psql "$TEST_DATABASE_URL" -X -v ON_ERROR_STOP=1 -f tests/database/atomic-actions.sql
 psql "$TEST_DATABASE_URL" -X -v ON_ERROR_STOP=1 -f tests/database/residency-reviews.sql
+psql "$TEST_DATABASE_URL" -X -v ON_ERROR_STOP=1 -f tests/database/residency-review.sql
 psql "$TEST_DATABASE_URL" -X -v ON_ERROR_STOP=1 -f tests/database/submission-limits.sql
 psql "$TEST_DATABASE_URL" -X -v ON_ERROR_STOP=1 -f tests/database/proof-retry-admission.sql
+psql "$TEST_DATABASE_URL" -X -v ON_ERROR_STOP=1 -f tests/database/auth-rate-limits.sql
 bun tests/database/residency-concurrency.ts
 ```
 
@@ -405,6 +408,10 @@ names the shared project, so point every process at the local stack instead.
    bun run seed:routing apply --target local
    ```
 
+   If the stack was seeded without `DEMO_PASSWORD`, the seed chose one and kept
+   it as `password` in `~/.local/share/kamoti/demo-seeds/credentials-local.json`.
+   Export that value before running the browser suite; otherwise the Staff
+   filter and pill tests stop at sign-in.
 4. From the same shell, start `bun run dev`. Run both browser commands with
    `EVIDENCE_DIR` set to a scratch folder, and `--retries=0` when you are
    recording a result.
