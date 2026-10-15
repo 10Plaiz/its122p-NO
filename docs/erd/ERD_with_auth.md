@@ -109,7 +109,8 @@ Table residency_proof_versions {
   object_path text [not null, unique]
   sha256 text [note: '64 hex characters; null for proofs uploaded before this table']
   created_at timestamptz [not null, default: `clock_timestamp()`]
-  superseded_at timestamptz [note: 'The only column that may change']
+  superseded_at timestamptz [note: 'Set once, when the proof is replaced']
+  file_removed_at timestamptz [note: 'Set once, when the file is removed 30 days after replacement (#70); the row stays']
 
   indexes {
     (id, user_id, object_path) [unique]
@@ -405,7 +406,8 @@ Ref log_actor: activity_logs.actor_id > profiles.id [delete: restrict]
   `profiles_version_residency_review` changes `residency_review_version` and
   returns residency to pending when a reviewed fact changes.
   `residency_proof_versions_immutable` refuses deletes and every change except
-  setting `superseded_at` once. `reports_set_reference_code` sets the
+  setting `superseded_at` once and `file_removed_at` once, never for an
+  account's current proof. `reports_set_reference_code` sets the
   reference code, and `touch_updated_at` triggers keep `updated_at` current.
 - **Not drawn:** the `public_reports` view (reviewed, non-cancelled reports
   joined to their category, barangay, approved rejection reason, and photos,

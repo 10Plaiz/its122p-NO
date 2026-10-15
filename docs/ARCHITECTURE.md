@@ -10,7 +10,7 @@ API, and database have separate responsibilities while sharing a repository.
 | `src/server/middleware/` | Authentication and route-level role gates | `requireAuth`, `requireRole` |
 | `src/server/routes/` | HTTP inputs and responses | `/api/*` |
 | `src/server/services/` | Record permissions, status flow, history, and notifications | Service functions |
-| `src/server/lib/` | Validation, rate limits, residency proofs, photo retention, SMS gateways | Shared helpers |
+| `src/server/lib/` | Validation, rate limits, residency proofs, photo and proof retention, SMS gateways | Shared helpers |
 | `src/server/config/` | Environment and Supabase clients | `env`, `db`, `auth` |
 | `supabase/migrations/` | Database schema and database access boundaries | SQL migrations |
 | `supabase/tests/` | Regression checks for database exposure | `api_access.sql` |
@@ -57,7 +57,7 @@ Proof attachment and self account changes also use locked database functions.
 Storage uploads remain separate from the database transaction. Failed or
 uncertain attachments retain the uploaded object so they cannot remove a
 committed current proof. The [API guide](API.md#residency-reviews) owns
-the exact fields, retry rules, and retention proposal.
+the exact fields, retry rules, and proof retention.
 
 ## Database behavior
 
@@ -69,6 +69,7 @@ change cannot skip them. The tables are drawn in the
 | :--- | :--- | :--- |
 | Rows are never deleted | Every foreign key restricts deletes; records are retired with `is_active` or `cancelled` | `20261003000100_no_delete.sql` |
 | Expired photo files go, rows stay | The purge removes files of reports cancelled over 90 days ago and stamps `report_photos.purged_at`. It is started by an Administrator | `20261003000100_no_delete.sql`, `src/server/lib/retention.ts` |
+| Expired proof files go, rows stay | `expired_residency_proof_files()` lists proof files 30 days after they stopped being current; a check constraint and the proof-version guard refuse an early or current-proof removal. Started by an Administrator | `20261015000400_proof_retention.sql`, `src/server/lib/proof-retention.ts` |
 | Report pins stay in Makati | `reports_within_makati_bbox` box check; the API applies the exact polygon | `20261003000600`, `20261004000300` |
 | A report's barangay comes from its pin | `reports_set_barangay` trigger calls `barangay_at()` over `barangays` boundaries | `20261003000800_area_routing.sql` |
 | Problem types match the report's category | Composite foreign keys to `problem_types (id, category_id)` | `20261003000300_problem_types.sql` |

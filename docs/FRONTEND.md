@@ -210,6 +210,11 @@ belong to [API.md](API.md).
 - **Photos.** Report photos open full size in a lightbox that closes with
   Escape or a backdrop click and returns focus to the photo. A photo removed by
   the retention purge shows that it was removed after the retention period.
+- **Proof retention (#70).** The dashboard's Proof retention panel checks, then
+  after a confirmation removes, residency proof files 30 days after they stopped
+  being current. It reports replaced proofs and stored files no proof record
+  points to separately. After a failed run it drops the old count, says how many
+  files went, and asks for a new check.
 - **Photo retention (DM-2).** The Administrator dashboard's Photo retention
   panel first checks which cancelled reports' photos are past 90 days, then
   removes them only after a second confirmation, because files cannot be
@@ -253,6 +258,7 @@ above.
 | `PhotoLightbox` | Full-size photo view | Report detail, Staff report |
 | `PhotoPicker` | Photo selection with type and size checks | New report, Staff report, `ResidencyProofStep` |
 | `PhotoRetention` | Check and remove expired photo files (DM-2) | Dashboard |
+| `ProofRetention` | Check and remove expired residency proof files (#70) | Dashboard |
 | `ReportMap` | Board map of report pins | Board |
 | `ResidencyProofStep` | Proof upload and review state (UA-8) | Register, My account |
 | `ResidencyReview` | Administrator proof review: version checks, the document checklist, and the no-document exception | Users |

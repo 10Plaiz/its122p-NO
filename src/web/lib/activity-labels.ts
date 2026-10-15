@@ -33,6 +33,7 @@ export const ACTIVITY_LABEL: Record<string, string> = {
   "feedback.created": "Rated a resolved report",
 
   "maintenance.photos_purged": "Removed expired photo files",
+  "maintenance.proofs_purged": "Removed expired residency proof files",
 
   "export.reports": "Exported reports",
   "export.logs": "Exported the activity log",

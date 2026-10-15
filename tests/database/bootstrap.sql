@@ -35,6 +35,7 @@ create table storage.objects (
     id uuid primary key default gen_random_uuid(),
     bucket_id text not null references storage.buckets(id),
     name text not null,
+    created_at timestamptz default now(),
     unique (bucket_id, name)
 );
 grant usage on schema storage to service_role;
