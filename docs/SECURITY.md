@@ -62,7 +62,7 @@ Evidence labels:
 | Proofs go to the private `residency-proofs` bucket; responses carry only a proof-present flag | `src/server/lib/residency.ts` | Local (IMP-02) |
 | An Administrator opens a proof through a five-minute signed link, and the access audit is saved before the link is returned | `GET /api/admin/users/:id/residency-proof` | Local (IMP-03, IMP-12) |
 | A residency decision is bound to the proof and address version the Administrator saw | `residency_review_version`, `residency_proof_versions` | Local (`tests/evidence/issue61/verification.md`) |
-| Proofs: JPG, PNG, WebP, or PDF up to 5 MB, with a check of the first bytes | `residency.ts` | Source (`tests/fast/residency.test.ts`) |
+| Proofs: JPG, PNG, WebP, or PDF up to 5 MB. Images fully decoded within 40 megapixels; PDFs need a complete trailer, open with PDF.js within 20 pages, and carry no password, scripts, or attachments; 5 s per check; refused before storage | `proof-files.ts`, `residency.ts` | Local (IMP-17); Source (`tests/fast/proof-files.test.ts`, `tests/fast/residency-http.test.ts`) |
 | Report photos: JPG, PNG, or WebP up to 3 MB, with the same first-byte check, before the report is saved | `checkPhoto` in `src/server/lib/photos.ts` | Source (`tests/fast/photos.test.ts`) |
 
 ### Abuse limits
@@ -100,7 +100,7 @@ Its pull request updates this table.
 | `/refresh` still accepts a body token | Only for moving sessions stored before the cookie | It is spent on first use and the browser deletes its copy | Remove it on or after 22 October 2026 (#71) |
 | Registration reveals existing accounts | Signing up with a used address answers `409` | The screen tells the person to sign in instead, which helps people who forgot they registered | Answer as if a code were sent |
 | A reset code is spent before the new password is saved (KI-16) | If Supabase refuses the password, the person must ask for a new code | The screen says so, and the send-a-new-code control sits below it | None planned |
-| A proof's PDF check reads only the header | A malformed PDF can be stored | Proofs are private and opened only by Administrators | #62 |
+| Proof checks are not a malware scan | A well-formed image or PDF can still carry a payload aimed at a viewer | Proofs are private, opened only by Administrators through a signed link on the Storage domain; PDFs with scripts, attachments, or passwords are refused; no outside scanning service sees the documents | Owner review of cost and privacy before any scanning service |
 | Phone numbers are confirmed by hand (KI-11) | No proof that a Citizen owns their number | No SMS budget (owner, 3 October and 15 October 2026). My account shows "Confirmed by staff" | Add a Philippine gateway to `PROVIDERS` if a budget appears |
 | Earlier rejection notes are replaced on re-upload (KI-17) | The profile shows only the latest note | Owner accepted on 15 October 2026: the audit log keeps every decision and note | None planned |
 | Replaced proofs are kept with no retention rule | Private personal documents stay in Storage | The owner has not decided a period; 30 days after replacement is proposed | Owner decision, then a purge like photo retention (#70) |

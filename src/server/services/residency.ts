@@ -13,7 +13,7 @@ const proofRecord = z.object({
 export async function completeResidencyProof({ userId, submissionId, expectedVersion, file, ip }: {
   userId: string; submissionId: string; expectedVersion: string; file: Express.Multer.File | undefined; ip?: string;
 }) {
-  const { file: proofFile, extension } = checkProof(file);
+  const { file: proofFile, extension } = await checkProof(file);
   const path = proofPath(userId, submissionId, extension);
   const sha256 = createHash("sha256").update(proofFile.buffer).digest("hex");
   const existing = await db.from("residency_proof_versions")

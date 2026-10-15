@@ -1,6 +1,7 @@
 import multer from "multer";
 import { db } from "../config/supabase.js";
 import { ApiError, badRequest, orThrow } from "./errors.js";
+import { ProofFileError, inspectProofFile } from "./proof-files.js";
 import type { Express, NextFunction, Request, Response } from "express";
 
 // Proof of residency for UA-8: one document a registrant uploads so an
@@ -70,12 +71,20 @@ export function looksLike(buffer: Buffer, mimetype: string): boolean {
   }
 }
 
-// Throws the same field error the form shows when the upload is missing or is
-// not what it claims to be. Returns the checked file and its storage extension.
-export function checkProof(file: Express.Multer.File | undefined) {
+// Throws the same field error the form shows when the upload is missing, is not
+// what it claims to be, or is not a complete file within the limits (#62). Runs
+// before anything is stored, so a refused file leaves the current proof as it was.
+// Returns the checked file and its storage extension.
+export async function checkProof(file: Express.Multer.File | undefined) {
   if (!file) throw proofFieldError(PROOF_MISSING_ERROR);
   const extension = PROOF_TYPES[file.mimetype as keyof typeof PROOF_TYPES];
   if (!extension || !looksLike(file.buffer, file.mimetype)) throw proofFieldError(PROOF_TYPE_ERROR);
+  try {
+    await inspectProofFile(file.buffer, file.mimetype);
+  } catch (error) {
+    if (error instanceof ProofFileError) throw proofFieldError(error.message);
+    throw error;
+  }
   return { file, extension };
 }
 

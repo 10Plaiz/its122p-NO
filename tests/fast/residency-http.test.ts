@@ -1,6 +1,9 @@
 import { afterAll, afterEach, beforeAll, beforeEach, expect, test } from "bun:test";
+import { createHash } from "node:crypto";
 import { once } from "node:events";
 import type { Server } from "node:http";
+import sharp from "sharp";
+import { syntheticPdf } from "./synthetic-pdf.js";
 
 process.env.SUPABASE_URL ??= "https://placeholder.supabase.co";
 process.env.SUPABASE_PUBLISHABLE_KEY ??= "placeholder-publishable-key";
@@ -15,14 +18,16 @@ const NEW_VERSION = "d0000000-0000-4000-8000-000000000011";
 const SUBMISSION = "d0000000-0000-4000-8000-000000000020";
 const OTHER_SUBMISSION = "d0000000-0000-4000-8000-000000000021";
 const OLD_PROOF = "d0000000-0000-4000-8000-000000000022";
-const PDF = Buffer.from("%PDF-1.7 synthetic proof");
-const JPG = Buffer.from([0xff, 0xd8, 0xff, 0x01]);
+// Real, complete files: since #62 the server decodes every proof before storing it.
+const PDF = syntheticPdf();
+const OTHER_PDF = syntheticPdf({ text: "A different synthetic document" });
+const JPG = await sharp({ create: { width: 64, height: 48, channels: 3, background: "#cfd8dc" } }).jpeg().toBuffer();
 const original = { from: db.from, rpc: db.rpc, getUser: db.auth.getUser, storage: db.storage.from, fetch: globalThis.fetch };
 let server: Server;
 let base: string;
 let requestNumber = 0;
 let externalRequests = 0;
-let profile: Omit<ReturnType<typeof account>, "phone_verified_at"> & { phone_verified_at: string | null };
+let profile: Omit<ReturnType<typeof account>, "phone_verified_at" | "residency_note"> & { phone_verified_at: string | null; residency_note: string | null };
 let records: Map<string, { id: string; user_id: string; object_path: string; sha256: string }>;
 let objects: Map<string, Buffer>;
 let uploads: { path: string; upsert: boolean }[];
@@ -258,7 +263,7 @@ test("same format replacements keep each old proof byte and use unique paths", a
   expect(uploads).toEqual([{ path: `${CITIZEN}/${SUBMISSION}.pdf`, upsert: false }, { path: `${CITIZEN}/${OTHER_SUBMISSION}.pdf`, upsert: false }]);
   expect(objects.get(`${CITIZEN}/${OLD_PROOF}.pdf`)).toEqual(PDF);
   expect(objects.get(`${CITIZEN}/${SUBMISSION}.pdf`)).toEqual(PDF);
-  expect(rpcCalls[0]?.args).toMatchObject({ p_expected_version: VERSION, p_sha256: "96f2871c402a550ed8a05b5ae8d81d6e35293d8b1d94d929733795442ff129c9" });
+  expect(rpcCalls[0]?.args).toMatchObject({ p_expected_version: VERSION, p_sha256: createHash("sha256").update(PDF).digest("hex") });
   expect(auditRows).toEqual([]);
 });
 test("different format replacements preserve the previous signed document bytes", async () => {
@@ -266,6 +271,19 @@ test("different format replacements preserve the previous signed document bytes"
   expect(uploads).toEqual([{ path: `${CITIZEN}/${SUBMISSION}.jpg`, upsert: false }]);
   expect(objects.get(`${CITIZEN}/${OLD_PROOF}.pdf`)).toEqual(PDF);
   expect(objects.get(`${CITIZEN}/${SUBMISSION}.jpg`)).toEqual(JPG);
+});
+test("a damaged file is refused on the proof field before Storage, keeping the current proof and review (#62)", async () => {
+  profile = { ...profile, residency_status: "rejected", residency_note: "Address unreadable." };
+  const before = { ...profile };
+  for (const [bytes, type] of [[PDF.subarray(0, 200), "application/pdf"], [Buffer.from("%PDF-1.7 rest"), "application/pdf"], [JPG.subarray(0, 40), "image/jpeg"]] as const) {
+    const response = await upload({ bytes, type });
+    expect(response.status).toBe(400);
+    const body = await response.json() as { details: { field: string; message: string }[] };
+    expect(body.details).toEqual([{ field: "proof", message: expect.stringContaining("damaged or incomplete") }]);
+  }
+  expect(uploads).toEqual([]); expect(rpcCalls).toEqual([]);
+  expect(profile).toEqual(before);
+  expect(objects.get(profile.residency_proof_path)).toEqual(PDF);
 });
 test("Storage failure returns an error without changing the current proof", async () => {
   storageFails = true;
@@ -309,7 +327,7 @@ test("committed submission ID cannot be reused with another format", async () =>
 });
 test("committed submission ID cannot be reused with different bytes in the same format", async () => {
   expect((await upload()).status).toBe(200);
-  const response = await upload({ bytes: Buffer.from("%PDF-1.7 different document") });
+  const response = await upload({ bytes: OTHER_PDF });
   expect(response.status).toBe(409);
   expect(uploads).toHaveLength(1);
   expect(objects.get(profile.residency_proof_path)).toEqual(PDF);

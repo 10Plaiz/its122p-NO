@@ -113,7 +113,11 @@ export function ResidencyProofStep({ variant = "locked" }: { variant?: "locked" 
           error={shownError}
           value={file}
           onChange={(next) => {
-            if (next !== file) submission.current = null;
+            if (next !== file) {
+              submission.current = null;
+              // The server's verdict was about the old file, not this one (#62).
+              if (!needsRefresh) setError(null);
+            }
             setFile(next);
           }}
         />

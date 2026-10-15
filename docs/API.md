@@ -354,6 +354,27 @@ The audit records the inspected version, proof identity, and relevant account
 details. A stale or repeated request receives `409` with a refresh instruction.
 It changes no residency state and adds no decision audit or notification.
 
+Before anything is stored, the server checks the whole file
+(`src/server/lib/proof-files.ts`, #62). It refuses a bad file with `400` on the
+`proof` field, so the current proof, status, and review stay as they were.
+- JPEG, PNG, and WebP are decoded in full with `sharp`, up to 40 megapixels, first
+  frame only. A truncated or corrupt image, or one whose real format differs
+  from its declared type, is refused. Size is read from the header first, so an
+  oversized image is refused before any decoding.
+- A PDF must end with `startxref` pointing at a real cross-reference table and
+  `%%EOF`, and must open with PDF.js (`stopAtErrors`) within 20 pages.
+  Password-protected PDFs, and PDFs with JavaScript, embedded files, launch
+  actions, rich media, or XFA forms, are refused, and the Citizen is asked for a
+  plain scan or photo.
+- Each check stops after 5 seconds. The 5 MB upload limit is unchanged.
+
+These checks establish only that the file is a complete image or a plain PDF.
+They are not a malware scan, and they do not show whose document it is or that
+the address is in Makati. An Administrator still judges that in review.
+Administrators open a PDF through its five-minute signed link in a new tab on
+the Storage domain, never embedded in KAMOTI. Proofs stored before #62 were not
+rechecked.
+
 `POST /api/auth/me/residency-proof` requires multipart fields `proof`,
 `submission_id`, and `expected_version`. Use a new UUID for each selected file.
 Keep that submission ID and expected version for retries of the same submission.

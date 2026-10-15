@@ -19,6 +19,7 @@ const { default: adminRouter, residencyReviewSchema, phoneVerifiedSchema } = awa
 );
 const { default: authRouter } = await import("../../src/server/routes/auth.routes.js");
 const { RESIDENCY_NOTE_ERROR, validateResidencyNote } = await import("../../src/web/components/ResidencyReview.js");
+const { PROOF_DAMAGED_ERROR } = await import("../../src/server/lib/proof-files.js");
 
 const restore: Array<() => void> = [];
 afterEach(() => {
@@ -170,12 +171,16 @@ describe("RES-04 the upload is checked the same way on both sides (UA-8)", () =>
     expect(web.validateProof(file("application/pdf", 10))).toBeUndefined();
   });
 
-  it("refuses a file whose bytes do not match its claimed type on the server", () => {
-    const pdf = { mimetype: "application/pdf", buffer: Buffer.from("%PDF-1.7 rest") } as Express.Multer.File;
-    expect(server.checkProof(pdf).extension).toBe("pdf");
+  it("refuses a file whose bytes do not match its claimed type on the server", async () => {
     const renamed = { mimetype: "application/pdf", buffer: Buffer.from("MZ executable") } as Express.Multer.File;
-    expect(() => server.checkProof(renamed)).toThrow();
-    expect(() => server.checkProof(undefined)).toThrow();
+    await expect(server.checkProof(renamed)).rejects.toThrow();
+    await expect(server.checkProof(undefined)).rejects.toThrow();
+  });
+
+  it("refuses a PDF that is only a header (#62)", async () => {
+    const headerOnly = { mimetype: "application/pdf", buffer: Buffer.from("%PDF-1.7 rest") } as Express.Multer.File;
+    const error = await server.checkProof(headerOnly).catch((caught: unknown) => caught);
+    expect((error as InstanceType<typeof ApiError>).details).toEqual([{ field: "proof", message: PROOF_DAMAGED_ERROR }]);
   });
 });
 
