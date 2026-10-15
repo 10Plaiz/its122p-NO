@@ -9,7 +9,8 @@ import type { Session } from "./types.js";
 
 export const TOKEN_KEY = "kamoti.token";
 // Where refresh tokens were stored before KI-12 moved them to an HttpOnly cookie.
-// Never read or sent since #71; clearSession still removes any leftover copy.
+// Never read or sent since #71; any leftover copy is removed when the app starts
+// and when a session ends.
 const LEGACY_REFRESH_KEY = "kamoti.refresh";
 export const EXPIRES_KEY = "kamoti.expires";
 // Sent on /auth/refresh so another site cannot trigger it (see session-cookie.ts).
@@ -115,6 +116,16 @@ export function getToken(): string | null {
     return localStorage.getItem(TOKEN_KEY);
   } catch {
     return null;
+  }
+}
+
+// #71: a browser without an access token never reaches clearSession, so an old
+// refresh token would stay in localStorage for good. The app drops it on start.
+export function forgetLegacyRefreshToken() {
+  try {
+    localStorage.removeItem(LEGACY_REFRESH_KEY);
+  } catch {
+    // Nothing stored, nothing to remove.
   }
 }
 

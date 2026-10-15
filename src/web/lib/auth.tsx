@@ -5,6 +5,7 @@ import {
   ApiError,
   clearSession,
   EXPIRES_KEY,
+  forgetLegacyRefreshToken,
   getExpiresAt,
   getToken,
   refreshDelay,
@@ -137,8 +138,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   // On boot, trade a stored token for the current profile. An expired access token
-  // is refreshed by api.ts first; anything still refused clears the session.
+  // is refreshed by api.ts first; anything still refused clears the session. A
+  // refresh token stored before the cookie is dropped first (#71).
   useEffect(() => {
+    forgetLegacyRefreshToken();
     if (!getToken()) {
       setLoading(false);
       return;

@@ -31,7 +31,6 @@ describe("Citizen submission retry guidance", () => {
     });
     storage.clear();
     storage.set("kamoti.token", "citizen-access");
-    storage.set("kamoti.refresh", "citizen-refresh");
     events.length = 0;
     fetchMock.mockClear();
     nowMock.mockReturnValue(NOW);
@@ -70,7 +69,6 @@ describe("Citizen submission retry guidance", () => {
     expect(error.retry).toEqual({ afterSeconds: 90, at: new Date("2026-10-05T00:01:30.000Z") });
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(storage.get("kamoti.token")).toBe("citizen-access");
-    expect(storage.get("kamoti.refresh")).toBe("citizen-refresh");
     expect(events).toEqual([]);
   });
 
