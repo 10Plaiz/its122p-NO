@@ -2,7 +2,7 @@
 
 Source: instructor review notes ([scattered_notes.md](scattered_notes.md)).
 Scope: improvements to the current KAMOTI web application (Makati LGU infrastructure reporting).
-Work plan and file ownership: [PARALLEL_PLAN.md](PARALLEL_PLAN.md).
+Open work lives in GitHub Issues; each Partial row names its issue.
 
 ## Legends
 
@@ -12,36 +12,38 @@ Work plan and file ownership: [PARALLEL_PLAN.md](PARALLEL_PLAN.md).
 | Medium | Strengthens security, auditability, or usability. |
 | Low | Convenience or polish. |
 
-| Status | Meaning (checked against the code on 2026-10-02) |
+| Status | Meaning (checked against `main` on 2026-10-15) |
 | :--- | :--- |
-| Existing | Already implemented; verify only. |
-| Partial | Part of it exists; the remaining gap is named. |
-| Gap | Not implemented. |
+| Done | On `main`; the code and its tests exist. |
+| Done, verified hosted | Also checked on the shared project or the live site, as recorded in the closed issue named. |
+| Partial | Part of it is done; the open issue for the rest is named. |
+| Deferred | The owner postponed it; the reason is named. |
+| Decision | Merged into another requirement. |
 
 ## 1. User Accounts and Roles
 
 | ID | Requirement | Priority | Status |
 | :--- | :--- | :--- | :--- |
-| UA-1 | Define and document each user type (Citizen, Staff, Administrator) with its permissions. | High | Partial: roles exist; no single permissions document. |
-| UA-2 | Use "Citizen" as the public-user term in UI and documents, not "Customer". | Low | Existing: verify only. |
-| UA-3 | Let an Administrator activate and deactivate accounts. A deactivated account cannot sign in. | High | Existing: `profiles.is_active`, admin PATCH, `requireAuth` returns 403. Verify the sign-in message. |
-| UA-4 | Strengthen password rules: at least 8 characters with a letter, a number, and a special character; show which rules are unmet. | High | Partial: length only (`validate.ts`). |
-| UA-5 | Verify email addresses with a 6-digit code entered in the app before the account becomes active. | High | Gap: register uses `email_confirm: true`. |
-| UA-6 | Verify mobile numbers with a one-time code through Supabase phone OTP and the Send SMS Hook. | Medium | Deferred (no SMS budget, 2026-10-03): the signed Send SMS Hook and a provider slot are built but dormant; an Administrator marks numbers verified. |
-| UA-7 | Collect extra confirmation details at registration: split name (first, middle, last, suffix), barangay, and full address. | Medium | Partial: single name with a format rule. |
-| UA-8 | Confirm that a registrant lives in Makati: barangay + address + one proof-of-residency upload reviewed by an Administrator. | High | Gap. |
-| UA-9 | Add session timeout: idle sign-out with a warning, and token refresh for active sessions. | High | Gap: no refresh; no idle timeout. |
-| UA-10 | Review other security features (rate limiting, lockout, secure session handling) and document the results. | Medium | Gap: no rate limiting in Express. |
-| UA-11 | Show a clear reason when an action fails (sign-in, registration, submission) instead of a generic error. | Medium | Partial: field errors on some forms only. |
-| UA-12 | Let a person who forgot their password reset it with a 6-digit code sent to their email. | Medium | Gap: added by the team on 2026-10-03 (see Decisions). |
-| UA-13 | Let a citizen update their own details (name, contact number, barangay, street) under the registration rules. | Medium | Done locally (2026-10-04): My account page and `PATCH /api/auth/me` (citizens only, registration rules). A new number clears its verified mark; a new barangay or street sends residency back to review; email cannot be changed there. |
+| UA-1 | Define and document each user type (Citizen, Staff, Administrator) with its permissions. | High | Done: one Roles and permissions table in [API.md](../API.md#roles-and-permissions); other guides link to it. |
+| UA-2 | Use "Citizen" as the public-user term in UI and documents, not "Customer". | Low | Done: the interface and documents say Citizen. |
+| UA-3 | Let an Administrator activate and deactivate accounts. A deactivated account cannot sign in. | High | Done: `profiles.is_active`; a deactivated account gets 403 on every route, at sign-in, and at refresh (security IMP-14, local). |
+| UA-4 | Strengthen password rules: at least 8 characters with a letter, a number, and a special character; show which rules are unmet. | High | Done, verified hosted (#50): 8 to 72 characters with lowercase, uppercase, digit, and punctuation; a live checklist shows unmet rules. |
+| UA-5 | Verify email addresses with a 6-digit code entered in the app before the account becomes active. | High | Done, verified hosted (#50): six-digit signup code before the profile exists. |
+| UA-6 | Verify mobile numbers with a one-time code through Supabase phone OTP and the Send SMS Hook. | Medium | Deferred (no SMS budget, owner 2026-10-03, reaffirmed 2026-10-15): the signed Send SMS Hook is dormant; Administrators confirm numbers, shown as "Confirmed by staff". |
+| UA-7 | Collect extra confirmation details at registration: split name (first, middle, last, suffix), barangay, and full address. | Medium | Done: first, middle, last, and suffix; barangay; address; privacy consent. |
+| UA-8 | Confirm that a registrant lives in Makati: barangay + address + one proof-of-residency upload reviewed by an Administrator. | High | Partial: barangay, address, private proof, and Administrator review bound to the version reviewed (#61). Open: approval before new reports (#59), complete-file checks (#62), review evidence and exceptions (#63), name corrections (#67), proof retention (#70), combined verification (#64). |
+| UA-9 | Add session timeout: idle sign-out with a warning, and token refresh for active sessions. | High | Done: refresh through an HttpOnly cookie; idle warning at 15 minutes and sign-out a minute later. |
+| UA-10 | Review other security features (rate limiting, lockout, secure session handling) and document the results. | Medium | Done: [SECURITY.md](../SECURITY.md) lists the controls, evidence, and accepted risks. Shared rate limits, the refresh cookie, and an enforced CSP were added on 2026-10-15 (security suite 44/44, local). |
+| UA-11 | Show a clear reason when an action fails (sign-in, registration, submission) instead of a generic error. | Medium | Done: Supabase errors become plain messages with a next step; field errors sit beside their controls. |
+| UA-12 | Let a person who forgot their password reset it with a 6-digit code sent to their email. | Medium | Done, verified hosted (#50): reset by emailed code; every old session ends. |
+| UA-13 | Let a citizen update their own details (name, contact number, barangay, street) under the registration rules. | Medium | Done: My account and `PATCH /api/auth/me` with the registration rules. Open: keep verification when only a name is corrected (#67). |
 
 ## 2. Maps and Location
 
 | ID | Requirement | Priority | Status |
 | :--- | :--- | :--- | :--- |
-| MP-1 | Replace Leaflet with Google Maps for report location picking and display. | High | Done locally (2026-10-03): board, pin picker, report detail, and staff report use Google Maps; Leaflet removed. Needs the key on the deployed site (KI-03). |
-| MP-2 | Restrict the map and all pins to Makati (current boundary, after the 2023 EMBO transfer). Pins outside Makati (the instructor's test pin was in Bataan) are rejected in the UI and on the server. | High | Done locally (2026-10-03): map, report forms (device location and drafts included), API create and edit, and a database bounding-box check. The shared project still needs `validate constraint` after its pins are moved (KI-01). |
+| MP-1 | Replace Leaflet with Google Maps for report location picking and display. | High | Done, verified hosted (#51): Google Maps and Places on every map; Leaflet removed. |
+| MP-2 | Restrict the map and all pins to Makati (current boundary, after the 2023 EMBO transfer). Pins outside Makati (the instructor's test pin was in Bataan) are rejected in the UI and on the server. | High | Done, verified hosted (#49): polygon check in the browser and API; the database box check is validated on the shared project. |
 | MP-3 | "Infrastructure" means the report category list. Merged into MP-2. | Medium | Decision. |
 | MP-4 | Limit pinnable places to Makati, with place search restricted to Makati. Merged into MP-2. | Medium | Decision. |
 
@@ -49,46 +51,46 @@ Work plan and file ownership: [PARALLEL_PLAN.md](PARALLEL_PLAN.md).
 
 | ID | Requirement | Priority | Status |
 | :--- | :--- | :--- | :--- |
-| RS-1 | Add voice-to-text for the report description (progressive enhancement where the browser supports it). | Low | Gap. |
-| RS-2 | Show only the problem types that apply to the selected category. | Medium | Gap. |
-| RS-3 | Allow editing a submitted report, with the change recorded in its history. | Medium | Existing for the citizen while pending; history records field names only. |
-| RS-4 | Record a primary (required) and a secondary (optional) problem type for each report. | Medium | Gap. |
-| RS-5 | Keep a draft of the report form (text and pin) and warn before unsaved input is lost. | Medium | Gap. |
-| RS-6 | Let a citizen add a comment to their own report at any status; it appears in the report history and reaches the assigned staff member. | High | Done locally (2026-10-03): `POST /api/reports/:id/remarks` accepts the owner at any status; history reads \"Comment from the reporter\"; notifies the assigned staff member and every administrator; 10 an hour per citizen. |
+| RS-1 | Add voice-to-text for the report description (progressive enhancement where the browser supports it). | Low | Done: Dictate in English (Philippines) or Filipino where the browser supports speech recognition. Not tested with a real microphone. |
+| RS-2 | Show only the problem types that apply to the selected category. | Medium | Done: the form lists only the chosen category's problem types. |
+| RS-3 | Allow editing a submitted report, with the change recorded in its history. | Medium | Done for the owner while the report is pending; the history names the edited fields. |
+| RS-4 | Record a primary (required) and a secondary (optional) problem type for each report. | Medium | Done: one required main problem and one optional other problem. |
+| RS-5 | Keep a draft of the report form (text and pin) and warn before unsaved input is lost. | Medium | Partial: the new-report form keeps a draft and warns before losing input. Open: a draft for the edit form (#69). |
+| RS-6 | Let a citizen add a comment to their own report at any status; it appears in the report history and reaches the assigned staff member. | High | Done: the reporter comments at any status; the assigned Staff member and every Administrator are notified; 10 an hour. |
 
 ## 4. Staff Workflow
 
 | ID | Requirement | Priority | Status |
 | :--- | :--- | :--- | :--- |
-| SW-1 | Assign staff by specialization (category) and area (barangay). | High | Done locally (2026-10-03): the database sets each report's barangay from its pin (`…000800`, OpenStreetMap boundaries); administrators set each staff member's categories and barangays; the assign dialog lists staff matching both first, then category, then barangay. |
-| SW-2 | Require a comment with every status change, assignment, cancellation, and verification decision. | High | Partial: remarks require text; status and cancel do not. |
-| SW-3 | Capture each activity on a report (who, what, when) in an activity log. | High | Done locally (2026-10-03): every workflow action is logged; the activity log shows readable labels and filters on the server by action, role, report reference, and date, and its export uses the same filters. |
-| SW-4 | Staff request resolution; an Administrator approves or returns it before the report is closed. | High | Gap: staff set `resolved` directly. |
-| SW-5 | Show resolved reports in green, with a text label or icon as well. | Low | Done locally: badges (green, check, word) and map pins (green, check). |
-| SW-6 | Track status delays and show the relevant dates (submitted, assigned, completed). | Medium | Done locally (2026-10-03): Key dates and a Delayed tag on the staff page; report tables show Delayed in the status column and offer Assigned on and Days in stage columns. |
-| SW-7 | Staff can reject a report that cannot be fixed, with a required reason, through admin verification (new `rejected` status). | High | Done locally (2026-10-03): migrations `…000700` and `…000710`; request from under review or in progress; admin approves or returns; the citizen and the public board see the reason. |
+| SW-1 | Assign staff by specialization (category) and area (barangay). | High | Done: barangay from the pin; Staff categories and barangays; ranked assignment suggestions. |
+| SW-2 | Require a comment with every status change, assignment, cancellation, and verification decision. | High | Done: status changes, assignments, cancellations, closure requests, and closure reviews all require a comment or reason. |
+| SW-3 | Capture each activity on a report (who, what, when) in an activity log. | High | Done: every workflow action is logged with readable labels, server filters, and export. |
+| SW-4 | Staff request resolution; an Administrator approves or returns it before the report is closed. | High | Done: Staff request closure; a different Administrator approves or returns it in one transaction. |
+| SW-5 | Show resolved reports in green, with a text label or icon as well. | Low | Done: green with a check on badges and map pins. |
+| SW-6 | Track status delays and show the relevant dates (submitted, assigned, completed). | Medium | Done: Key dates, a Delayed tag, Assigned on, and Days in stage. |
+| SW-7 | Staff can reject a report that cannot be fixed, with a required reason, through admin verification (new `rejected` status). | High | Done: requested by Staff, approved by an Administrator, reason shown on the public board. |
 
 ## 5. Data Management
 
 | ID | Requirement | Priority | Status |
 | :--- | :--- | :--- | :--- |
-| DM-1 | Never delete records from the database. Use soft deletion or deactivation flags. | High | Partial: categories soft-delete; several foreign keys still cascade. |
-| DM-2 | After 90 days, remove the stored image files of cancelled reports. The photo rows stay with a `purged_at` date. | Medium | Done locally (2026-10-04): the admin dashboard checks which photos are past 90 days, then removes them after a confirmation; rows stay with `purged_at`, and report pages say the photo was removed. No automatic schedule. |
+| DM-1 | Never delete records from the database. Use soft deletion or deactivation flags. | High | Done: every foreign key restricts deletes; accounts are deactivated, not deleted. |
+| DM-2 | After 90 days, remove the stored image files of cancelled reports. The photo rows stay with a `purged_at` date. | Medium | Done: an Administrator checks, then removes expired photo files from the dashboard; rows keep `purged_at`. No automatic schedule. |
 
 ## 6. Tables, Search, and Export
 
 | ID | Requirement | Priority | Status |
 | :--- | :--- | :--- | :--- |
-| TB-1 | Add Google-style numbered pagination with a jump-to-page control. | Medium | Gap: Previous/Next only. |
-| TB-2 | Let users hide and show columns, including a completion-date column. | Medium | Done locally (2026-10-03): column choice per table; "Closed" date (resolved or rejected); optional Problems, Assigned on, Days in stage, Reporter residency, Phone verified, and Rating columns. |
-| TB-3 | Place filter and search at the top right of the table. | Low | Gap. |
-| TB-4 | Export table data to PDF and CSV, respecting the current filters and visible columns. | Medium | Done locally (2026-10-03): report and activity-log exports use the screen's filters and visible columns. |
+| TB-1 | Add Google-style numbered pagination with a jump-to-page control. | Medium | Done: numbered pages with a jump-to-page box. |
+| TB-2 | Let users hide and show columns, including a completion-date column. | Medium | Done: column choice per table, kept in the browser; a Closed date column. |
+| TB-3 | Place filter and search at the top right of the table. | Low | Done: search sits at the right edge of each table toolbar, after filters. |
+| TB-4 | Export table data to PDF and CSV, respecting the current filters and visible columns. | Medium | Done: CSV and PDF with the screen's filters and visible columns, up to 5,000 rows. |
 
 ## 7. Feedback
 
 | ID | Requirement | Priority | Status |
 | :--- | :--- | :--- | :--- |
-| FB-1 | Let the citizen rate and comment on a resolved report, and route that feedback to the assigned staff member. | Medium | Done locally (2026-10-03): rating form on the citizen's resolved report, the reporter's rating on the staff page, averages on the staff queue and admin dashboard. |
+| FB-1 | Let the citizen rate and comment on a resolved report, and route that feedback to the assigned staff member. | Medium | Done: one rating per resolved report, shown to the assigned Staff member; averages on the queue and dashboard. |
 
 ## Implementation Notes
 
@@ -124,3 +126,8 @@ Work plan and file ownership: [PARALLEL_PLAN.md](PARALLEL_PLAN.md).
 | SW-7 | Rejected reports on the board; when staff can reject (2026-10-03) | Rejected reports stay on the public board with the approved reason; other closure reasons stay private. Staff can request rejection from under review or in progress, without a proof photo. |
 | RS-6 | Who hears about a comment; spam (2026-10-03) | A citizen's comment notifies the assigned staff member and every active administrator. Ten comments an hour per citizen (per account, not per network); staff and admin remarks are not limited. |
 | SW-1 | Barangay on the board; filters (2026-10-03) | Each report's barangay is shown on the public board, which can be filtered by it; All reports and the staff queue get a Barangay filter and an optional column, and exports follow the filter. |
+| UA-4 | Password policy (owner, 2026-10-04) | 8 to 72 characters with lowercase, uppercase, digit, and punctuation: stronger than the original letters-and-digits wording. Leaked-password checking stays off on the free plan. |
+| UA-8 | Approval before reporting (owner, 2026-10-05) | A Citizen files new reports and report photos only after an Administrator approves their residency. Replaces the 2026-10-03 rule that uploading proof unlocks reporting. Built in #59. |
+| UA-10 | Citizen submission quotas (owner, 2026-10-05) | Trial limits per hour: 5 reports, 15 report photos, 3 proofs per account; ten times that per network. Changing them needs a migration. |
+| UA-6 | SMS, again (owner, 2026-10-15) | Still no SMS budget. Administrators confirm numbers; My account shows "Confirmed by staff". |
+| UA-10 | Security review follow-ups (owner, 2026-10-15) | Fixed: refresh token in an HttpOnly cookie, shared rate limits, code requests that no longer reveal accounts, an enforced CSP, and byte checks on report photos. Sign-in also stops after 20 failures for one address from any client. Accepted: earlier rejection notes live in the audit log only (KI-17). |
