@@ -116,3 +116,10 @@ export function residencyLocked(facts: ResidencyFacts) {
   const step = residencyStep(facts);
   return step === "upload" || step === "rejected";
 }
+
+// Issue #59 (approved 2026-10-05): sending a proof no longer opens new reports or
+// report photos. Only an administrator's approval does. A pending citizen keeps
+// everything else requireResidency lets through.
+export function residencyApproved(facts: ResidencyFacts) {
+  return residencyStep(facts) === "verified";
+}

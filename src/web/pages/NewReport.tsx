@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { MapPicker } from "../components/MapPicker.js";
 import type { Point } from "../components/MapPicker.js";
 import { ALLOWED_TYPES, MAX_PHOTO_BYTES, PhotoPicker, formatFileSize, formatMimeType } from "../components/PhotoPicker.js";
@@ -8,6 +8,7 @@ import { Alert, Button, Field, Input, Select, Textarea, useLeftFields } from "..
 import { VoiceInput } from "../components/VoiceInput.js";
 import { api } from "../lib/api.js";
 import { useAuth } from "../lib/auth.js";
+import { residencyApproved } from "../lib/residency.js";
 import { reverseGeocode } from "../lib/maps.js";
 import {
   ADDRESS_MAX,
@@ -24,7 +25,7 @@ import type { NewReportDraft } from "../lib/report-rules.js";
 import type { ProblemTypesResponse } from "../lib/submission-types.js";
 import { useDraft, useUnsavedChangesWarning } from "../lib/useDraft.js";
 import { useAction, useApi } from "../lib/useApi.js";
-import type { Category, Report } from "../lib/types.js";
+import type { Category, Profile, Report } from "../lib/types.js";
 
 // Wireframe 1b: location first, so the map and any GPS prompt arrive while intent is
 // highest and a citizen who abandons has given up the least.
@@ -67,7 +68,52 @@ type Values = {
   photo: File | null;
 };
 
+// Issue #59: a citizen whose proof awaits review sees where they stand instead of a
+// form the server would refuse. The draft in this tab is kept for after approval.
 export function NewReportPage() {
+  const { user } = useAuth();
+  if (user && !residencyApproved(user)) return <AwaitingApproval />;
+  return <NewReportForm />;
+}
+
+function AwaitingApproval() {
+  const { replaceUser } = useAuth();
+  const [checked, setChecked] = useState(false);
+  const refresh = useAction(() => api.get<{ user: Profile }>("/auth/me"));
+
+  async function checkAgain() {
+    if (refresh.pending) return;
+    const result = await refresh.run();
+    if (!result) return;
+    replaceUser(result.user);
+    setChecked(true);
+  }
+
+  return (
+    <div className="max-w-2xl flex flex-col gap-5">
+      <h2>Report an issue</h2>
+      <Alert title="Waiting for approval" tone="warning">
+        An administrator is reviewing your proof of residency. You can file reports and add photos once they confirm you
+        live in Makati.
+      </Alert>
+      <p className="text-[13px] text-muted !m-0">
+        Need to fix your address or send a different proof? Do it from <Link to="/account">My account</Link>. Until then,
+        you can still follow your reports and <Link to="/board">browse the public board</Link>.
+      </p>
+      <div className="flex flex-wrap items-center gap-3">
+        <Button type="button" disabled={refresh.pending} onClick={checkAgain}>
+          {refresh.pending ? "Checking…" : "Check again"}
+        </Button>
+        <span role="status" className="text-[13px] text-muted">
+          {checked && !refresh.pending ? "Still awaiting review." : ""}
+        </span>
+      </div>
+      {refresh.error && <Alert title="Could not check your review">{refresh.error.displayMessage}</Alert>}
+    </div>
+  );
+}
+
+function NewReportForm() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { data: categoryData } = useApi<{ categories: Category[] }>("/categories");

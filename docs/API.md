@@ -192,7 +192,8 @@ Supabase Auth owns passwords and issues the JWT. The API verifies that token and
 3. `requireAuth` attaches `req.user = { id, name, email, role }` plus the
    caller's residency facts, and refuses a deactivated account with `403`.
 4. `requireRole("admin")` gates whatever comes after it. `requireResidency`
-   refuses a locked Citizen. [Roles and permissions](#roles-and-permissions)
+   refuses a locked Citizen, and `requireApprovedResidency` refuses new reports
+   and report photos from a Citizen whose proof is not yet approved. [Roles and permissions](#roles-and-permissions)
    lists which gate protects each capability.
 
 Public registration collects name parts, email, password, barangay, address,
@@ -498,7 +499,11 @@ enforces every row below.
 
 A Citizen is **locked** while they have no proof, or their proof was rejected.
 They are **unlocked** while a proof waits for review (pending) and after an
-Administrator verifies them. Staff and Administrators are never locked. A
+Administrator verifies them. Only a **verified** Citizen may file a new report
+or add a report photo (#59, owner decision of 2026-10-05). A pending Citizen
+gets `403 residency_pending` for those two actions and keeps every other
+unlocked permission. Uploading a new proof or changing the address returns a
+verified Citizen to pending. Staff and Administrators are never locked. A
 deactivated account of any role receives `403` on every protected route, and
 its next refresh ends the session.
 
@@ -510,10 +515,10 @@ its next refresh ends the session.
 | Read own account | — | Yes | Yes | Yes | Yes | `requireAuth` |
 | Edit own name, number, and address | — | Yes | Yes | No | No | `requireRole("citizen")` |
 | Upload proof of residency | — | Yes | Pending only | No | No | `requireRole("citizen")`; verified accounts may only retry a committed upload |
-| File a report | — | No | Yes | No | No | `requireResidency`, `requireRole("citizen")`, shared quota |
+| File a report | — | No | Verified only | No | No | `requireResidency`, `requireRole("citizen")`, `requireApprovedResidency`, shared quota |
 | List and view reports | — | No | Own | Assigned | All | `scopeReportQuery`, `assertCanView` |
 | Edit or cancel a report | — | No | Own, while pending | No | No | `assertCanEdit` |
-| Add a report photo | — | No | Own, while pending | Assigned | Any | Photo route, `assertCanUpdate`, shared quota |
+| Add a report photo | — | No | Own, while pending; verified only | Assigned | Any | Photo route, `assertResidencyApproved`, `assertCanUpdate`, shared quota |
 | Comment on a report | — | No | Own, 10 an hour | Assigned | Any | `requireRole`, `limits.citizenComment` |
 | Change status (up to `in_progress`) | — | No | No | Assigned | Any | `requireRole("admin", "staff")`, `assertCanUpdate` |
 | Assign a report | — | No | No | No | Yes | `requireRole("admin")` |

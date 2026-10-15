@@ -22,11 +22,18 @@ export function residencyLocked(user: ResidencyFacts | null): boolean {
   return step === "upload" || step === "rejected";
 }
 
+// Issue #59: new reports and report photos wait for an administrator's approval.
+export function residencyApproved(user: ResidencyFacts | null): boolean {
+  return user !== null && residencyStep(user) === "verified";
+}
+
 // Where a locked citizen is sent, and the only signed-in page they can use.
 export const PROOF_STEP_PATH = "/register?step=proof";
 
 // Matches ACCOUNT_ERROR_CODES.residencyRequired in src/server/lib/accounts-errors.ts.
 export const RESIDENCY_REQUIRED = "residency_required";
+// Matches ACCOUNT_ERROR_CODES.residencyPending.
+export const RESIDENCY_PENDING = "residency_pending";
 
 export const PROOF_MAX_BYTES = 5 * 1024 * 1024;
 export const PROOF_TYPES = ["image/jpeg", "image/png", "image/webp", "application/pdf"] as const;

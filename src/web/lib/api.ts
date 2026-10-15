@@ -305,7 +305,7 @@ async function request<T>(path: string, options: RequestOptions = {}, retried = 
 
     const details = payload && typeof payload === "object" && "details" in payload ? payload.details : undefined;
     const error = new ApiError(response.status, message, details, submissionRetry(response, details));
-    if (typeof window !== "undefined" && response.status === 403 && error.code === "residency_required") {
+    if (typeof window !== "undefined" && response.status === 403 && (error.code === "residency_required" || error.code === "residency_pending")) {
       window.dispatchEvent(new CustomEvent(RESIDENCY_REQUIRED_EVENT));
     }
     throw error;

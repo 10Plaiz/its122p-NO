@@ -179,8 +179,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => window.removeEventListener("kamoti:auth-expired", handleSessionExpired);
   }, [endLocally]);
 
-  // UA-8: the server locked this citizen (an administrator rejected their proof).
-  // Re-read the account so the guards send them to the upload step.
+  // UA-8: the server locked this citizen (an administrator rejected their proof),
+  // or refused a report because their proof still awaits review (issue #59).
+  // Re-read the account so the guards show the upload step or the waiting state.
   useEffect(() => {
     function handleResidencyRequired() {
       api

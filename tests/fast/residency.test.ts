@@ -56,6 +56,13 @@ describe("RES-01 a citizen without an accepted proof is locked (UA-8)", () => {
     expect(server.residencyLocked({ role: "citizen", residency_status: "pending", has_residency_proof: true })).toBe(false);
   });
 
+  it("approves only a verified citizen, plus staff and admins (issue #59)", () => {
+    expect(server.residencyApproved({ role: "citizen", residency_status: "pending", has_residency_proof: true })).toBe(false);
+    expect(server.residencyApproved({ role: "citizen", residency_status: "rejected", has_residency_proof: true })).toBe(false);
+    expect(server.residencyApproved({ role: "citizen", residency_status: "verified", has_residency_proof: false })).toBe(true);
+    expect(server.residencyApproved({ role: "staff", residency_status: null, has_residency_proof: false })).toBe(true);
+  });
+
   it("agrees with the browser in every combination", () => {
     for (const role of ROLES) {
       for (const residency_status of STATUSES) {
@@ -63,10 +70,12 @@ describe("RES-01 a citizen without an accepted proof is locked (UA-8)", () => {
           const facts = { role, residency_status, has_residency_proof };
           expect(web.residencyStep(facts)).toBe(server.residencyStep(facts));
           expect(web.residencyLocked(facts)).toBe(server.residencyLocked(facts));
+          expect(web.residencyApproved(facts)).toBe(server.residencyApproved(facts));
         }
       }
     }
     expect(web.RESIDENCY_REQUIRED).toBe(ACCOUNT_ERROR_CODES.residencyRequired);
+    expect(web.RESIDENCY_PENDING).toBe(ACCOUNT_ERROR_CODES.residencyPending);
   });
 });
 

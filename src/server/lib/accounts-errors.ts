@@ -15,6 +15,9 @@ export const ACCOUNT_ERROR_CODES = {
   // UA-8: a citizen without an accepted proof of residency. The web app sends
   // them to the upload step.
   residencyRequired: "residency_required",
+  // Issue #59: a citizen whose proof is still awaiting review tried to file a
+  // report or add a photo. The web app shows the waiting state, not the upload.
+  residencyPending: "residency_pending",
 } as const;
 
 type AuthFailure = { code?: string | null; message?: string; status?: number } | null | undefined;

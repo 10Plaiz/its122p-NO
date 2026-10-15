@@ -7,7 +7,7 @@ import { BARANGAYS, parse } from "../lib/validate.js";
 import { photoUpload, photoUrl, savePhoto } from "../lib/photos.js";
 import { citizenSubmissionLimit } from "../lib/submission-limits.js";
 import { endOfDay, pageFields, searchFields, searchFilter, sortColumn } from "../lib/query.js";
-import { currentUser, requireAuth, requireResidency } from "../middleware/auth.js";
+import { assertResidencyApproved, currentUser, requireAuth, requireResidency } from "../middleware/auth.js";
 import { findReport, present, type Report } from "../services/reports.common.js";
 import { REPORT_ROW_FIELDS } from "../services/reports.rows.js";
 import { assertCanUpdate, assertCanView, scopeReportQuery } from "../services/reports.access.js";
@@ -91,6 +91,7 @@ router.post<{ id: string }, unknown, unknown, ParsedQs, PhotoResponseLocals>("/:
   const report = await findReport(req.params.id);
   const isOwner = report.citizen.id === currentUser(req).id;
   if (isOwner) {
+    assertResidencyApproved(req);
     if (report.status !== "pending") {
       throw forbidden("Photos can only be added while the report is still pending.");
     }

@@ -41,6 +41,7 @@ Evidence labels:
 | Record checks: Citizens see their own reports, Staff their assigned ones, Administrators all | `src/server/services/reports.access.ts` | Local (AUTHZ-06 to AUTHZ-15) |
 | Role scope is applied before any filter, so a filter can only narrow results | `scopeReportQuery`, also in exports | Source |
 | Locked Citizens (no proof, or rejected) get `403 residency_required` | `requireResidency` | Local (IMP-01, IMP-15) |
+| Citizens whose proof awaits review get `403 residency_pending` on new reports and report photos, before the quota is spent | `requireApprovedResidency`, `assertResidencyApproved` | Local (IMP-17); Source (`tests/fast/residency-approval.test.ts`) |
 | Closure approval needs a different account from the requester | `review_report_closure` | Local (`tests/database/atomic-actions.sql`) |
 
 ### Database

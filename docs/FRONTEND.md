@@ -14,7 +14,7 @@ important interface behavior. Use [API.md](API.md) for endpoint contracts and
 | `/board` | Public | Searchable and filterable community report board |
 | `/signin` | Public | Sign in, confirm an unconfirmed email, or start password recovery through `?step=reset` |
 | `/register` | Public | Create a Citizen account, confirm its email code, then upload residency proof through `?step=proof` |
-| `/report/new` | Citizen | Submit a report through the location, details, and review steps |
+| `/report/new` | Citizen | Submit a report through the location, details, and review steps. A Citizen whose proof awaits review sees a waiting panel with a "Check again" button instead |
 | `/my-reports` | Citizen | Search, filter, open, or cancel the Citizen's reports |
 | `/reports/:id` | Citizen, Staff, Administrator | Read a report and its history, subject to record-level server authorization (owning Citizen, assigned Staff, or Administrator). Owning citizens can edit pending reports inline. |
 | `/notifications` | Citizen, Staff, Administrator | Read and mark the signed-in user's notifications |

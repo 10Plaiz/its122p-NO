@@ -2,7 +2,7 @@ import { Suspense, useEffect, useState } from "react";
 import { Link as RouterLink, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { Loading, StatusPill } from "./ui.js";
 import { useAuth } from "../lib/auth.js";
-import { PROOF_STEP_PATH, residencyLocked } from "../lib/residency.js";
+import { PROOF_STEP_PATH, residencyApproved, residencyLocked } from "../lib/residency.js";
 import { useApi } from "../lib/useApi.js";
 import { ROLE_LABEL } from "../lib/types.js";
 import type { Notification } from "../lib/types.js";
@@ -30,11 +30,14 @@ const LINKS_BY_ROLE: Record<string, Link[]> = {
 // UA-8: a citizen locked to the proof upload still sees where things are, greyed
 // out, rather than a menu that changes shape. No href, so it cannot be followed or
 // focused; the banner under the header says why and links to the fix.
-function LockedLink({ label }: { label: string }) {
+const LOCKED_REASON = "until you upload your proof of residency";
+const AWAITING_REASON = "until an administrator approves your proof of residency";
+
+function LockedLink({ label, reason = LOCKED_REASON }: { label: string; reason?: string }) {
   return (
-    <a role="link" aria-disabled="true" title="Upload your proof of residency to unlock this.">
+    <a role="link" aria-disabled="true" title={`Locked ${reason}.`}>
       {label}
-      <span className="sr-only"> (locked until you upload your proof of residency)</span>
+      <span className="sr-only"> (locked {reason})</span>
     </a>
   );
 }
@@ -65,6 +68,8 @@ export function Layout() {
 
   const links = [...PUBLIC_LINKS, ...(user ? (LINKS_BY_ROLE[user.role] ?? []) : [])];
   const locked = residencyLocked(user);
+  // Issue #59: a citizen whose proof awaits review cannot file yet.
+  const awaiting = !locked && user?.role === "citizen" && !residencyApproved(user);
 
   function handleSignOut() {
     signOut();
@@ -95,6 +100,8 @@ export function Layout() {
           {links.map((link) =>
             locked && !PUBLIC_LINKS.includes(link) ? (
               <LockedLink key={link.to} label={link.label} />
+            ) : awaiting && link.to === "/report/new" ? (
+              <LockedLink key={link.to} label={link.label} reason={AWAITING_REASON} />
             ) : (
               <NavLink key={link.to} to={link.to}>
                 {link.label}

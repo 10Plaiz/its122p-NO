@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
 import { useApi } from "../lib/useApi.js";
 import { useAuth } from "../lib/auth.js";
-import { PROOF_STEP_PATH, residencyLocked } from "../lib/residency.js";
+import { PROOF_STEP_PATH, residencyApproved, residencyLocked } from "../lib/residency.js";
 import type { PublicStats } from "../lib/types.js";
 
 const STEPS = [
@@ -21,6 +21,8 @@ export function EntryPage() {
   // UA-8: a citizen locked to the proof upload sees the button greyed, like the
   // menu, with the reason and the way out beside it (KI-18).
   const locked = residencyLocked(user);
+  // Issue #59: a sent proof still needs an administrator's approval.
+  const awaiting = !locked && user?.role === "citizen" && !residencyApproved(user);
 
   return (
     <div className="flex flex-col gap-10">
@@ -37,7 +39,7 @@ export function EntryPage() {
         </p>
 
         <div className="flex flex-wrap gap-3 pt-2">
-          {locked ? (
+          {locked || awaiting ? (
             <a role="link" aria-disabled="true" aria-describedby="report-locked" className="btn btn-primary opacity-50 cursor-not-allowed">
               Report an issue
             </a>
@@ -55,6 +57,14 @@ export function EntryPage() {
             Send your proof of residency first.{" "}
             <Link to={PROOF_STEP_PATH} className="underline">
               Upload it now
+            </Link>
+          </p>
+        )}
+        {awaiting && (
+          <p id="report-locked" className="text-[13px] !m-0">
+            An administrator is reviewing your proof of residency.{" "}
+            <Link to="/report/new" className="underline">
+              Check your review
             </Link>
           </p>
         )}

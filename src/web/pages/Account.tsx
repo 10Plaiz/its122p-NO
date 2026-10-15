@@ -95,7 +95,9 @@ export function AccountPage() {
             <dd className="!m-0 break-words">{account.address_line ?? "—"}</dd>
             <dt className="text-muted">Residency</dt>
             <dd className="!m-0">
-              <StatusPill tone={step === "verified" ? "success" : "warning"}>{RESIDENCY_LABEL[step]}</StatusPill>
+              <StatusPill tone={step === "verified" ? "success" : "warning"}>
+                {step === "pending" ? "Awaiting review" : RESIDENCY_LABEL[step]}
+              </StatusPill>
             </dd>
           </dl>
           <p className="text-[12px] text-muted !m-0">

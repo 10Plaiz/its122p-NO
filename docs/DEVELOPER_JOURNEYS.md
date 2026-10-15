@@ -159,7 +159,7 @@ flowchart TD
    - The user enters name parts, email, password, barangay, address, privacy consent, and optional contact number.
    - Public registration always assigns the `citizen` role.
    - A six-digit signup code confirms the email and signs the user in. An unconfirmed account cannot sign in with its password.
-   - The user uploads residency proof at `/register?step=proof`. Uploading unlocks reporting during Administrator review; rejection locks it again.
+   - The user uploads residency proof at `/register?step=proof`. Uploading unlocks the account, but new reports and report photos wait for Administrator approval; rejection locks the account again.
    - Later sign-in and password recovery use [`SignInPage`](../src/web/pages/SignIn.tsx). Recovery requires an emailed recovery code, then ends old sessions.
 2. Report Submission Wizard:
    - The citizen opens [`NewReportPage`](../src/web/pages/NewReport.tsx) at `/report/new`.

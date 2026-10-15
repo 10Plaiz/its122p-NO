@@ -6,7 +6,7 @@ import { parse } from "../lib/validate.js";
 import { refineInsideMakati } from "../lib/makati.js";
 import { checkPhoto, photoUpload, savePhoto } from "../lib/photos.js";
 import { citizenSubmissionLimit } from "../lib/submission-limits.js";
-import { currentUser, requireRole } from "../middleware/auth.js";
+import { currentUser, requireApprovedResidency, requireRole } from "../middleware/auth.js";
 import { findReport, present, problemIdsOf } from "../services/reports.common.js";
 import { assertCanEdit } from "../services/reports.access.js";
 import {
@@ -102,8 +102,9 @@ router.get("/meta/problem-types", async (_req, res) => {
   res.json({ groups: await listProblemTypes() });
 });
 
-// POST /api/reports — citizens file a report, optionally with one photo.
-router.post("/", requireRole("citizen"), citizenSubmissionLimit("report.create"), photoUpload.single("photo"), async (req, res) => {
+// POST /api/reports — citizens file a report, optionally with one photo. Checked
+// before the quota so a refused request spends nothing.
+router.post("/", requireRole("citizen"), requireApprovedResidency, citizenSubmissionLimit("report.create"), photoUpload.single("photo"), async (req, res) => {
   const input = parse(createSchema, req.body);
   if (req.file) checkPhoto(req.file);
   await assertCategorySelectable(input.category_id);
