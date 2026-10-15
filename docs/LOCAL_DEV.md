@@ -411,13 +411,14 @@ names the shared project, so point every process at the local stack instead.
 
 Each run registers two accounts and makes four deliberate code failures. The
 API allows five sign-ups an hour and ten failed codes per 15 minutes from one
-address. It keeps those limits in memory, so restart `bun run dev` between
-repeated runs. Citizen report quotas are stored in the database. On the local
-database only, clear them before a rerun within the hour:
+address. Those limits and the Citizen report quotas are stored in the database
+(KI-14), so restarting `bun run dev` does not reset them. On the local database
+only, clear both before a rerun within the hour:
 
 ```bash
 psql postgresql://postgres:postgres@127.0.0.1:54322/postgres \
-  -c "delete from public.citizen_submission_events"
+  -c "delete from public.citizen_submission_events" \
+  -c "delete from public.auth_rate_counters"
 ```
 
 These runs prove the application and Mailpit flow. They do not prove hosted

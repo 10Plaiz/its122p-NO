@@ -15,7 +15,7 @@ Issue: [#63](https://github.com/10Plaiz/its122p-NO/issues/63)
 
 | Item | Value |
 | :--- | :--- |
-| Revision | `253250d` plus the uncommitted #63 changes on `feat/63-review-evidence` |
+| Revision | `feat/63-review-evidence`, rebased on `2fa08ae` (#59 and #62 merged) |
 | Database | Local Supabase CLI 2.117.0 stack `kamoti`, all 23 migrations, marked `kamoti.test_database = 'disposable'`, holding the fixture and demo seed |
 | Shared project | Not contacted |
 
@@ -24,10 +24,11 @@ Issue: [#63](https://github.com/10Plaiz/its122p-NO/issues/63)
 | Check | Command | Result |
 | :--- | :--- | :--- |
 | Review SQL | `psql ... -f tests/database/residency-review.sql` | 21/21 |
-| Fast suite | `bun run test` | Pass, including `tests/fast/residency-review.test.ts` |
-| Security suite | `bun run test:security -- --target 127` | 44/44; IMP-12 now proves an approval with no basis gets `400` and the audit records `method` and `checks` |
-| Account browser suite | `npx playwright test tests/browser/accounts.browser.ts` on the local stack | 8/8; the Administrator ticks the four checks before Accept the document |
-| Review browser suite | `bun run test:browser:residency` (simulated API) | 18 tests passed on two full runs. One earlier run had a single intermittent console-error failure in the mobile conflict test; it passed alone and on both reruns, and its message was not captured |
+| Fast suite | `bun run test` | 650 pass, including `tests/fast/residency-review.test.ts` |
+| Security suite | `bun run test:security -- --target 127` | 45/45; IMP-12 now proves an approval with no basis gets `400` and the audit records `method` and `checks`; IMP-17 (#59) sends the document basis |
+| Account browser suite | `npx playwright test tests/browser/accounts.browser.ts` on the local stack | 8/8; the Administrator ticks the four checks before Accept the document, and the Citizen waits for approval (#59) |
+| Review browser suite | `bun run test:browser:residency` (simulated API) | 18/18 after the rebase. One earlier run had a single intermittent console-error failure in the mobile conflict test; it passed alone and on both reruns, and its message was not captured |
+| Full browser suite | `npx playwright test` on the local stack | 65 passed; the 2 Staff queue tests that sign in with the local `DEMO_PASSWORD` were not runnable here |
 
 Screenshots (from the simulated-API harness, whose label still names issue 61):
 
