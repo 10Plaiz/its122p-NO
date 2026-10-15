@@ -211,6 +211,20 @@ test("the decision forwards the snapshot version and converts the atomic conflic
     p_action: "residency.reviewed", p_input: { decision: "verified", note: "Known resident.", expected_version: VERSION, method: "no_document", checks: null },
     p_ip: expect.any(String) } }]);
 });
+test("#63 a citizen cannot approve themselves; a document approval forwards its checks and no reason", async () => {
+  const checks = ["name", "address", "readable", "document"];
+  for (const body of [{ decision: "verified", expected_version: VERSION, method: "no_document", note: "I live in Makati." },
+    { decision: "verified", expected_version: VERSION, method: "document", checks }]) {
+    const self = await request(`admin/users/${CITIZEN}/residency`, json(body), "citizen");
+    expect(self.status).toBe(403);
+  }
+  expect(rpcCalls).toEqual([]);
+  const response = await request(`admin/users/${CITIZEN}/residency`, json({ decision: "verified", expected_version: VERSION, method: "document", checks }));
+  expect(response.status).toBe(200);
+  expect(rpcCalls).toEqual([{ name: "admin_change_profile", args: { p_actor_id: ADMIN, p_user_id: CITIZEN,
+    p_action: "residency.reviewed", p_input: { decision: "verified", note: null, expected_version: VERSION, method: "document", checks },
+    p_ip: expect.any(String) } }]);
+});
 test("UUID validation rejects missing versions and malformed IDs before a decision", async () => {
   for (const [id, body] of [[CITIZEN, { decision: "verified" }], ["invalid", { decision: "verified", expected_version: VERSION }],
     [CITIZEN, { decision: "verified", expected_version: "invalid" }]] as const) {
