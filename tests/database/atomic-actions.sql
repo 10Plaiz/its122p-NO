@@ -1,6 +1,8 @@
 -- Run only against a disposable Postgres database with the repository migrations.
 -- The runner must set kamoti.test_database = 'disposable'. All fixture rows and
 -- fault-injection triggers below are rolled back. No emails or files are sent.
+-- Every count is limited to the synthetic report and accounts inserted here, so
+-- the suite also passes on a database that holds the fixture and demo seed (#72).
 \set ON_ERROR_STOP on
 begin;
 do $$ begin
@@ -48,9 +50,19 @@ end $$;
 drop trigger test_history_failure on public.report_updates;
 select public.request_report_closure('b0000000-0000-4000-8000-000000000001', 'a0000000-0000-4000-8000-000000000002', 'resolved', 'Repair completed.');
 insert into request_versions select closure_requested_at from public.reports where id = 'b0000000-0000-4000-8000-000000000001';
-select pg_temp.check_that((select count(*) = 1 from public.report_updates), 'request retains history');
-select pg_temp.check_that((select count(*) = 1 from public.activity_logs), 'request retains audit');
-select pg_temp.check_that((select count(*) = 2 from public.notifications), 'request notifies citizen and administrator');
+select pg_temp.check_that((select count(*) = 1 from public.report_updates where report_id = 'b0000000-0000-4000-8000-000000000001'),
+    'request retains history');
+select pg_temp.check_that((select count(*) = 1 from public.activity_logs where entity_id = 'b0000000-0000-4000-8000-000000000001'),
+    'request retains audit');
+-- A request notifies the citizen and every active administrator, so a seeded
+-- database adds one notice per administrator it holds.
+select pg_temp.check_that((select array_agg(user_id order by user_id) from public.notifications
+    where report_id = 'b0000000-0000-4000-8000-000000000001')
+    = (select array_agg(id order by id) from public.profiles
+        where id = 'a0000000-0000-4000-8000-000000000003' or (role = 'admin' and is_active)),
+    'request notifies the citizen and every active administrator');
+create temporary table after_request as
+select count(*) as notices from public.notifications where report_id = 'b0000000-0000-4000-8000-000000000001';
 
 create trigger test_history_failure before insert on public.report_updates for each row execute function pg_temp.fail_write();
 do $$ declare failed boolean := false; begin
@@ -60,7 +72,8 @@ do $$ declare failed boolean := false; begin
     perform pg_temp.check_that(failed, 'approval propagates history failure');
     perform pg_temp.check_that((select status = 'in_progress' and verified_at is null from public.reports where id = 'b0000000-0000-4000-8000-000000000001'),
         'history failure rolls back terminal status');
-    perform pg_temp.check_that((select count(*) = 1 from public.activity_logs), 'history failure adds no approval audit');
+    perform pg_temp.check_that((select count(*) = 1 from public.activity_logs where entity_id = 'b0000000-0000-4000-8000-000000000001'),
+        'history failure adds no approval audit');
 end $$;
 drop trigger test_history_failure on public.report_updates;
 
@@ -72,8 +85,10 @@ do $$ declare failed boolean := false; begin
     perform pg_temp.check_that(failed, 'approval propagates audit failure');
     perform pg_temp.check_that((select status = 'in_progress' and verified_at is null from public.reports where id = 'b0000000-0000-4000-8000-000000000001'),
         'audit failure rolls back terminal status');
-    perform pg_temp.check_that((select count(*) = 1 from public.report_updates), 'audit failure rolls back approval history');
-    perform pg_temp.check_that((select count(*) = 2 from public.notifications), 'audit failure rolls back approval notices');
+    perform pg_temp.check_that((select count(*) = 1 from public.report_updates where report_id = 'b0000000-0000-4000-8000-000000000001'),
+        'audit failure rolls back approval history');
+    perform pg_temp.check_that((select count(*) from public.notifications where report_id = 'b0000000-0000-4000-8000-000000000001')
+        = (select notices from after_request), 'audit failure rolls back approval notices');
     failed := false;
     begin perform public.admin_change_profile('a0000000-0000-4000-8000-000000000001',
         'a0000000-0000-4000-8000-000000000003', 'user.updated', '{"role":"admin"}');
@@ -116,16 +131,17 @@ select public.review_report_closure('b0000000-0000-4000-8000-000000000001', 'a00
     (select closure_requested_at from public.reports where id = 'b0000000-0000-4000-8000-000000000001'), 'approve', 'Confirmed outside scope.');
 select pg_temp.check_that((select status = 'rejected' and resolved_at is null and verified_at is not null from public.reports
     where id = 'b0000000-0000-4000-8000-000000000001'), 'rejection closes with verification and no resolved date');
-select pg_temp.check_that((select count(*) = 1 from public.report_updates where update_type = 'verification' and new_status = 'rejected'),
-    'approved rejection retains one transition');
-select pg_temp.check_that((select count(*) = 1 from public.activity_logs where action = 'report.closure_approved'),
-    'approved rejection retains one audit');
+select pg_temp.check_that((select count(*) = 1 from public.report_updates where report_id = 'b0000000-0000-4000-8000-000000000001'
+    and update_type = 'verification' and new_status = 'rejected'), 'approved rejection retains one transition');
+select pg_temp.check_that((select count(*) = 1 from public.activity_logs where entity_id = 'b0000000-0000-4000-8000-000000000001'
+    and action = 'report.closure_approved'), 'approved rejection retains one audit');
 select public.admin_change_profile('a0000000-0000-4000-8000-000000000001', 'a0000000-0000-4000-8000-000000000003', 'residency.reviewed',
     jsonb_build_object('decision', 'rejected', 'note', 'Please upload a readable proof.', 'expected_version',
         (select residency_review_version from public.profiles where id = 'a0000000-0000-4000-8000-000000000003')));
 select pg_temp.check_that((select residency_status = 'rejected' and residency_reviewed_by = 'a0000000-0000-4000-8000-000000000001'
     from public.profiles where id = 'a0000000-0000-4000-8000-000000000003'), 'residency decision retains reviewer');
-select pg_temp.check_that((select count(*) = 1 from public.activity_logs where action = 'residency.reviewed'), 'residency decision retains audit');
+select pg_temp.check_that((select count(*) = 1 from public.activity_logs where entity_id = 'a0000000-0000-4000-8000-000000000003'
+    and action = 'residency.reviewed'), 'residency decision retains audit');
 select pg_temp.check_that(not has_function_privilege('anon', 'public.review_report_closure(uuid,uuid,timestamptz,text,text,inet)', 'execute'),
     'anonymous clients cannot invoke closure write');
 select pg_temp.check_that(not has_function_privilege('authenticated', 'public.admin_change_profile(uuid,uuid,text,jsonb,inet)', 'execute'),

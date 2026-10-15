@@ -218,6 +218,8 @@ sign-in answers `503`.
 It creates synthetic records inside a transaction and rolls them back. Do not
 run it against a database that is not approved for testing. `atomic-actions.sql`
 injects failures to check rollback of closure and privileged account operations.
+It counts only the rows it creates, so it passes on a freshly migrated database
+and on a local stack that holds the fixture and demo seed (#72).
 It requires a disposable database with `kamoti.test_database = 'disposable'`.
 Do not enable that setting or install its failure triggers on the shared project.
 Native PostgreSQL replay verifies SQL behavior; it does not run Supabase Auth,
