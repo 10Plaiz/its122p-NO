@@ -1178,6 +1178,56 @@ async function main(): Promise<void> {
       }
     });
 
+    await runCase("IMP-19", "Residency Review", "an administrator's name correction keeps a verified resident verified; the citizen's own name change returns to review (#67)", async () => {
+      const fields = "id, first_name, middle_name, last_name, suffix, name, contact_number, phone_verified_at, barangay, address_line, residency_status, residency_note, residency_reviewed_by, residency_reviewed_at";
+      const { data: before } = await db.from("profiles").select(fields).eq("email", "fixture-citizen-2@kamoti.invalid").single();
+      if (!before) throw new Error("Could not read fixture citizen 2");
+      // Names first (that update returns the account to review), then the decision.
+      const restore = async () => {
+        const { id, residency_status, residency_note, residency_reviewed_by, residency_reviewed_at, ...details } = before;
+        await db.from("profiles").update(details).eq("id", id);
+        await db.from("profiles").update({ residency_status, residency_note, residency_reviewed_by, residency_reviewed_at }).eq("id", id);
+      };
+      cleanups.push(restore);
+      const { data: admin } = await db.from("profiles").select("id").eq("email", "fixture-admin@kamoti.invalid").single();
+      try {
+        // An address on file first, so the citizen's own edit below changes only the name.
+        const home = { barangay: before.barangay ?? "Poblacion", address_line: before.address_line ?? "7 Fixture Street" };
+        await db.from("profiles").update(home).eq("id", before.id);
+        await db.from("profiles").update({ residency_status: "verified", residency_reviewed_by: admin!.id, residency_reviewed_at: new Date().toISOString() }).eq("id", before.id);
+        const token = await login("fixture-citizen-2@kamoti.invalid");
+        // An empty report passes the residency gate and stops at its fields (400); a gated one gets 403.
+        const gate = async () => (await api("/api/reports", { method: "POST", headers: bearer(token), body: "{}" })).status;
+
+        const fixed = await api(`/api/admin/users/${before.id}`, {
+          method: "PATCH",
+          headers: bearer(adminToken),
+          // Explicit names: older fixture accounts may have only the composed name.
+          body: JSON.stringify({ first_name: "Fixture", last_name: "Corrected" }),
+        });
+        if (fixed.status !== 200 || fixed.body?.user?.residency_status !== "verified") {
+          throw new Error(`Administrator name fix: expected 200 and still verified, got ${fixed.status} ${fixed.body?.user?.residency_status ?? fixed.body?.error}`);
+        }
+        const { data: audit } = await db.from("activity_logs").select("metadata").eq("action", "user.updated").eq("entity_id", before.id)
+          .order("id", { ascending: false }).limit(1).single();
+        if ((audit?.metadata as { residency_kept?: string } | null)?.residency_kept !== "verified") throw new Error("The audit does not record the kept decision");
+        if (await gate() !== 400) throw new Error("After the administrator's fix, the citizen should still pass the residency gate");
+
+        const own = await api("/api/auth/me", {
+          method: "PATCH",
+          headers: bearer(token),
+          body: JSON.stringify({ first_name: "Fixtura", last_name: "Corrected", ...home,
+            ...(before.contact_number ? { contact_number: before.contact_number } : {}) }),
+        });
+        if (own.status !== 200 || own.body?.user?.residency_status !== "pending") {
+          throw new Error(`Citizen's own name change: expected 200 and pending, got ${own.status} ${own.body?.user?.residency_status ?? own.body?.error}`);
+        }
+        if (await gate() !== 403) throw new Error("After the citizen's own name change, new reports should wait for review");
+      } finally {
+        await restore();
+      }
+    });
+
     // ------------------------------------------------------------------ Section A: Input Validation Live Check
     console.log("\n--- Section A: Input Validation Live Tests ---");
 
