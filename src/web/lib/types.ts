@@ -296,9 +296,9 @@ export type Paged<K extends string, T> = { [P in K]: T[] } & {
   total: number;
 };
 
+// The refresh token never reaches the page: it travels as an HttpOnly cookie (KI-12).
 export type Session = {
   user: Profile;
   access_token: string;
-  refresh_token: string;
   expires_at: number;
 };

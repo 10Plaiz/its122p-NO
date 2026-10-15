@@ -8,8 +8,12 @@ import { z } from "zod";
 import type { Session } from "./types.js";
 
 export const TOKEN_KEY = "kamoti.token";
-const REFRESH_KEY = "kamoti.refresh";
+// Where refresh tokens were stored before KI-12 moved them to an HttpOnly cookie.
+// Read only to move an existing session over, then removed.
+const LEGACY_REFRESH_KEY = "kamoti.refresh";
 export const EXPIRES_KEY = "kamoti.expires";
+// Sent on /auth/refresh so another site cannot trigger it (see session-cookie.ts).
+export const SESSION_HEADER = "X-KAMOTI-Session";
 
 // Fired on window after a refresh stores a new session; detail is the Session.
 export const SESSION_REFRESHED_EVENT = "kamoti:session-refreshed";
@@ -114,10 +118,18 @@ export function getToken(): string | null {
   }
 }
 
-// KI-13: sign-out sends it, so the server can end a session whose access token has
-// already expired.
-export function getRefreshToken(): string | null {
-  return read(REFRESH_KEY);
+// KI-13: sign-out sends a legacy token, so the server can end that session even
+// when its access token has expired. Newer sessions use the cookie instead.
+export function getLegacyRefreshToken(): string | null {
+  return read(LEGACY_REFRESH_KEY);
+}
+
+function removeLegacyRefreshToken() {
+  try {
+    localStorage.removeItem(LEGACY_REFRESH_KEY);
+  } catch {
+    // Nothing stored, nothing to remove.
+  }
 }
 
 function read(key: string): string | null {
@@ -128,12 +140,12 @@ function read(key: string): string | null {
   }
 }
 
-// UA-9. The refresh token sits beside the access token in localStorage (agreed
-// 2026-10-03). Every tab reads the same keys, so a refresh in one tab is seen by all.
-export function storeSession(session: Pick<Session, "access_token" | "refresh_token" | "expires_at">) {
+// UA-9. The access token and its expiry sit in localStorage; the refresh token is
+// an HttpOnly cookie the page never sees (KI-12). Every tab reads the same keys,
+// so a refresh in one tab is seen by all.
+export function storeSession(session: Pick<Session, "access_token" | "expires_at">) {
   try {
     localStorage.setItem(TOKEN_KEY, session.access_token);
-    localStorage.setItem(REFRESH_KEY, session.refresh_token);
     localStorage.setItem(EXPIRES_KEY, String(session.expires_at));
   } catch {
     // A session that cannot be persisted still works until the tab closes.
@@ -142,7 +154,7 @@ export function storeSession(session: Pick<Session, "access_token" | "refresh_to
 
 export function clearSession() {
   try {
-    localStorage.removeItem(REFRESH_KEY);
+    localStorage.removeItem(LEGACY_REFRESH_KEY);
     localStorage.removeItem(EXPIRES_KEY);
     // Last, because other tabs treat the token's removal as the sign-out.
     localStorage.removeItem(TOKEN_KEY);
@@ -180,29 +192,37 @@ export function refreshSession(): Promise<boolean> {
   return refreshing;
 }
 
-function withRefreshLock(task: (spent: string) => Promise<boolean>): Promise<boolean> {
-  const spent = read(REFRESH_KEY);
-  if (!spent) return Promise.resolve(false);
+// The access token stands for the session: the page cannot see the refresh cookie,
+// so a changed access token is how this tab learns another tab already refreshed.
+function withRefreshLock(task: (before: string) => Promise<boolean>): Promise<boolean> {
+  const before = getToken();
+  if (!before) return Promise.resolve(false);
   const locks = typeof navigator === "undefined" ? undefined : navigator.locks;
-  return locks ? locks.request("kamoti.refresh", () => task(spent)) : task(spent);
+  return locks ? locks.request("kamoti.refresh", () => task(before)) : task(before);
 }
 
-async function runRefresh(spent: string): Promise<boolean> {
+async function runRefresh(before: string): Promise<boolean> {
   // Another tab refreshed while this one waited for the lock: use its session.
-  const current = read(REFRESH_KEY);
-  if (current !== spent) return current !== null;
+  const current = getToken();
+  if (current !== before) return current !== null;
+
+  // A session from before KI-12 hands its stored token over once; the answer sets
+  // the cookie, and the stored copy is dropped whatever the outcome.
+  const legacy = getLegacyRefreshToken();
 
   let response: Response;
   try {
     response = await fetch("/api/auth/refresh", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ refresh_token: spent }),
+      credentials: "same-origin",
+      headers: { "Content-Type": "application/json", [SESSION_HEADER]: "1" },
+      body: JSON.stringify(legacy ? { refresh_token: legacy } : {}),
     });
   } catch {
     // Offline. Keep the session; the next request or timer tries again.
     return false;
   }
+  if (legacy && (response.ok || response.status === 401 || response.status === 403)) removeLegacyRefreshToken();
 
   if (!response.ok) {
     // The server refused the token itself (expired, revoked, deactivated). A

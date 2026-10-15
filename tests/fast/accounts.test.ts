@@ -3,13 +3,16 @@ process.env.SUPABASE_PUBLISHABLE_KEY ??= "placeholder-publishable-key";
 process.env.SUPABASE_SECRET_KEY ??= "placeholder-secret-key";
 
 import { describe, expect, it } from "bun:test";
+import express from "express";
+import type { AddressInfo } from "node:net";
 
 // Accounts (UA-4, UA-7, UA-10, UA-11). No live Supabase: these cover how auth
 // failures are worded and how the account forms are checked.
 
 const { ACCOUNT_ERROR_CODES, accountError } = await import("../../src/server/lib/accounts-errors.js");
 const { createUserSchema, updateUserSchema } = await import("../../src/server/routes/admin.routes.js");
-const { limits } = await import("../../src/server/lib/rate-limit.js");
+const { limit, limits } = await import("../../src/server/lib/rate-limit.js");
+const { errorHandler } = await import("../../src/server/middleware/error.js");
 
 describe("ACC-01 a failed sign-in or sign-up says what happened (UA-11)", () => {
   it("turns Supabase codes into plain sentences with a fitting status", () => {
@@ -54,8 +57,35 @@ describe("ACC-02 administrators create accounts with the same rules (UA-4, UA-7)
 
 describe("ACC-03 throttles exist for every secret-guessing or sending route (UA-10)", () => {
   it("defines a limiter for sign-in, sign-up, codes, and refresh", () => {
-    for (const name of ["loginPerAccount", "loginPerClient", "register", "verify", "sendCode", "refresh"] as const) {
+    for (const name of ["loginPerAccount", "loginPerClient", "loginPerAddress", "register", "verify", "sendCode", "refresh"] as const) {
       expect(typeof limits[name]).toBe("function");
+    }
+  });
+
+  it("locks one address after twenty failures, whichever client sends them", async () => {
+    const app = express();
+    app.use(express.json());
+    // A fresh instance, so this test does not share counts with the mounted one.
+    const perAddress = limit({ windowMs: 60_000, limit: 20, message: "Wait.", failuresOnly: true, perAddress: true });
+    app.post("/login", perAddress, (_req, res) => {
+      res.status(401).json({ error: "That email and password do not match." });
+    });
+    app.use(errorHandler);
+    const server = app.listen(0);
+    const { port } = server.address() as AddressInfo;
+    const login = (email: string) =>
+      fetch(`http://127.0.0.1:${port}/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+
+    try {
+      for (let i = 0; i < 20; i++) expect((await login(i % 2 ? "Ana@Example.com" : "ana@example.com")).status).toBe(401);
+      expect((await login("ana@example.com")).status).toBe(429);
+      expect((await login("ben@example.com")).status).toBe(401);
+    } finally {
+      server.close();
     }
   });
 });

@@ -87,7 +87,6 @@ async function adaptApi(page: Page, state: Simulation, persona: "admin" | "citiz
       return reply({
         user: persona === "admin" ? admin : state.current,
         access_token: "local-simulated-token",
-        refresh_token: "local-simulated-refresh",
         expires_at: Math.floor(Date.now() / 1000) + 3600,
       });
     }

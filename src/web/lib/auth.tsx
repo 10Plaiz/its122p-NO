@@ -6,7 +6,7 @@ import {
   clearSession,
   EXPIRES_KEY,
   getExpiresAt,
-  getRefreshToken,
+  getLegacyRefreshToken,
   getToken,
   refreshDelay,
   refreshSession,
@@ -114,9 +114,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // not wait for it or let it fail the sign-out — clearing the session locally is
       // what matters, and it must happen even offline. The token is read when the
       // request starts, before clearSession() below.
-      // The refresh token goes along, so the server can end the session even when
-      // the access token has already expired (KI-13).
-      void api.post<void>("/auth/logout", { refresh_token: getRefreshToken() ?? undefined }).catch(() => undefined);
+      // The refresh cookie goes along, so the server can end the session even when
+      // the access token has already expired (KI-13). A session from before the
+      // cookie (KI-12) sends its stored token instead.
+      void api.post<void>("/auth/logout", { refresh_token: getLegacyRefreshToken() ?? undefined }).catch(() => undefined);
 
       writeEndReason(reason);
       clearSession();

@@ -63,14 +63,28 @@ export async function confirmEmail(email: string, token: string) {
   return sessionResponse(data.session, data.user);
 }
 
+// KI-15. Supabase answers its per-address email throttle only for addresses that
+// have an account, so passing that 429 on would tell anyone which emails are
+// registered. It is answered like a sent code instead and logged here, since it
+// also covers the project running out of its hourly email allowance.
+function hidesAccount(error: { code?: string | null }, purpose: string) {
+  if (error.code !== "over_email_send_rate_limit") return false;
+  console.warn(`Supabase withheld a ${purpose} email: over_email_send_rate_limit.`);
+  return true;
+}
+
 export async function resendSignUpCode(email: string) {
   const { error } = await auth.auth.resend({ type: "signup", email });
-  if (error) throw accountError(error, "A new code could not be sent. Try again in a few minutes.");
+  if (error && !hidesAccount(error, "signup code")) {
+    throw accountError(error, "A new code could not be sent. Try again in a few minutes.");
+  }
 }
 
 export async function sendPasswordResetCode(email: string) {
   const { error } = await auth.auth.resetPasswordForEmail(email);
-  if (error) throw accountError(error, "A reset code could not be sent. Try again in a few minutes.");
+  if (error && !hidesAccount(error, "reset code")) {
+    throw accountError(error, "A reset code could not be sent. Try again in a few minutes.");
+  }
 }
 
 // UA-12. The code proves the person reads the address's mail. The new password is

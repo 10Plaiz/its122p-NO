@@ -11,8 +11,9 @@ import {
   startSignUp,
 } from "../lib/accounts-email.js";
 import { ACCOUNT_FIELDS, revokeSession, sessionResponse, withProofFlag } from "../lib/accounts-profile.js";
-import { badRequest, orThrow } from "../lib/errors.js";
+import { ApiError, badRequest, orThrow } from "../lib/errors.js";
 import { residencyUpload } from "../lib/residency.js";
+import { clearRefreshCookie, issueSession, readRefreshCookie, requireSessionHeader } from "../lib/session-cookie.js";
 import { completeResidencyProof, updateOwnProfile } from "../services/residency.js";
 import { limits } from "../lib/rate-limit.js";
 import { citizenSubmissionLimit } from "../lib/submission-limits.js";
@@ -56,8 +57,10 @@ export const loginSchema = z.object({
 export const emailSchema = z.object({ email });
 export const verifyEmailSchema = z.object({ email, token: verificationCode });
 export const resetPasswordSchema = z.object({ email, token: verificationCode, password: passwordRule });
+// KI-12: the token comes from the cookie. A body token is accepted only from a
+// browser that stored one before the cookie existed, once, to move it over.
 export const refreshSchema = z.object({
-  refresh_token: z.string().min(1, "Sign in again.").max(1024, "Sign in again."),
+  refresh_token: z.string().min(1, "Sign in again.").max(1024, "Sign in again.").optional(),
 });
 
 // Kept on the login as user_metadata. ensureProfile() builds the profile from it
@@ -96,7 +99,7 @@ router.post("/register", limits.register, async (req, res) => {
 // A correct code confirms the address and signs the person in.
 router.post("/verify-email", limits.verify, async (req, res) => {
   const input = parse(verifyEmailSchema, req.body);
-  res.json(await confirmEmail(input.email, input.token));
+  res.json(issueSession(req, res, await confirmEmail(input.email, input.token)));
 });
 
 // Same answer whether or not the address has an account waiting for a code.
@@ -119,21 +122,30 @@ router.post("/reset-password", limits.verify, async (req, res) => {
   res.status(204).end();
 });
 
-// UA-9: trades a refresh token for a new session before the access token expires.
-router.post("/refresh", limits.refresh, async (req, res) => {
-  const input = parse(refreshSchema, req.body);
-  res.json(await refreshSession(input.refresh_token));
+// UA-9: trades the refresh cookie for a new session before the access token
+// expires. Supabase rotates the token, so the cookie is replaced each time. A
+// refused token clears the cookie, as the browser clears its session.
+router.post("/refresh", limits.refresh, requireSessionHeader, async (req, res) => {
+  const input = parse(refreshSchema, req.body ?? {});
+  const token = readRefreshCookie(req) ?? input.refresh_token;
+  try {
+    if (!token) throw new ApiError(401, "Your session has expired. Sign in again.");
+    res.json(issueSession(req, res, await refreshSession(token)));
+  } catch (error) {
+    if (error instanceof ApiError && (error.status === 401 || error.status === 403)) clearRefreshCookie(req, res);
+    throw error;
+  }
 });
 
-// Wrong passwords are counted per address and per client (UA-10); a correct one
-// is never slowed down by earlier typos.
-router.post("/login", limits.loginPerClient, limits.loginPerAccount, async (req, res) => {
+// Wrong passwords are counted per client, per address from that client, and per
+// address from any client (UA-10); a correct one is never slowed down by earlier typos.
+router.post("/login", limits.loginPerClient, limits.loginPerAccount, limits.loginPerAddress, async (req, res) => {
   const input = parse(loginSchema, req.body);
 
   const { data, error } = await auth.auth.signInWithPassword(input);
   if (error) throw accountError(error, "That email and password do not match.");
 
-  res.json(await sessionResponse(data.session, data.user));
+  res.json(issueSession(req, res, await sessionResponse(data.session, data.user)));
 });
 
 // The whole account, as login returns it, so a reload sees the same residency
@@ -210,13 +222,15 @@ router.post(
 
 const logoutSchema = z.object({ refresh_token: z.string().min(1).max(4096).optional() });
 
-// POST /api/auth/logout { refresh_token? } — ends this session on the server too,
-// so a copied token stops working (UA-10). A live access token is revoked as it
-// is. If it has already expired, the refresh token stands in: it is exchanged once
-// for a fresh token, which is then revoked (KI-13). Always 204: signing out never
-// fails for the person, who is signed out in the browser either way.
+// POST /api/auth/logout — ends this session on the server too, so a copied token
+// stops working (UA-10). A live access token is revoked as it is. If it has
+// already expired, the refresh cookie (or a legacy body token) stands in: it is
+// exchanged once for a fresh token, which is then revoked (KI-13). The cookie is
+// always cleared. Always 204: signing out never fails for the person, who is
+// signed out in the browser either way.
 router.post("/logout", limits.refresh, async (req, res) => {
-  const { refresh_token } = parse(logoutSchema, req.body ?? {});
+  const refresh_token = readRefreshCookie(req) ?? parse(logoutSchema, req.body ?? {}).refresh_token;
+  clearRefreshCookie(req, res);
   let token = bearerToken(req);
   let userId: string | null = null;
 

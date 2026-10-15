@@ -3,6 +3,8 @@ process.env.SUPABASE_PUBLISHABLE_KEY ??= "placeholder-publishable-key";
 process.env.SUPABASE_SECRET_KEY ??= "placeholder-secret-key";
 
 import { afterEach, describe, expect, it } from "bun:test";
+import express from "express";
+import type { AddressInfo } from "node:net";
 
 // Email codes, password reset, and refresh (UA-5, UA-9, UA-12). No live Supabase:
 // the Auth client and the profiles table are stubbed, so these check what the API
@@ -11,9 +13,16 @@ import { afterEach, describe, expect, it } from "bun:test";
 const { auth, db } = await import("../../src/server/config/supabase.js");
 const { ACCOUNT_ERROR_CODES } = await import("../../src/server/lib/accounts-errors.js");
 const { ApiError } = await import("../../src/server/lib/errors.js");
-const { VERIFICATION_OFF_ERROR, confirmEmail, refreshSession, resetPassword, startSignUp } = await import(
-  "../../src/server/lib/accounts-email.js"
-);
+const { errorHandler } = await import("../../src/server/middleware/error.js");
+const {
+  VERIFICATION_OFF_ERROR,
+  confirmEmail,
+  refreshSession,
+  resendSignUpCode,
+  resetPassword,
+  sendPasswordResetCode,
+  startSignUp,
+} = await import("../../src/server/lib/accounts-email.js");
 const { default: authRouter, refreshSchema, registerSchema, resetPasswordSchema, signUpMetadata, verifyEmailSchema } =
   await import("../../src/server/routes/auth.routes.js");
 const { ensureProfile } = await import("../../src/server/lib/accounts-profile.js");
@@ -180,6 +189,23 @@ describe("ACC-06 a reset code sets a new password and ends every session (UA-12)
   });
 });
 
+describe("ACC-12 code requests never reveal whether an account exists (KI-15)", () => {
+  it("answers Supabase's per-address throttle like a sent code", async () => {
+    const throttled = { data: {}, error: { code: "over_email_send_rate_limit", status: 429 } };
+    stub(auth.auth, "resend", throttled);
+    stub(auth.auth, "resetPasswordForEmail", throttled);
+    await resendSignUpCode("ana@example.com");
+    await sendPasswordResetCode("ana@example.com");
+    expect(calls.resend).toHaveLength(1);
+    expect(calls.resetPasswordForEmail).toHaveLength(1);
+  });
+
+  it("still refuses throttles that do not depend on the address", async () => {
+    stub(auth.auth, "resend", { data: {}, error: { code: "over_request_rate_limit", status: 429 } });
+    expect((await rejection(resendSignUpCode("ana@example.com"))).status).toBe(429);
+  });
+});
+
 describe("ACC-07 refresh keeps an active session going (UA-9)", () => {
   it("returns a new session for a valid refresh token", async () => {
     stub(auth.auth, "refreshSession", {
@@ -225,9 +251,9 @@ describe("ACC-08 the code and refresh routes check their input (UA-5, UA-9, UA-1
     expect(resetPasswordSchema.safeParse({ email: "ana@example.com", token: "123456", password: "Str0ng!pass" }).success).toBe(true);
   });
 
-  it("needs a refresh token", () => {
+  it("takes no body token, but refuses an empty legacy one", () => {
     expect(refreshSchema.safeParse({ refresh_token: "" }).success).toBe(false);
-    expect(refreshSchema.safeParse({}).success).toBe(false);
+    expect(refreshSchema.safeParse({}).success).toBe(true);
   });
 
   it("mounts every route behind a throttle", () => {
@@ -279,6 +305,96 @@ describe("ACC-11 every registration the form accepts can become a profile (UA-5,
       barangay: "Poblacion",
       residency_status: "pending",
       privacy_consent_at: "2026-10-03T00:00:00.000Z",
+    });
+  });
+});
+
+describe("ACC-13 the refresh token travels only as an HttpOnly cookie (KI-12)", () => {
+  async function withApp(run: (base: string) => Promise<void>) {
+    const app = express();
+    app.use(express.json());
+    app.use("/api/auth", authRouter);
+    app.use(errorHandler);
+    const server = app.listen(0);
+    try {
+      await run(`http://127.0.0.1:${(server.address() as AddressInfo).port}`);
+    } finally {
+      server.close();
+    }
+  }
+  const post = (url: string, headers: Record<string, string> = {}, body: unknown = {}) =>
+    fetch(url, { method: "POST", headers: { "Content-Type": "application/json", ...headers }, body: JSON.stringify(body) });
+
+  it("sets the cookie at sign-in and leaves the token out of the body", async () => {
+    stub(auth.auth, "signInWithPassword", { data: { user: USER, session: SESSION }, error: null });
+    stubProfiles(PROFILE);
+    await withApp(async (base) => {
+      const res = await post(`${base}/api/auth/login`, {}, { email: "ana@example.com", password: "Str0ng!pass" });
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.access_token).toBe("access-1");
+      expect(body.refresh_token).toBeUndefined();
+      const cookie = res.headers.get("set-cookie") ?? "";
+      expect(cookie).toContain("kamoti_refresh=refresh-1");
+      expect(cookie).toContain("HttpOnly");
+      expect(cookie).toContain("SameSite=Strict");
+      expect(cookie).toContain("Path=/api/auth");
+    });
+  });
+
+  it("refreshes from the cookie and replaces it with the rotated token", async () => {
+    stub(auth.auth, "refreshSession", { data: { user: USER, session: { ...SESSION, refresh_token: "refresh-2" } }, error: null });
+    stubProfiles(PROFILE);
+    await withApp(async (base) => {
+      const res = await post(`${base}/api/auth/refresh`, { Cookie: "kamoti_refresh=refresh-1", "X-KAMOTI-Session": "1" });
+      expect(res.status).toBe(200);
+      expect(calls.refreshSession?.[0]).toEqual({ refresh_token: "refresh-1" });
+      expect((await res.json()).refresh_token).toBeUndefined();
+      expect(res.headers.get("set-cookie")).toContain("kamoti_refresh=refresh-2");
+    });
+  });
+
+  it("refuses a refresh another site could trigger, without the session header", async () => {
+    stub(auth.auth, "refreshSession", { data: { user: USER, session: SESSION }, error: null });
+    await withApp(async (base) => {
+      const res = await post(`${base}/api/auth/refresh`, { Cookie: "kamoti_refresh=refresh-1" });
+      expect(res.status).toBe(403);
+      expect(calls.refreshSession).toBeUndefined();
+    });
+  });
+
+  it("answers 401 and clears the cookie when there is no usable token", async () => {
+    stub(auth.auth, "refreshSession", { data: { user: null, session: null }, error: { code: "refresh_token_already_used" } });
+    await withApp(async (base) => {
+      const none = await post(`${base}/api/auth/refresh`, { "X-KAMOTI-Session": "1" });
+      expect(none.status).toBe(401);
+      const used = await post(`${base}/api/auth/refresh`, { Cookie: "kamoti_refresh=used", "X-KAMOTI-Session": "1" });
+      expect(used.status).toBe(401);
+      expect(used.headers.get("set-cookie")).toMatch(/kamoti_refresh=;.*Expires=Thu, 01 Jan 1970/);
+    });
+  });
+
+  it("moves a legacy body token over to the cookie", async () => {
+    stub(auth.auth, "refreshSession", { data: { user: USER, session: { ...SESSION, refresh_token: "refresh-2" } }, error: null });
+    stubProfiles(PROFILE);
+    await withApp(async (base) => {
+      const res = await post(`${base}/api/auth/refresh`, { "X-KAMOTI-Session": "1" }, { refresh_token: "legacy-1" });
+      expect(res.status).toBe(200);
+      expect(calls.refreshSession?.[0]).toEqual({ refresh_token: "legacy-1" });
+      expect(res.headers.get("set-cookie")).toContain("kamoti_refresh=refresh-2");
+    });
+  });
+
+  it("signs out with the cookie when the access token has expired, and clears it", async () => {
+    stub(auth.auth, "refreshSession", { data: { user: USER, session: { ...SESSION, access_token: "access-9" } }, error: null });
+    stub(db.auth.admin, "signOut", { error: null });
+    stubFrom(() => ({ insert: async () => ({ error: null }) }));
+    await withApp(async (base) => {
+      const res = await post(`${base}/api/auth/logout`, { Cookie: "kamoti_refresh=refresh-1" });
+      expect(res.status).toBe(204);
+      expect(calls.refreshSession?.[0]).toEqual({ refresh_token: "refresh-1" });
+      expect(calls.signOut?.[0]).toEqual(["access-9", "local"]);
+      expect(res.headers.get("set-cookie")).toMatch(/kamoti_refresh=;/);
     });
   });
 });

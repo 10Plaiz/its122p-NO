@@ -245,6 +245,14 @@ async function main(): Promise<void> {
       return { status: res.status, ok: res.ok, headers: res.headers, body: json };
     }
 
+    // KI-12: the refresh token arrives only as the HttpOnly kamoti_refresh cookie.
+    function refreshCookieOf(res: { headers: Headers }) {
+      const match = /kamoti_refresh=([^;]+)/.exec(res.headers.get("set-cookie") ?? "");
+      return match ? decodeURIComponent(match[1]!) : null;
+    }
+    const refreshWith = (token: string) =>
+      api("/api/auth/refresh", { method: "POST", headers: { Cookie: `kamoti_refresh=${encodeURIComponent(token)}`, "X-KAMOTI-Session": "1" } });
+
     async function login(email: string) {
       const res = await api("/api/auth/login", {
         method: "POST",
@@ -729,16 +737,34 @@ async function main(): Promise<void> {
         method: "POST",
         body: JSON.stringify({ email: "fixture-citizen-1@kamoti.invalid", password: fixturePassword }),
       });
-      const refreshToken = session.body?.refresh_token as string;
-      if (!refreshToken) throw new Error("No refresh token from login");
+      const refreshToken = refreshCookieOf(session);
+      if (!refreshToken) throw new Error("No refresh cookie from login");
       const out = await api("/api/auth/logout", {
         method: "POST",
-        headers: { Authorization: "Bearer expired.or.garbage" },
-        body: JSON.stringify({ refresh_token: refreshToken }),
+        headers: { Authorization: "Bearer expired.or.garbage", Cookie: `kamoti_refresh=${encodeURIComponent(refreshToken)}` },
       });
       if (out.status !== 204) throw new Error(`Expected 204 from logout, got ${out.status}`);
-      const reused = await api("/api/auth/refresh", { method: "POST", body: JSON.stringify({ refresh_token: refreshToken }) });
+      const reused = await refreshWith(refreshToken);
       if (reused.status !== 401) throw new Error(`The old refresh token still works after sign-out: ${reused.status}`);
+    });
+
+    await runCase("IMP-16", "Session Handling", "the refresh token is an HttpOnly cookie and refresh needs the session header (KI-12)", async () => {
+      const session = await api("/api/auth/login", {
+        method: "POST",
+        body: JSON.stringify({ email: "fixture-citizen-1@kamoti.invalid", password: fixturePassword }),
+      });
+      if (session.status !== 200) throw new Error(`Sign-in: expected 200, got ${session.status}`);
+      if (session.body?.refresh_token !== undefined) throw new Error("The login body still carries the refresh token");
+      const cookie = session.headers.get("set-cookie") ?? "";
+      for (const part of ["HttpOnly", "SameSite=Strict", "Path=/api/auth"]) {
+        if (!cookie.includes(part)) throw new Error(`The refresh cookie lacks ${part}: ${cookie}`);
+      }
+      const token = refreshCookieOf(session)!;
+      const forged = await api("/api/auth/refresh", { method: "POST", headers: { Cookie: `kamoti_refresh=${encodeURIComponent(token)}` } });
+      if (forged.status !== 403) throw new Error(`Refresh without the session header: expected 403, got ${forged.status}`);
+      const refreshed = await refreshWith(token);
+      if (refreshed.status !== 200 || !refreshCookieOf(refreshed)) throw new Error(`Refresh: expected 200 and a new cookie, got ${refreshed.status}`);
+      await api("/api/auth/logout", { method: "POST", headers: { Cookie: `kamoti_refresh=${encodeURIComponent(refreshCookieOf(refreshed)!)}` } });
     });
 
     await runCase("IMP-11", "Account Details", "a citizen edits their own details; a new number loses its verified mark and a new barangay goes back to review (UA-13)", async () => {
@@ -828,7 +854,7 @@ async function main(): Promise<void> {
       const session = await api("/api/auth/login", { method: "POST", body: JSON.stringify({ email: securityEmail, password: securityPassword }) });
       if (session.status !== 200) throw new Error(`Synthetic citizen sign-in: expected 200, got ${session.status}`);
       securityToken = session.body.access_token;
-      securityRefresh = session.body.refresh_token;
+      securityRefresh = refreshCookieOf(session) ?? "";
       securityId = session.body.user.id;
 
       const submissionId = randomUUID();
@@ -917,7 +943,7 @@ async function main(): Promise<void> {
       }
       const login = await api("/api/auth/login", { method: "POST", body: JSON.stringify({ email: securityEmail, password: securityPassword }) });
       if (login.status !== 403) throw new Error(`Sign-in: expected 403, got ${login.status}`);
-      const refresh = await api("/api/auth/refresh", { method: "POST", body: JSON.stringify({ refresh_token: securityRefresh }) });
+      const refresh = await refreshWith(securityRefresh);
       if (refresh.ok) throw new Error(`Refresh still worked for a deactivated account (${refresh.status})`);
     });
 
