@@ -935,7 +935,7 @@ async function main(): Promise<void> {
       if (saved !== 1) throw new Error(`Expected one saved rating, found ${saved}`);
     });
 
-    await runCase("IMP-17", "Residency Approval", "new reports and report photos wait for an administrator's approval, through an address change, a rejection, and a re-upload of the same file (#59)", async () => {
+    await runCase("IMP-17", "Residency Approval", "new reports and report photos wait for an administrator's approval, through an address change, a rejection, a refused damaged file (#62), and a re-upload of the same file (#59)", async () => {
       if (!securityReportId) throw new Error("IMP-13 did not create the synthetic citizen's report");
       const reportBody = JSON.stringify({ title: "[TEST] Refused before approval", description: "This report must not be saved.", category_id: testCategory.id, primary_problem_id: 1, latitude: 14.5547, longitude: 121.0244 });
       const version = async () => {
@@ -977,6 +977,21 @@ async function main(): Promise<void> {
       });
       if (rejected.status !== 200) throw new Error(`Rejection: expected 200, got ${rejected.status} ${rejected.body?.error ?? ""}`);
       await expectRefused("residency_required", "After a rejection");
+
+      // #62: a damaged file is refused on the proof field and changes nothing.
+      const { data: beforeDamaged } = await db.from("profiles").select("residency_status, residency_note, residency_proof_id, residency_proof_path").eq("id", securityId).single();
+      const damagedId = randomUUID();
+      const damagedForm = new FormData();
+      damagedForm.append("proof", new Blob([PNG.subarray(0, 40)], { type: "image/png" }), "proof.png");
+      damagedForm.append("submission_id", damagedId);
+      damagedForm.append("expected_version", (await version()).residency_review_version);
+      const damaged = await multipart(`/api/auth/me/residency-proof?submission_id=${damagedId}`, securityToken, damagedForm);
+      const damagedBody = (await damaged.json()) as { details?: { field: string }[] };
+      if (damaged.status !== 400 || damagedBody.details?.[0]?.field !== "proof") throw new Error(`A damaged proof: expected 400 on the proof field, got ${damaged.status} ${JSON.stringify(damagedBody)}`);
+      const { data: afterDamaged } = await db.from("profiles").select("residency_status, residency_note, residency_proof_id, residency_proof_path").eq("id", securityId).single();
+      if (JSON.stringify(afterDamaged) !== JSON.stringify(beforeDamaged)) throw new Error(`A damaged proof changed the account: ${JSON.stringify(beforeDamaged)} -> ${JSON.stringify(afterDamaged)}`);
+      const stored = await db.storage.from("residency-proofs").list(securityId);
+      if ((stored.data ?? []).some((object) => object.name.startsWith(damagedId))) throw new Error("A damaged proof was stored");
 
       const submissionId = randomUUID();
       const reupload = await multipart(`/api/auth/me/residency-proof?submission_id=${submissionId}`, securityToken,
