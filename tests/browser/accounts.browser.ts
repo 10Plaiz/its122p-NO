@@ -115,7 +115,11 @@ test("UA-8: an administrator accepts the new proof; the citizen is a verified re
   await row.getByRole("button", { name: /Review/ }).click();
   await admin.getByRole("button", { name: "Open proof" }).click();
   await expect(admin.getByAltText("Proof of residency uploaded by Ana Reyes")).toBeVisible();
-  await admin.getByRole("button", { name: "Accept as resident" }).click();
+  // #63: all four checks before the document can be accepted.
+  const accept = admin.getByRole("button", { name: "Accept the document" });
+  await expect(accept).toBeDisabled();
+  for (const box of await admin.getByRole("checkbox").all()) await box.check();
+  await accept.click();
   await expect(admin.getByText("Ana Reyes is now a verified resident.")).toBeVisible();
   await admin.close();
 

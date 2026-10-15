@@ -49,16 +49,41 @@ export const updateUserSchema = z
 
 export const RESIDENCY_NOTE_ERROR = "Say why the proof was not accepted, so the citizen knows what to upload instead.";
 
+// #63, owner decisions 2026-10-15: what an Administrator confirms before accepting
+// an uploaded document. Mirrored by REVIEW_CHECKS in ResidencyReview.tsx and by
+// admin_change_profile (migration 20261015000200).
+export const REVIEW_CHECKS = ["name", "address", "readable", "document"] as const;
+export const RESIDENCY_METHOD_ERROR = "Choose how you confirmed this resident.";
+export const RESIDENCY_CHECKS_ERROR = "Confirm all four checks before accepting the document.";
+export const RESIDENCY_EXCEPTION_ERROR = "Say how you confirmed this resident without a document.";
+
 // UA-8. Rejecting needs a reason the citizen will read on their upload screen.
+// Accepting names its basis (#63): the uploaded document with all four checks, or
+// the explicit no-document exception with a reason that stays in the audit.
 export const residencyReviewSchema = z
   .object({
     decision: z.enum(["verified", "rejected"], "Choose whether to accept or reject the proof."),
     expected_version: z.uuid("Refresh the review before deciding.").transform(value => value.toLowerCase()),
+    method: z.enum(["document", "no_document"], RESIDENCY_METHOD_ERROR).optional(),
+    checks: z.array(z.enum(REVIEW_CHECKS, RESIDENCY_CHECKS_ERROR)).max(REVIEW_CHECKS.length, RESIDENCY_CHECKS_ERROR).optional(),
     note: z.string().trim().max(500, "Keep the reason under 500 characters.").optional(),
   })
-  .refine((input) => input.decision !== "rejected" || (input.note?.length ?? 0) >= 5, {
-    path: ["note"],
-    message: RESIDENCY_NOTE_ERROR,
+  .superRefine((input, ctx) => {
+    const issue = (path: string, message: string) => ctx.addIssue({ code: "custom", path: [path], message });
+    const reason = input.note?.length ?? 0;
+    if (input.decision === "rejected") {
+      if (input.method || input.checks) issue("method", "A rejection has no approval method or checks.");
+      if (reason < 5) issue("note", RESIDENCY_NOTE_ERROR);
+      return;
+    }
+    if (!input.method) return issue("method", RESIDENCY_METHOD_ERROR);
+    if (input.method === "document") {
+      if (new Set(input.checks).size !== REVIEW_CHECKS.length) issue("checks", RESIDENCY_CHECKS_ERROR);
+      if (reason > 0) issue("note", "A document approval takes no reason.");
+      return;
+    }
+    if (input.checks) issue("checks", "An approval without a document has no document checks.");
+    if (reason < 5) issue("note", RESIDENCY_EXCEPTION_ERROR);
   });
 
 export const phoneVerifiedSchema = z.object({ verified: z.boolean("Say whether the number is verified.") });
@@ -188,14 +213,15 @@ router.get("/users/:id/residency-proof", async (req, res) => {
     residency_proof_id: user.residency_proof_id, residency_review_version: user.residency_review_version });
 });
 
-// Accepting needs no upload (an administrator may know an existing citizen);
-// rejecting does, because the citizen is then locked until they send a new one.
+// Accepting with the document needs an upload and the four checks; accepting
+// without one is the recorded exception. Rejecting needs an upload, because the
+// citizen is then locked until they send a new one. The database re-checks all of it.
 router.patch("/users/:id/residency", async (req, res) => {
   const input = parse(residencyReviewSchema, req.body);
   const userId = parse(userIdSchema, req.params.id);
   const updated = await changeAccount({ actorId: currentUser(req).id, userId,
-    action: "residency.reviewed", input: { decision: input.decision, note: input.note ?? null,
-      expected_version: input.expected_version }, ip: req.ip });
+    action: "residency.reviewed", input: { decision: input.decision, note: input.note || null,
+      expected_version: input.expected_version, method: input.method ?? null, checks: input.checks ?? null }, ip: req.ip });
   res.json({ user: updated });
 });
 

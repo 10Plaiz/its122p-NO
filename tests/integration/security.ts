@@ -878,13 +878,28 @@ async function main(): Promise<void> {
       const stale = await api(`/api/admin/users/${securityId}/residency-proof?expected_version=${randomUUID()}`, { headers: bearer(adminToken) });
       if (stale.status !== 409) throw new Error(`A stale review version: expected 409, got ${stale.status}`);
 
-      // Approve, so the next case runs as a verified resident under any reporting rule.
-      const approved = await api(`/api/admin/users/${securityId}/residency`, {
+      // #63: an approval must name its basis; one without it changes nothing.
+      const bare = await api(`/api/admin/users/${securityId}/residency`, {
         method: "PATCH",
         headers: bearer(adminToken),
         body: JSON.stringify({ decision: "verified", expected_version: version }),
       });
+      if (bare.status !== 400) throw new Error(`Approval with no basis: expected 400, got ${bare.status}`);
+
+      // Approve with the document, so the next case runs as a verified resident under any reporting rule.
+      const checks = ["name", "address", "readable", "document"];
+      const approved = await api(`/api/admin/users/${securityId}/residency`, {
+        method: "PATCH",
+        headers: bearer(adminToken),
+        body: JSON.stringify({ decision: "verified", expected_version: version, method: "document", checks }),
+      });
       if (approved.status !== 200) throw new Error(`Approval: expected 200, got ${approved.status} ${approved.body?.error ?? ""}`);
+      const decision = await db.from("activity_logs").select("metadata").eq("action", "residency.reviewed").eq("entity_id", securityId)
+        .order("id", { ascending: false }).limit(1).single();
+      const basis = decision.data?.metadata as { method?: string; checks?: string[] } | undefined;
+      if (basis?.method !== "document" || JSON.stringify(basis.checks) !== JSON.stringify(checks)) {
+        throw new Error(`The approval audit does not record its basis: ${JSON.stringify(basis)}`);
+      }
     });
 
     await runCase("IMP-13", "Feedback Rules", "a resolved report takes one rating: two at once give 201 and 409, a third gives 409", async () => {

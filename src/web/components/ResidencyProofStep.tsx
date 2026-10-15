@@ -100,6 +100,11 @@ export function ResidencyProofStep({ variant = "locked" }: { variant?: "locked" 
         <li>A barangay certificate or clearance</li>
         <li>A lease or a government ID with your Makati address</li>
       </ul>
+      {/* #63: the same checks the administrator confirms in the review. */}
+      <p className="m-0 text-[13px] text-muted">
+        An administrator checks that the name and Makati address match your account, and that the document is readable,
+        one of the kinds above, and recent enough.
+      </p>
 
       <form className="flex flex-col gap-4" onSubmit={handleSubmit} noValidate>
         <PhotoPicker

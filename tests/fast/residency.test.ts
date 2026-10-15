@@ -129,7 +129,8 @@ describe("RES-02 the server enforces the lock (UA-8)", () => {
 
 describe("RES-03 rejecting a proof needs a reason the citizen can act on (UA-8)", () => {
   it("accepts without a note and rejects only with one", () => {
-    expect(residencyReviewSchema.safeParse({ decision: "verified", expected_version: VERSION }).success).toBe(true);
+    // #63: an approval names its basis; tests/fast/residency-review.test.ts covers the rules.
+    expect(residencyReviewSchema.safeParse({ decision: "verified", expected_version: VERSION, method: "no_document", note: "Known resident." }).success).toBe(true);
     const bare = residencyReviewSchema.safeParse({ decision: "rejected", expected_version: VERSION });
     expect(bare.success).toBe(false);
     expect(bare.error?.issues[0]?.message).toBe(RESIDENCY_NOTE_ERROR);
