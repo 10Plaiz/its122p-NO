@@ -278,7 +278,7 @@ token.
   access token has expired, and clears the cookie.
 - Only the cookie counts: a `refresh_token` in the body is ignored by both
   routes (#71). A browser still holding a token stored before the cookie existed
-  signs in again; signing out deletes that old copy.
+  signs in again; the page deletes that old copy when it loads.
 
 Sign-in failures are limited three ways in 15 minutes: 10 for one address from
 one client, 30 from one client, and 20 for one address from any client. The
