@@ -21,7 +21,15 @@ function fakeClient(files: File[], { failRemoveOn, failRecordOn, listError }: { 
   const calls = { removes: [] as string[][], records: [] as string[][], deletes: 0, removeCalls: 0, recordCalls: 0 };
 
   const client = {
-    rpc: async (name: string, args: { p_limit: number }) => {
+    rpc: async (name: string, args: { p_limit?: number; p_ids?: string[] }) => {
+      if (name === "record_residency_proof_files_removed") {
+        calls.recordCalls += 1;
+        if (calls.recordCalls === failRecordOn) return { data: null, error: { message: "update failed" } };
+        const fresh = (args.p_ids ?? []).filter((id) => !recorded.has(id));
+        calls.records.push(args.p_ids ?? []);
+        for (const id of fresh) recorded.add(id);
+        return { data: fresh.length, error: null };
+      }
       expect(name).toBe("expired_residency_proof_files");
       if (listError) return { data: null, error: { message: "listing failed" } };
       const pending = files.filter((file) => file.kind === "replaced" ? !recorded.has(file.version_id!) : stored.has(file.object_path));
@@ -42,23 +50,8 @@ function fakeClient(files: File[], { failRemoveOn, failRecordOn, listError }: { 
         };
       },
     },
-    from: (table: string) => {
-      expect(table).toBe("residency_proof_versions");
-      return {
-        delete: () => { calls.deletes += 1; throw new Error("rows are never deleted"); },
-        update: (patch: Record<string, unknown>) => ({
-          in: async (column: string, ids: string[]) => {
-            expect(column).toBe("id");
-            expect(typeof patch.file_removed_at).toBe("string");
-            calls.recordCalls += 1;
-            if (calls.recordCalls === failRecordOn) return { data: null, error: { message: "update failed" } };
-            calls.records.push(ids);
-            for (const id of ids) recorded.add(id);
-            return { data: null, error: null };
-          },
-        }),
-      };
-    },
+    // Rows are never written directly: removals are recorded by the database function.
+    from: () => { calls.deletes += 1; throw new Error("no direct table access"); },
   } as unknown as Client;
   return { client, calls, stored, recorded };
 }
@@ -89,7 +82,7 @@ describe("PRET-03 a run removes files, then records replaced proofs", () => {
     const files = [...replaced(PURGE_BATCH_SIZE + 5), ...unattached(3)];
     const { client, calls, stored, recorded } = fakeClient(files);
     const result = await purgeExpiredProofs({}, client);
-    expect(result).toMatchObject({ removed: files.length, failed: 0 });
+    expect(result).toMatchObject({ removed: files.length, recorded: PURGE_BATCH_SIZE + 5, failed: 0 });
     expect(calls.removes.map((batch) => batch.length)).toEqual([PURGE_BATCH_SIZE, 8]);
     expect(stored.size).toBe(0);
     expect(recorded.size).toBe(PURGE_BATCH_SIZE + 5);
@@ -121,13 +114,13 @@ describe("PRET-04 failures stop the run and a rerun finishes it", () => {
     expect(recorded.size).toBe(PURGE_BATCH_SIZE * 2);
   });
 
-  test("a failed record leaves the proof listed; the rerun removes again (a no-op) and records it", async () => {
+  test("a failed record counts the files as removed, leaves the proofs listed, and the rerun records them", async () => {
     const { client, calls, recorded } = fakeClient(replaced(2), { failRecordOn: 1 });
     const first = await purgeExpiredProofs({}, client);
-    expect(first).toMatchObject({ removed: 0, failed: 2, error: "update failed" });
+    expect(first).toMatchObject({ removed: 2, recorded: 0, failed: 0, error: "update failed" });
     expect(recorded.size).toBe(0);
     const second = await purgeExpiredProofs({}, client);
-    expect(second).toMatchObject({ replaced: 2, removed: 2, failed: 0 });
+    expect(second).toMatchObject({ replaced: 2, removed: 2, recorded: 2, failed: 0 });
     expect(calls.removes).toHaveLength(2);
     expect(recorded.size).toBe(2);
   });
@@ -136,6 +129,26 @@ describe("PRET-04 failures stop the run and a rerun finishes it", () => {
     const { client, calls } = fakeClient(replaced(1), { listError: true });
     await expect(purgeExpiredProofs({}, client)).rejects.toThrow("The expired proof files could not be listed.");
     expect(calls.removeCalls).toBe(0);
+  });
+});
+
+describe("PRET-06 the run is recorded before anything is removed", () => {
+  test("a failed record of the start removes nothing", async () => {
+    const { client, calls, stored } = fakeClient([...replaced(1), ...unattached(1)]);
+    const beforeRemove = async () => { throw new Error("audit failed"); };
+    await expect(purgeExpiredProofs({ beforeRemove }, client)).rejects.toThrow("audit failed");
+    expect(calls.removeCalls).toBe(0);
+    expect(stored.size).toBe(2);
+  });
+
+  test("the start record carries the listed counts; dry runs and empty runs skip it", async () => {
+    const seen: unknown[] = [];
+    const beforeRemove = async (listed: unknown) => { seen.push(listed); };
+    await purgeExpiredProofs({ dryRun: true, beforeRemove }, fakeClient(replaced(1)).client);
+    await purgeExpiredProofs({ beforeRemove }, fakeClient([]).client);
+    expect(seen).toEqual([]);
+    await purgeExpiredProofs({ beforeRemove }, fakeClient([...replaced(2), ...unattached(1)]).client);
+    expect(seen).toEqual([expect.objectContaining({ dry_run: false, replaced: 2, unattached: 1, removed: 0 })]);
   });
 });
 

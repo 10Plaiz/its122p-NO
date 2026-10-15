@@ -38,10 +38,18 @@ router.post("/purge-cancelled-photos", async (req: Request, res: Response) => {
 // counts. Safe to run again: recorded removals are skipped.
 router.post("/purge-expired-proofs", async (req: Request, res: Response) => {
   const { dry_run } = parse(purgeSchema, req.body ?? {});
-  const result = await purgeExpiredProofs({ dryRun: dry_run ?? false });
+  // A removal is on the record before any file goes: if this audit fails, nothing is removed.
+  const beforeRemove = async (listed: object) => {
+    try {
+      await logActivity(req, "maintenance.proofs_purged", { entityType: "residency_proof", metadata: { ...listed, phase: "started" }, required: true });
+    } catch {
+      throw new ApiError(503, "The cleanup could not be recorded first, so no file was removed. Try again in a minute.");
+    }
+  };
+  const result = await purgeExpiredProofs({ dryRun: dry_run ?? false, beforeRemove });
 
-  // Required, and logged even when a batch failed, so every removal is on the record.
-  await logActivity(req, "maintenance.proofs_purged", { entityType: "residency_proof", metadata: { ...result }, required: true });
+  // The outcome, logged even when a batch failed, so what did go is on the record too.
+  await logActivity(req, "maintenance.proofs_purged", { entityType: "residency_proof", metadata: { ...result, phase: dry_run ? "checked" : "finished" } });
 
   if (result.error) {
     throw new ApiError(500, "Some proof files could not be removed. Run the cleanup again to finish.", result);
