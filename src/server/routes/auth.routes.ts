@@ -139,7 +139,7 @@ router.post("/refresh", limits.refresh, requireSessionHeader, async (req, res) =
 
 // Wrong passwords are counted per client, per address from that client, and per
 // address from any client (UA-10); a correct one is never slowed down by earlier typos.
-router.post("/login", limits.loginPerClient, limits.loginPerAccount, limits.loginPerAddress, async (req, res) => {
+router.post("/login", limits.login, async (req, res) => {
   const input = parse(loginSchema, req.body);
 
   const { data, error } = await auth.auth.signInWithPassword(input);

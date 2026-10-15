@@ -1,0 +1,3 @@
+[test]
+# Placeholder Supabase settings and the in-memory rate-limit store for the fast suite.
+preload = ["./tests/fast/preload.ts"]
