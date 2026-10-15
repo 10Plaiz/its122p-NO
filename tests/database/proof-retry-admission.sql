@@ -81,8 +81,10 @@ begin
         if fixture not in (2, 3, 4, 7, 8) then continue; end if;
         citizen := ('f6100000-0000-4000-8000-' || lpad(fixture::text, 12, '0'))::uuid;
         select residency_review_version into review_version from public.profiles where id = citizen;
+        -- #63: every fixture here holds a proof, accepted after the four checks.
         perform public.admin_change_profile('f6100000-0000-4000-8000-000000000001', citizen,
-            'residency.reviewed', jsonb_build_object('decision', 'verified', 'expected_version', review_version));
+            'residency.reviewed', jsonb_build_object('decision', 'verified', 'expected_version', review_version,
+                'method', 'document', 'checks', '["name","address","readable","document"]'::jsonb));
     end loop;
 end $$;
 update public.profiles set is_active = false where id = 'f6100000-0000-4000-8000-000000000007';

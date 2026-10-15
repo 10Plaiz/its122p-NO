@@ -17,29 +17,36 @@ begin
     insert into checks values (label);
 end $$;
 
--- d1 admin, d2 staff, d3 citizen with a proof, d4 citizen without one.
+-- d1 admin, d2 staff, d3 citizen with a proof, d4 citizen without one. d5 (with a
+-- proof) and d6 (without) stay pending for the audit failure checks.
 insert into auth.users (id) values
-    ('d0000000-0000-4000-8000-000000000001'), ('d0000000-0000-4000-8000-000000000002'),
-    ('d0000000-0000-4000-8000-000000000003'), ('d0000000-0000-4000-8000-000000000004');
+    ('d6300000-0000-4000-8000-000000000001'), ('d6300000-0000-4000-8000-000000000002'),
+    ('d6300000-0000-4000-8000-000000000003'), ('d6300000-0000-4000-8000-000000000004'),
+    ('d6300000-0000-4000-8000-000000000005'), ('d6300000-0000-4000-8000-000000000006');
 insert into public.profiles (id, name, email, role, residency_status) values
-    ('d0000000-0000-4000-8000-000000000001', 'Review Administrator', 'review-admin@kamoti.invalid', 'admin', null),
-    ('d0000000-0000-4000-8000-000000000002', 'Review Staff', 'review-staff@kamoti.invalid', 'staff', null),
-    ('d0000000-0000-4000-8000-000000000003', 'Review Citizen', 'review-citizen@kamoti.invalid', 'citizen', 'pending'),
-    ('d0000000-0000-4000-8000-000000000004', 'Review Walk-in', 'review-walkin@kamoti.invalid', 'citizen', 'pending');
+    ('d6300000-0000-4000-8000-000000000001', 'Review Administrator', 'review-admin@kamoti.invalid', 'admin', null),
+    ('d6300000-0000-4000-8000-000000000002', 'Review Staff', 'review-staff@kamoti.invalid', 'staff', null),
+    ('d6300000-0000-4000-8000-000000000003', 'Review Citizen', 'review-citizen@kamoti.invalid', 'citizen', 'pending'),
+    ('d6300000-0000-4000-8000-000000000004', 'Review Walk-in', 'review-walkin@kamoti.invalid', 'citizen', 'pending'),
+    ('d6300000-0000-4000-8000-000000000005', 'Review Pending', 'review-pending@kamoti.invalid', 'citizen', 'pending'),
+    ('d6300000-0000-4000-8000-000000000006', 'Review Pending Walk-in', 'review-pending-walkin@kamoti.invalid', 'citizen', 'pending');
 insert into public.residency_proof_versions (id, user_id, object_path) values
-    ('e0000000-0000-4000-8000-000000000001', 'd0000000-0000-4000-8000-000000000003', 'test/review-proof.pdf');
-update public.profiles set residency_proof_id = 'e0000000-0000-4000-8000-000000000001', residency_proof_path = 'test/review-proof.pdf'
-where id = 'd0000000-0000-4000-8000-000000000003';
+    ('e6300000-0000-4000-8000-000000000001', 'd6300000-0000-4000-8000-000000000003', 'test/review-proof.pdf'),
+    ('e6300000-0000-4000-8000-000000000002', 'd6300000-0000-4000-8000-000000000005', 'test/review-pending-proof.pdf');
+update public.profiles set residency_proof_id = 'e6300000-0000-4000-8000-000000000001', residency_proof_path = 'test/review-proof.pdf'
+where id = 'd6300000-0000-4000-8000-000000000003';
+update public.profiles set residency_proof_id = 'e6300000-0000-4000-8000-000000000002', residency_proof_path = 'test/review-pending-proof.pdf'
+where id = 'd6300000-0000-4000-8000-000000000005';
 
 -- Calls the review as d1 (or another actor) with the citizen's current version.
-create function pg_temp.review(citizen text, body jsonb, actor text default 'd0000000-0000-4000-8000-000000000001')
+create function pg_temp.review(citizen text, body jsonb, actor text default 'd6300000-0000-4000-8000-000000000001')
 returns jsonb language sql as $$
     select public.admin_change_profile(actor::uuid, citizen::uuid, 'residency.reviewed',
         body || jsonb_build_object('expected_version',
             (select residency_review_version from public.profiles where id = citizen::uuid)))
 $$;
 -- True when the review is refused with the given SQLSTATE and changes nothing.
-create function pg_temp.refused(citizen text, body jsonb, state text, actor text default 'd0000000-0000-4000-8000-000000000001')
+create function pg_temp.refused(citizen text, body jsonb, state text, actor text default 'd6300000-0000-4000-8000-000000000001')
 returns boolean language plpgsql as $$
 declare before_status text;
 begin
@@ -58,8 +65,10 @@ create function pg_temp.last_audit(citizen text) returns jsonb language sql as $
     select metadata from public.activity_logs where action = 'residency.reviewed' and entity_id = citizen order by id desc limit 1
 $$;
 
-\set c3 '''d0000000-0000-4000-8000-000000000003'''
-\set c4 '''d0000000-0000-4000-8000-000000000004'''
+\set c3 '''d6300000-0000-4000-8000-000000000003'''
+\set c4 '''d6300000-0000-4000-8000-000000000004'''
+\set c5 '''d6300000-0000-4000-8000-000000000005'''
+\set c6 '''d6300000-0000-4000-8000-000000000006'''
 \set all_checks '''["name","address","readable","document"]'''
 
 -- An approval must name its basis.
@@ -107,10 +116,10 @@ select pg_temp.check_that((select count(*) = 1 from public.notifications where u
 
 -- Stale versions and non-administrators are refused as before.
 select pg_temp.check_that(pg_temp.refused(:c3, '{"decision":"rejected","note":"Please send a newer bill."}', 'PT403',
-    'd0000000-0000-4000-8000-000000000002'), 'a Staff member cannot review');
+    'd6300000-0000-4000-8000-000000000002'), 'a Staff member cannot review');
 do $$ declare failed boolean := false; begin
     begin
-        perform public.admin_change_profile('d0000000-0000-4000-8000-000000000001', 'd0000000-0000-4000-8000-000000000003',
+        perform public.admin_change_profile('d6300000-0000-4000-8000-000000000001', 'd6300000-0000-4000-8000-000000000003',
             'residency.reviewed', '{"decision":"rejected","note":"Please send a newer bill.","expected_version":"00000000-0000-4000-8000-000000000000"}');
     exception when sqlstate 'PT409' then failed := true; end;
     perform pg_temp.check_that(failed, 'a stale version is refused');
@@ -122,6 +131,13 @@ begin raise sqlstate 'ZZ002' using message = 'Deliberately failed audit'; end $$
 create trigger test_review_audit_failure before insert on public.activity_logs for each row execute function pg_temp.fail_audit();
 select pg_temp.check_that(pg_temp.refused(:c3, '{"decision":"rejected","note":"Please send a newer bill."}', 'ZZ002'),
     'an audit failure rolls the decision back');
+select pg_temp.check_that(pg_temp.refused(:c5, jsonb_build_object('decision', 'verified', 'method', 'document', 'checks', :all_checks::jsonb), 'ZZ002'),
+    'an audit failure rolls a document approval back');
+select pg_temp.check_that(pg_temp.refused(:c6, '{"decision":"verified","method":"no_document","note":"Known resident."}', 'ZZ002'),
+    'an audit failure rolls an exception back');
+select pg_temp.check_that((select count(*) = 0 from public.notifications where user_id in (:c5::uuid, :c6::uuid))
+    and (select bool_and(residency_status = 'pending' and residency_reviewed_by is null) from public.profiles where id in (:c5::uuid, :c6::uuid)),
+    'a failed approval audit leaves the citizen pending and unnotified');
 drop trigger test_review_audit_failure on public.activity_logs;
 
 -- Only the API's server role can call the function.
