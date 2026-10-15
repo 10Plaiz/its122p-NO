@@ -13,11 +13,17 @@ type ProofPurgeResult = {
   replaced: number;
   unattached: number;
   removed: number;
+  recorded: number;
   failed: number;
   more: boolean;
 };
 
 const count = (n: number, one: string, many: string) => `${n.toLocaleString("en-PH")} ${n === 1 ? one : many}`;
+
+// A failed run still returns its counts, so the panel can say what already went.
+function removedBeforeError(details: unknown) {
+  return details && typeof details === "object" && "removed" in details && typeof details.removed === "number" ? details.removed : 0;
+}
 
 export function ProofRetention() {
   const [found, setFound] = useState<ProofPurgeResult | null>(null);
@@ -38,15 +44,19 @@ export function ProofRetention() {
     setMessage(
       replaced + unattached === 0
         ? "Nothing to remove. No proof file is past the 30-day retention period."
-        : `${count(replaced, "replaced proof", "replaced proofs")} and ${count(unattached, "upload that never reached an account", "uploads that never reached an account")} are past the 30-day retention period.${more ? " More will be found after this cleanup." : ""}`,
+        : `${count(replaced, "replaced proof", "replaced proofs")} and ${count(unattached, "stored file no proof record points to", "stored files no proof record points to")} are past the 30-day retention period.${more ? " More will be found after this cleanup." : ""}`,
     );
   }
 
   async function remove() {
     const response = await run({ dry_run: false });
     setConfirming(false);
-    if (!response) return;
+    // Success or failure, the earlier count is out of date: check again first.
     setFound(null);
+    if (!response) {
+      setMessage("");
+      return;
+    }
     setMessage(
       `Removed ${count(response.result.removed, "proof file", "proof files")}. Every account's current proof and every proof record are kept.${response.result.more ? " Check again to remove the rest." : ""}`,
     );
@@ -56,14 +66,21 @@ export function ProofRetention() {
     <section className="flex flex-col gap-3" aria-labelledby="proof-retention-title">
       <h6 id="proof-retention-title">Proof retention</h6>
       <p className="text-[13px] text-muted !m-0 max-w-prose">
-        Residency proofs that were replaced, and uploads that never reached an account, can be removed 30 days later.
-        Each account&rsquo;s current proof is never removed, and the record of every proof and decision stays.
+        Residency proofs that were replaced, and stored files no proof record points to (such as uploads that never
+        reached an account), can be removed 30 days later. Each account&rsquo;s current proof is never removed, and the
+        record of every proof and decision stays.
       </p>
 
       <p role="status" aria-live="polite" className={message ? "text-[13px] !m-0" : "sr-only"}>
         {message}
       </p>
-      {error && <Alert title="Could not finish the proof cleanup">{error.message}</Alert>}
+      {error && (
+        <Alert title="Could not finish the proof cleanup">
+          {error.message}
+          {removedBeforeError(error.details) > 0 &&
+            ` ${count(removedBeforeError(error.details), "file was", "files were")} removed before it stopped. Check again before removing the rest.`}
+        </Alert>
+      )}
 
       {confirming && found ? (
         <div className="flex flex-col gap-2 border border-danger bg-danger-100 p-3 max-w-prose" role="group" aria-labelledby="proof-retention-confirm">
