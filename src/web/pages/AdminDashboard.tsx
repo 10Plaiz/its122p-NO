@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { RatingAverage } from "../components/FeedbackSummary.js";
 import { PhotoRetention } from "../components/PhotoRetention.js";
+import { ProofRetention } from "../components/ProofRetention.js";
 import { Alert, Loading } from "../components/ui.js";
 import { useApi } from "../lib/useApi.js";
 import { OPEN_STATUSES, STATUSES, STATUS_LABEL } from "../lib/types.js";
@@ -75,6 +76,8 @@ export function AdminDashboardPage() {
       </section>
 
       <PhotoRetention />
+
+      <ProofRetention />
 
       <div className="flex flex-wrap gap-3 border-t-2 border-divider pt-4">
         <Link to="/admin/reports" className="btn btn-primary">
