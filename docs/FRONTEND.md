@@ -41,11 +41,14 @@ record-level permission checks before returning data.
 
 All signed-in roles receive the notification link. The community board remains
 available without an account. Navigation visibility is a presentation choice;
-the server remains responsible for access control.
+the server remains responsible for access control. What each role may do is
+listed once, in [API.md](API.md#roles-and-permissions).
 
 A Citizen with no uploaded proof, or with a rejected proof, must return to
 `/register?step=proof` before using protected screens. Uploading proof unlocks
 reporting while Administrator review is pending. Rejection locks it again.
+The owner has approved keeping reporting closed until an Administrator
+approves; #59 builds that change.
 
 ### Report-detail return navigation
 
@@ -160,6 +163,94 @@ are in the components cascade layer in `src/web/styles/ds.css`.
 
 The browser request wrapper, data hooks, endpoint behavior, and response shapes
 belong to [API.md](API.md).
+
+## Feature behavior
+
+- **Voice input (RS-1).** The report wizard and the inline edit form offer
+  Dictate beside the description, in English (Philippines) by default or
+  Filipino. It uses the browser's Web Speech API, so the audio goes to the
+  browser vendor's recognition service, never to KAMOTI. Where the browser has
+  no speech recognition, such as Firefox, the control is not shown and typing is
+  the whole feature. Dictated text is appended and trimmed to the field limit.
+  Not verified with a real microphone in any recorded test.
+- **Drafts (RS-5).** The new-report form keeps a draft per account in this tab
+  (text and pin, not the photo), including through an idle sign-out. The inline
+  edit form has no draft; it warns before the page unloads and asks before
+  Cancel discards changes. In-app navigation is not blocked.
+- **Problem types (RS-2, RS-4).** After a category is chosen, the form lists
+  only that category's problem types: one main problem is required, one other
+  is optional.
+- **Assignment suggestions (SW-1).** The Assign dialog on All reports lists
+  active Staff ranked by the server: those who handle the report's category and
+  cover its barangay first, then category specialists, then those covering the
+  barangay, each with their open workload. The Administrator still chooses, and
+  the assignment needs a comment. Administrators cannot be assigned, so they
+  approve closures rather than closing reports themselves.
+- **Staff routing (SW-1).** On Users, a Staff row's Routing control opens the
+  specialization and area editors. Saving replaces the whole set; removed
+  categories or barangays are switched off, not deleted.
+- **Tables and exports (TB-1 to TB-4).** Report and log tables show numbered
+  pages with a jump-to-page box; the current page is not kept in the URL. Column
+  menus remember each table's columns in this browser only. Export offers CSV or
+  PDF of every matching row up to 5,000, with the screen's filters and visible
+  columns, and says when rows were left out. PDFs replace characters the
+  built-in font cannot print, such as arrows and emoji; CSV keeps them.
+- **Photos.** Report photos open full size in a lightbox that closes with
+  Escape or a backdrop click and returns focus to the photo. A photo removed by
+  the retention purge shows that it was removed after the retention period.
+- **Photo retention (DM-2).** The Administrator dashboard's Photo retention
+  panel first checks which cancelled reports' photos are past 90 days, then
+  removes them only after a second confirmation, because files cannot be
+  restored.
+- **Password reset (UA-12).** `/signin?step=reset` asks for an email, answers
+  the same whether or not an account exists, then takes the six-digit code and
+  a new password checked against the live rules list. A spent code that
+  Supabase refuses to pair with the password asks for a new code.
+- **Phone numbers (UA-6).** Text-message codes are not used (no SMS budget). My
+  account shows a number as Confirmed by staff or Not confirmed yet, and a
+  changed number returns to Not confirmed yet.
+- **Ratings (FB-1).** The reporting Citizen can rate a resolved report once.
+  The rating reaches only the assigned Staff member; Staff and Administrators
+  see it read-only and cannot rate.
+
+## Components
+
+Shared building blocks in `src/web/components/`. Pages are described by route
+above.
+
+| Component | Purpose | Used on |
+| :--- | :--- | :--- |
+| `AdminLayout` | Secondary navigation tabs for the Administrator screens | Administrator routes |
+| `AreaEditor` | Barangays a Staff member covers (SW-1) | Users |
+| `AssignDialog` | Ranked Staff choice and required comment for an assignment | All reports |
+| `BarangayFilter` | One-barangay filter with result counts | Board, All reports, Staff queue |
+| `BoardReportCard` | One expandable report on the public board | Board |
+| `CancelDialog` | Withdraw a pending report with a required reason (SW-2) | My reports |
+| `ContactNumberField` | Philippine mobile number field, same rule as the API | Register, My account, Users |
+| `EmailCode` | Six-digit code entry and resend controls | Register, Sign in, `PasswordReset` |
+| `FeedbackForm` | The reporter's one rating of a resolved report | Report detail |
+| `FeedbackSummary` | A rating or Staff average, read-only | Dashboard, Staff queue, Staff report, `FeedbackForm` |
+| `FilterOption` | A filter choice with its result count | Report and user list filters |
+| `IdleTimeoutDialog` | Idle warning and sign-out (UA-9) | Every signed-in screen |
+| `Layout` | Page shell and role-based navigation | Every route |
+| `LocationMap` | One report's pin, read-only | Report detail, Staff report |
+| `MapFrame` | Loads Google Maps where needed and shows Map unavailable on failure | `LocationMap`, `MapPicker`, `ReportMap` |
+| `MapPicker` | Pin placement inside Makati, with place search | New report, Report detail edit |
+| `PasswordReset` | Forgotten-password steps (UA-12) | Sign in |
+| `PasswordRules` | Live checklist of password rules (UA-4) | Register, Users, `PasswordReset` |
+| `PhotoLightbox` | Full-size photo view | Report detail, Staff report |
+| `PhotoPicker` | Photo selection with type and size checks | New report, Staff report, `ResidencyProofStep` |
+| `PhotoRetention` | Check and remove expired photo files (DM-2) | Dashboard |
+| `ReportMap` | Board map of report pins | Board |
+| `ResidencyProofStep` | Proof upload and review state (UA-8) | Register, My account |
+| `ResidencyReview` | Administrator proof review with version checks | Users |
+| `SpecializationEditor` | Categories a Staff member handles (SW-1) | Users |
+| `StatusPin` | Map pin in its status color | `LocationMap`, `ReportMap` |
+| `Toast` | Success messages | App shell and forms that save |
+| `VerificationPanel` | Approve or return a closure request (SW-4, SW-7) | Staff report |
+| `VoiceInput` | Dictation for the description (RS-1) | New report, Report detail edit |
+| `ui` | Shared fields, buttons, alerts, and status pills | Every screen |
+| `data-table/` | `DataTable`, `TableToolbar`, `ColumnMenu`, `ExportMenu`, `NumberedPagination`, and the shared report columns | All reports, Staff queue, My reports, Users, Activity log |
 
 ## Change boundaries
 
