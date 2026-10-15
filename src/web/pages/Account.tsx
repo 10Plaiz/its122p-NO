@@ -80,8 +80,9 @@ export function AccountPage() {
               {account.contact_number ? (
                 <>
                   <span translate="no">{account.contact_number}</span>
+                  {/* UA-6: no text-message codes (no SMS budget); staff confirm numbers. */}
                   <StatusPill tone={account.phone_verified_at ? "success" : "warning"}>
-                    {account.phone_verified_at ? "Verified" : "Not verified"}
+                    {account.phone_verified_at ? "Confirmed by staff" : "Not confirmed yet"}
                   </StatusPill>
                 </>
               ) : (
