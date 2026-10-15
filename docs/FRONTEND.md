@@ -212,7 +212,9 @@ belong to [API.md](API.md).
   the retention purge shows that it was removed after the retention period.
 - **Proof retention (#70).** The dashboard's Proof retention panel checks, then
   after a confirmation removes, residency proof files 30 days after they stopped
-  being current. It reports replaced proofs and unattached uploads separately.
+  being current. It reports replaced proofs and stored files no proof record
+  points to separately. After a failed run it drops the old count, says how many
+  files went, and asks for a new check.
 - **Photo retention (DM-2).** The Administrator dashboard's Photo retention
   panel first checks which cancelled reports' photos are past 90 days, then
   removes them only after a second confirmation, because files cannot be

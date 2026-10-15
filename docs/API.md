@@ -729,32 +729,40 @@ dashboard's Photo retention panel. No scheduled job runs it.
 
 Owner decision (#70, 2026-10-15): a residency proof file is kept 30 days after
 it stops being current. Rows are never deleted. The database owns the rule:
-`expired_residency_proof_files()` lists the files, and a check constraint and
-the proof-version guard refuse to record a removal early.
+`expired_residency_proof_files()` lists the files,
+`record_residency_proof_files_removed()` records removals in database time, and
+a check constraint and the proof-version guard refuse to record a removal early.
 
 | File | Removed | Recorded |
 | :--- | :--- | :--- |
 | A replaced proof | 30 days after `superseded_at` | `residency_proof_versions.file_removed_at`, set once |
-| An upload that never reached an account (a failed or uncertain attachment; no version row) | 30 days after the object was created | No row exists; counted in the audit |
+| A stored file no proof record points to: an upload that never reached an account (a failed or uncertain attachment), or a file replaced before proof records began on 6 October 2026 | 30 days after the object was created | No row exists; counted in the audit as `unattached` |
 | An account's current proof | Never | The guard refuses it |
 
-Signed links are issued only for the current proof and last five minutes, so no
-open link points at a listed file. The decision and access audits keep every
-proof's identity and path for good.
+`complete_residency_proof` refuses to attach a file stored more than 29 days
+earlier (`409`, "Upload the proof again as a new submission"). A file the cleanup
+has listed is at least 30 days old, so it can never become a current proof
+between the listing and its removal. An exact retry of a committed upload is
+unaffected. Signed links are issued only for the current proof and last five
+minutes, so no open link points at a listed file. The decision and access
+audits keep every proof's identity and path for good.
 
 `POST /api/maintenance/purge-expired-proofs` takes an optional
 `{ "dry_run": true }`. It returns `{ result }` with `dry_run`,
-`retention_days`, `replaced`, `unattached`, `removed`, `failed`, and `more`.
-Files go first, in batches of 100, then the replaced proofs are recorded. A
-failed batch returns `500` with the same counts; run it again to finish, since
-removing a missing file is a no-op and recorded proofs are skipped. One run
-handles up to 1,000 files of each kind; `more` says to run it again. Every run,
-including a dry run, is recorded as `maintenance.proofs_purged`, and that audit
-is required. An Administrator starts it from the dashboard's Proof retention
-panel. No scheduled job runs it.
+`retention_days`, `replaced`, `unattached`, `removed`, `recorded`, `failed`, and
+`more`. Before any file goes, the run is recorded as
+`maintenance.proofs_purged` with `phase: "started"` and the listed counts; that
+audit is required, and if it fails nothing is removed (`503`). Files then go in
+batches of 100, and each batch's replaced proofs are recorded. A failed batch
+returns `500` with the counts so far; `removed` includes files that went even if
+recording them failed. Run it again to finish: removing a missing file is a
+no-op and recorded proofs are skipped. One run handles up to 1,000 files of
+each kind; `more` says to run it again. The outcome is recorded with
+`phase: "finished"` (or `"checked"` for a dry run). An Administrator starts it
+from the dashboard's Proof retention panel. No scheduled job runs it.
 
 Apply `20261015000400_proof_retention.sql` after #67's `20261015000300`, then
-deploy the matching API. The earlier API never calls the new function.
+deploy the matching API. The earlier API never calls the new functions.
 
 ## Send SMS Hook
 
