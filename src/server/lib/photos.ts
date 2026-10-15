@@ -2,6 +2,7 @@ import multer from "multer";
 import { randomUUID } from "node:crypto";
 import { db, PHOTO_BUCKET } from "../config/supabase.js";
 import { badRequest, orThrow } from "./errors.js";
+import { looksLike } from "./residency.js";
 import type { Express } from "express";
 
 const ALLOWED = {
@@ -10,6 +11,17 @@ const ALLOWED = {
   "image/webp": "webp",
 };
 
+export const PHOTO_TYPE_ERROR = "Photos must be JPG, PNG, or WebP.";
+
+// The browser supplies the MIME type, so the first bytes must agree with it, as
+// for proofs. Called before the report row is written, so a bad file leaves
+// nothing behind. Returns the storage extension.
+export function checkPhoto(file: Express.Multer.File) {
+  const extension = ALLOWED[file.mimetype as keyof typeof ALLOWED];
+  if (!extension || !looksLike(file.buffer, file.mimetype)) throw badRequest(PHOTO_TYPE_ERROR);
+  return extension;
+}
+
 // Photos are held in memory, checked here, then pushed to Supabase Storage —
 // the proposal requires the backend to validate images before they are stored.
 export const photoUpload = multer({
@@ -17,7 +29,7 @@ export const photoUpload = multer({
   limits: { fileSize: 3 * 1024 * 1024, files: 1 },
   fileFilter(_req, file, cb) {
     if (!(file.mimetype in ALLOWED)) {
-      return cb(new Error("Photos must be JPG, PNG, or WebP."));
+      return cb(new Error(PHOTO_TYPE_ERROR));
     }
     cb(null, true);
   },
@@ -26,8 +38,7 @@ export const photoUpload = multer({
 // Stores the file and records it against the report. Returns the row.
 type PhotoInput = { file: Express.Multer.File; reportId: string | number; uploadedBy: string; kind: "initial" | "resolution" };
 export async function savePhoto({ file, reportId, uploadedBy, kind }: PhotoInput) {
-  const extension = ALLOWED[file.mimetype as keyof typeof ALLOWED];
-  if (!extension) throw badRequest("Photos must be JPG, PNG, or WebP.");
+  const extension = checkPhoto(file);
 
   const path = `${reportId}/${kind}-${randomUUID()}.${extension}`;
 

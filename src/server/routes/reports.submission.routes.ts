@@ -4,7 +4,7 @@ import { db } from "../config/supabase.js";
 import { orThrow } from "../lib/errors.js";
 import { parse } from "../lib/validate.js";
 import { refineInsideMakati } from "../lib/makati.js";
-import { photoUpload, savePhoto } from "../lib/photos.js";
+import { checkPhoto, photoUpload, savePhoto } from "../lib/photos.js";
 import { citizenSubmissionLimit } from "../lib/submission-limits.js";
 import { currentUser, requireRole } from "../middleware/auth.js";
 import { findReport, present, problemIdsOf } from "../services/reports.common.js";
@@ -105,6 +105,7 @@ router.get("/meta/problem-types", async (_req, res) => {
 // POST /api/reports — citizens file a report, optionally with one photo.
 router.post("/", requireRole("citizen"), citizenSubmissionLimit("report.create"), photoUpload.single("photo"), async (req, res) => {
   const input = parse(createSchema, req.body);
+  if (req.file) checkPhoto(req.file);
   await assertCategorySelectable(input.category_id);
   await assertProblemsSelectable(input.category_id, {
     primary_problem_id: input.primary_problem_id,
