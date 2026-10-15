@@ -842,6 +842,7 @@ async function main(): Promise<void> {
     let securityToken = "";
     let securityRefresh = "";
     let securityId = "";
+    let securityReportId = "";
 
     await runCase("IMP-12", "Residency Proofs", "an administrator gets a working, audited 5-minute proof link through the API; a stale version gets 409", async () => {
       const created = await db.auth.admin.createUser({
@@ -898,6 +899,7 @@ async function main(): Promise<void> {
       });
       if (created.status !== 201) throw new Error(`Report: expected 201, got ${created.status} ${created.body?.error ?? ""}`);
       const reportId = created.body.report.id as string;
+      securityReportId = reportId;
 
       const { data: staff } = await db.from("profiles").select("id").eq("email", "fixture-staff-1@kamoti.invalid").single();
       for (const [path, body] of [
@@ -931,6 +933,71 @@ async function main(): Promise<void> {
       if (third.status !== 409) throw new Error(`A repeated rating: expected 409, got ${third.status}`);
       const saved = await count("report_feedback", "report_id", reportId);
       if (saved !== 1) throw new Error(`Expected one saved rating, found ${saved}`);
+    });
+
+    await runCase("IMP-17", "Residency Approval", "new reports and report photos wait for an administrator's approval, through an address change, a rejection, and a re-upload of the same file (#59)", async () => {
+      if (!securityReportId) throw new Error("IMP-13 did not create the synthetic citizen's report");
+      const reportBody = JSON.stringify({ title: "[TEST] Refused before approval", description: "This report must not be saved.", category_id: testCategory.id, primary_problem_id: 1, latitude: 14.5547, longitude: 121.0244 });
+      const version = async () => {
+        const { data } = await db.from("profiles").select("residency_status, residency_review_version").eq("id", securityId).single();
+        return data as { residency_status: string | null; residency_review_version: string };
+      };
+      const snapshot = async () => ({
+        reports: await count("reports", "citizen_id", securityId),
+        photos: await count("report_photos", "report_id", securityReportId),
+        notifications: (await db.from("notifications").select("*", { count: "exact", head: true })).count ?? 0,
+      });
+      // The same session throughout: every request must read the current status.
+      const expectRefused = async (code: string, step: string) => {
+        const before = await snapshot();
+        const report = await api("/api/reports", { method: "POST", headers: bearer(securityToken), body: reportBody });
+        const photo = await multipart(`/api/reports/${securityReportId}/photos`, securityToken, pngForm("photo"));
+        const photoCode = ((await photo.json()) as { details?: { code?: string } }).details?.code;
+        if (report.status !== 403 || report.body?.details?.code !== code) throw new Error(`${step}, new report: expected 403 ${code}, got ${report.status} ${report.body?.details?.code}`);
+        if (photo.status !== 403 || photoCode !== code) throw new Error(`${step}, photo: expected 403 ${code}, got ${photo.status} ${photoCode}`);
+        const after = await snapshot();
+        if (JSON.stringify(after) !== JSON.stringify(before)) throw new Error(`${step}: refused writes changed records: ${JSON.stringify(before)} -> ${JSON.stringify(after)}`);
+      };
+
+      const moved = await api("/api/auth/me", {
+        method: "PATCH",
+        headers: bearer(securityToken),
+        body: JSON.stringify({ first_name: "Security", last_name: "Check", barangay: "Bel-Air", address_line: "2 Moved Street" }),
+      });
+      if (moved.status !== 200) throw new Error(`Address change: expected 200, got ${moved.status} ${moved.body?.error ?? ""}`);
+      if ((await version()).residency_status !== "pending") throw new Error("An address change did not return the citizen to review");
+      await expectRefused("residency_pending", "After an address change");
+      const history = await api("/api/reports", { headers: bearer(securityToken) });
+      if (history.status !== 200) throw new Error(`Report history while pending: expected 200, got ${history.status}`);
+
+      const rejected = await api(`/api/admin/users/${securityId}/residency`, {
+        method: "PATCH",
+        headers: bearer(adminToken),
+        body: JSON.stringify({ decision: "rejected", note: "The proof shows the old address.", expected_version: (await version()).residency_review_version }),
+      });
+      if (rejected.status !== 200) throw new Error(`Rejection: expected 200, got ${rejected.status} ${rejected.body?.error ?? ""}`);
+      await expectRefused("residency_required", "After a rejection");
+
+      const submissionId = randomUUID();
+      const reupload = await multipart(`/api/auth/me/residency-proof?submission_id=${submissionId}`, securityToken,
+        pngForm("proof", { submission_id: submissionId, expected_version: (await version()).residency_review_version }));
+      if (reupload.status !== 200) throw new Error(`Re-upload of the same file: expected 200, got ${reupload.status} ${await reupload.text()}`);
+      if ((await version()).residency_status !== "pending") throw new Error("A re-upload did not leave the citizen awaiting review");
+      await expectRefused("residency_pending", "After re-uploading the rejected file");
+
+      const approved = await api(`/api/admin/users/${securityId}/residency`, {
+        method: "PATCH",
+        headers: bearer(adminToken),
+        body: JSON.stringify({ decision: "verified", expected_version: (await version()).residency_review_version }),
+      });
+      if (approved.status !== 200) throw new Error(`Approval: expected 200, got ${approved.status} ${approved.body?.error ?? ""}`);
+      // Past the gate: an empty report is refused for its fields, and a photo on the
+      // resolved report for its status, neither for residency.
+      const empty = await api("/api/reports", { method: "POST", headers: bearer(securityToken), body: "{}" });
+      if (empty.status !== 400) throw new Error(`After approval, an empty report: expected 400, got ${empty.status} ${empty.body?.details?.code ?? ""}`);
+      const late = await multipart(`/api/reports/${securityReportId}/photos`, securityToken, pngForm("photo"));
+      const lateCode = ((await late.json()) as { details?: { code?: string } }).details?.code;
+      if (late.status !== 403 || lateCode !== undefined) throw new Error(`After approval, a photo on a resolved report: expected 403 for its status, got ${late.status} ${lateCode}`);
     });
 
     await runCase("IMP-14", "Session Handling", "a deactivated citizen is refused with an old token, at sign-in, and on refresh", async () => {
