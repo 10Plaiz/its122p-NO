@@ -79,8 +79,9 @@ are in the components cascade layer in `src/web/styles/ds.css`.
   a separate recovery code before changing the password and ending old sessions.
 - The session can refresh a refused access token. After 15 minutes without
   activity, the interface warns the user and gives one minute to stay signed in.
-  If the user remains idle, it signs out and saves an open report draft in this
-  tab's session storage. A draft keeps text and the pin, but not an attached file.
+  If the user remains idle, it signs out and saves an open report draft, new or
+  edit, in this tab's session storage. A draft keeps text and the pin, but not an
+  attached file.
 - Client validation mirrors server validation where immediate field feedback is
   useful. Server validation remains authoritative.
 - An action button is disabled while its form is invalid or sending, and an
@@ -181,8 +182,13 @@ belong to [API.md](API.md).
   Not verified with a real microphone in any recorded test.
 - **Drafts (RS-5).** The new-report form keeps a draft per account in this tab
   (text and pin, not the photo), including through an idle sign-out. The inline
-  edit form has no draft; it warns before the page unloads and asks before
-  Cancel discards changes. In-app navigation is not blocked.
+  edit form on a pending report keeps a draft per account and report (title,
+  description, category, problems, address, and a moved pin), through a reload,
+  an idle sign-out, or an in-app link. Back on the report, the Citizen can
+  continue editing or discard the edits. Saving, Cancel, and Discard clear it. A
+  draft is dropped with a short notice when the report is no longer pending or
+  has changed since the draft was made. Both forms warn before the page unloads,
+  and Cancel on the edit form asks first. In-app navigation is not blocked.
 - **Problem types (RS-2, RS-4).** After a category is chosen, the form lists
   only that category's problem types: one main problem is required, one other
   is optional.

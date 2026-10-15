@@ -66,6 +66,9 @@ type DraftOptions<T> = {
   isEmpty: (value: T) => boolean;
   /** Checks a stored value, which may be old or edited by hand. Null rejects it. */
   parse: (raw: unknown) => T | null;
+  /** False when the page has already offered the stored draft and it was taken, so
+   * saving starts at once and the stored draft stays until the next save replaces it. */
+  offer?: boolean;
   delay?: number;
 };
 
@@ -73,7 +76,7 @@ type DraftOptions<T> = {
 // draft found on load. While that offer is open nothing is saved, so an untouched
 // form cannot overwrite the draft before the citizen decides; the choice is
 // `restore` or `discard`. `clear` ends drafting after a successful submit.
-export function useDraft<T>({ key, value, isEmpty, parse, delay = 600 }: DraftOptions<T>) {
+export function useDraft<T>({ key, value, isEmpty, parse, offer: offerStored = true, delay = 600 }: DraftOptions<T>) {
   const [offer, setOffer] = useState<T | null>(null);
 
   const latest = useRef(value);
@@ -93,6 +96,10 @@ export function useDraft<T>({ key, value, isEmpty, parse, delay = 600 }: DraftOp
       paused.current = true;
       return;
     }
+    if (!offerStored) {
+      paused.current = false;
+      return;
+    }
 
     const stored = readDraft(key);
     const draft = stored === null ? null : parseRef.current(stored);
@@ -104,7 +111,7 @@ export function useDraft<T>({ key, value, isEmpty, parse, delay = 600 }: DraftOp
       paused.current = false;
       setOffer(null);
     }
-  }, [key]);
+  }, [key, offerStored]);
 
   const save = useCallback(() => {
     if (!key || paused.current || cleared.current) return;

@@ -2,7 +2,9 @@ process.env.SUPABASE_URL ??= "https://placeholder.supabase.co";
 process.env.SUPABASE_PUBLISHABLE_KEY ??= "placeholder-publishable-key";
 process.env.SUPABASE_SECRET_KEY ??= "placeholder-secret-key";
 
-import { describe, expect, it } from "bun:test";
+import { afterAll, beforeAll, describe, expect, it } from "bun:test";
+import type { EditReportDraft } from "../../src/web/lib/report-rules.js";
+import type { Report } from "../../src/web/lib/types.js";
 
 // Report submission (RS-1 to RS-5, and the citizen's cancel reason from SW-2).
 // No live database: these cover the pure rules the routes and forms share.
@@ -11,6 +13,7 @@ const server = await import("../../src/server/services/reports.submission.js");
 const routes = await import("../../src/server/routes/reports.submission.routes.js");
 const rules = await import("../../src/web/lib/report-rules.js");
 const { appendTranscript } = await import("../../src/web/components/VoiceInput.js");
+const { readDraft, removeDraft, writeDraft } = await import("../../src/web/lib/useDraft.js");
 
 const valid = {
   title: "Pothole on Ayala Avenue",
@@ -201,5 +204,101 @@ describe("SUB-07 dictation appends without passing the limit (RS-1)", () => {
 
   it("stops at the character limit and says so", () => {
     expect(appendTranscript("12345", "67890", 8)).toEqual({ text: "12345 67", truncated: true });
+  });
+});
+
+describe("SUB-08 the edit form keeps a draft per account and report (RS-5, #69)", () => {
+  const report = {
+    id: "report-1",
+    title: "Pothole on Ayala Avenue",
+    description: "A deep pothole in the right lane near the corner.",
+    status: "pending",
+    latitude: 14.5547,
+    longitude: 121.0244,
+    address_text: "Ayala Avenue",
+    updated_at: "2026-10-15T01:00:00.000Z",
+    category: { id: 1, name: "Roads" },
+    primary_problem: { id: 3, name: "Pothole" },
+    secondary_problem: null,
+  } as Report;
+
+  const edit = (changes: Partial<EditReportDraft> = {}) => ({
+    version: 1 as const,
+    basedOn: report.updated_at,
+    title: report.title,
+    description: report.description,
+    categoryId: "1",
+    primaryId: "3",
+    secondaryId: "",
+    address: "Ayala Avenue",
+    point: null,
+    ...changes,
+  });
+
+  // This tab's storage, stood in for and put back so later files see none.
+  const original = globalThis.sessionStorage;
+  beforeAll(() => {
+    const store = new Map<string, string>();
+    globalThis.sessionStorage = {
+      getItem: (key: string) => store.get(key) ?? null,
+      setItem: (key: string, value: string) => void store.set(key, value),
+      removeItem: (key: string) => void store.delete(key),
+    } as Storage;
+  });
+  afterAll(() => {
+    globalThis.sessionStorage = original;
+  });
+
+  it("keys the draft to both the account and the report", () => {
+    const mine = rules.editReportDraftKey("user-a", "report-1");
+    expect(mine).toBe("kamoti.draft.edit-report.user-a.report-1");
+    writeDraft(mine, edit({ title: "Pothole, now wider" }));
+    expect(readDraft(rules.editReportDraftKey("user-b", "report-1"))).toBeNull();
+    expect(readDraft(rules.editReportDraftKey("user-a", "report-2"))).toBeNull();
+    removeDraft(mine);
+  });
+
+  it("offers back an unsaved edit after a reload, with the moved pin", () => {
+    const key = rules.editReportDraftKey("user-a", "report-1");
+    writeDraft(key, edit({ title: "Pothole, now wider", primaryId: "4", point: { lat: 14.556, lng: 121.025 } }));
+    const { offer, notice } = rules.checkEditDraft(readDraft(key), report);
+    expect(notice).toBeNull();
+    expect(offer?.title).toBe("Pothole, now wider");
+    expect(rules.editReportChanges(offer!, report)).toEqual({
+      title: "Pothole, now wider",
+      latitude: 14.556,
+      longitude: 121.025,
+      primary_problem_id: 4,
+    });
+    removeDraft(key);
+    expect(readDraft(key)).toBeNull();
+  });
+
+  it("drops a draft with a notice once the report has left pending or changed", () => {
+    const stored = edit({ title: "Pothole, now wider" });
+    expect(rules.checkEditDraft(stored, { ...report, status: "in_progress" })).toEqual({
+      offer: null,
+      notice: rules.EDIT_DRAFT_NOT_PENDING,
+    });
+    expect(rules.checkEditDraft(stored, { ...report, updated_at: "2026-10-15T02:00:00.000Z" })).toEqual({
+      offer: null,
+      notice: rules.EDIT_DRAFT_CHANGED,
+    });
+  });
+
+  it("drops quietly a draft that changes nothing or cannot be read", () => {
+    expect(rules.checkEditDraft(edit(), report)).toEqual({ offer: null, notice: null });
+    // An unmoved pin is not an edit, and neither is surrounding whitespace.
+    expect(rules.editReportChanges(edit({ title: ` ${report.title} ` }), report)).toEqual({});
+    expect(rules.checkEditDraft({ ...edit({ title: "Changed" }), basedOn: 5 }, report).offer).toBeNull();
+    expect(rules.checkEditDraft({ ...edit({ title: "Changed" }), version: 2 }, report).offer).toBeNull();
+    expect(rules.checkEditDraft("text", report).offer).toBeNull();
+  });
+
+  it("keeps no file, only text, choices, and the pin", () => {
+    const parsed = rules.parseEditReportDraft({ ...edit({ title: "Changed" }), photo: { name: "x.jpg" } });
+    expect(Object.keys(parsed!).sort()).toEqual(
+      ["address", "basedOn", "categoryId", "description", "point", "primaryId", "secondaryId", "title", "version"],
+    );
   });
 });

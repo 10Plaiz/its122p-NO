@@ -30,12 +30,17 @@ import {
   PRIMARY_PROBLEM_AGAIN_ERROR,
   PRIMARY_PROBLEM_ERROR,
   TITLE_MAX,
+  checkEditDraft,
+  editReportChanges,
+  editReportDraftKey,
+  parseEditReportDraft,
   problemOptions,
   pinError,
   validateReportFields,
 } from "../lib/report-rules.js";
+import type { EditReportDraft } from "../lib/report-rules.js";
 import type { ProblemTypesResponse, ReportProblems } from "../lib/submission-types.js";
-import { useUnsavedChangesWarning } from "../lib/useDraft.js";
+import { readDraft, removeDraft, useDraft, useUnsavedChangesWarning } from "../lib/useDraft.js";
 import { useAction, useApi } from "../lib/useApi.js";
 import { ROLE_LABEL, STATUS_LABEL, closurePendingOf, historyLabel } from "../lib/types.js";
 import type { Category, Report, ReportUpdate } from "../lib/types.js";
@@ -48,6 +53,9 @@ export function ReportDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { user } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
+  const [draftOffer, setDraftOffer] = useState<EditReportDraft | null>(null);
+  const [resumed, setResumed] = useState<EditReportDraft | null>(null);
+  const toast = useToast();
   const [activePhoto, setActivePhoto] = useState<{ src: string; alt: string; title?: string } | null>(null);
   const returnTarget = getReportReturnTarget(user?.role);
 
@@ -59,6 +67,19 @@ export function ReportDetailPage() {
     reload();
     reloadHistory();
   }
+
+  // RS-5 (#69): an edit left unsaved by a reload, an idle sign-out or an in-app
+  // link is offered back here. One the report can no longer take is dropped with
+  // a short notice; one that changes nothing is dropped quietly.
+  const draftKey = user && id ? editReportDraftKey(user.id, id) : null;
+  useEffect(() => {
+    if (!draftKey || !data || isEditing) return;
+    const stored = readDraft(draftKey);
+    const { offer, notice } = checkEditDraft(stored, data.report);
+    if (!offer && stored !== null) removeDraft(draftKey);
+    setDraftOffer(offer);
+    if (notice) toast(notice);
+  }, [draftKey, data, isEditing, toast]);
 
   if (loading) return <Loading label="Loading the report" />;
 
@@ -80,11 +101,13 @@ export function ReportDetailPage() {
   const canEdit = isOwner && report.status === "pending";
   const problems: ReportProblems = { primary: report.primary_problem, secondary: report.secondary_problem };
 
-  if (isEditing && canEdit) {
+  if (isEditing && canEdit && draftKey) {
     return (
       <EditReport
         report={report}
         problems={problems}
+        draftKey={draftKey}
+        resumed={resumed}
         onDone={() => {
           refresh();
           setIsEditing(false);
@@ -94,18 +117,47 @@ export function ReportDetailPage() {
     );
   }
 
+  function startEditing(draft: EditReportDraft | null) {
+    setResumed(draft);
+    setDraftOffer(null);
+    setIsEditing(true);
+  }
+
   const initial = report.photos.filter((photo) => photo.kind === "initial");
   const resolution = report.photos.filter((photo) => photo.kind === "resolution");
 
   return (
     <div className="flex flex-col gap-6">
+      {canEdit && draftOffer && (
+        <section aria-labelledby="edit-draft-title" className="border-2 border-accent bg-surface p-4 flex flex-col gap-3">
+          <h6 id="edit-draft-title" className="!m-0">
+            You have unsaved edits to this report
+          </h6>
+          <p className="text-[13px] !m-0">Changes you had not saved yet were kept in this tab.</p>
+          <div className="flex flex-wrap gap-3">
+            <Button type="button" variant="primary" onClick={() => startEditing(draftOffer)}>
+              Continue editing
+            </Button>
+            <Button
+              type="button"
+              onClick={() => {
+                if (draftKey) removeDraft(draftKey);
+                setDraftOffer(null);
+              }}
+            >
+              Discard them
+            </Button>
+          </div>
+        </section>
+      )}
+
       <header className="flex flex-col gap-2">
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <span className="font-mono text-[11px] text-muted">{report.reference_code}</span>
           <div className="flex items-center gap-2">
             <StatusBadge status={report.status} awaitingVerification={closurePendingOf(report)} />
-            {canEdit && (
-              <Button type="button" variant="secondary" onClick={() => setIsEditing(true)}>
+            {canEdit && !draftOffer && (
+              <Button type="button" variant="secondary" onClick={() => startEditing(null)}>
                 Edit report
               </Button>
             )}
@@ -361,14 +413,19 @@ function ReportComment({ reportId, onDone }: { reportId: string; onDone: () => v
 }
 
 // Allows the reporting citizen to edit their pending report before staff begin handling it.
+// `resumed` is a draft the citizen chose to continue from the report page.
 function EditReport({
   report,
   problems,
+  draftKey,
+  resumed,
   onDone,
   onCancel,
 }: {
   report: Report;
   problems: ReportProblems;
+  draftKey: string;
+  resumed: EditReportDraft | null;
   onDone: () => void;
   onCancel: () => void;
 }) {
@@ -376,20 +433,22 @@ function EditReport({
   const { data: categoryData } = useApi<{ categories: Category[] }>("/categories");
   const { data: problemTypeData } = useApi<ProblemTypesResponse>("/reports/meta/problem-types");
 
-  const [title, setTitle] = useState(report.title);
-  const [description, setDescription] = useState(report.description);
-  const [categoryId, setCategoryId] = useState(String(report.category?.id ?? ""));
-  const [address, setAddress] = useState(report.address_text ?? "");
   const savedPrimary = problems.primary ? String(problems.primary.id) : "";
   const savedSecondary = problems.secondary ? String(problems.secondary.id) : "";
-  const [primaryId, setPrimaryId] = useState(savedPrimary);
-  const [secondaryId, setSecondaryId] = useState(savedSecondary);
-  const [point, setPoint] = useState<Point>({ lat: report.latitude, lng: report.longitude });
+  const [title, setTitle] = useState(resumed?.title ?? report.title);
+  const [description, setDescription] = useState(resumed?.description ?? report.description);
+  const [categoryId, setCategoryId] = useState(resumed?.categoryId ?? String(report.category?.id ?? ""));
+  const [address, setAddress] = useState(resumed?.address ?? report.address_text ?? "");
+  const [primaryId, setPrimaryId] = useState(resumed?.primaryId ?? savedPrimary);
+  const [secondaryId, setSecondaryId] = useState(resumed?.secondaryId ?? savedSecondary);
+  const [point, setPoint] = useState<Point>(resumed?.point ?? { lat: report.latitude, lng: report.longitude });
   const [locating, setLocating] = useState(false);
   const fields = useLeftFields();
 
-  const pointChangedByUser = useRef(false);
-  const addressTouched = useRef(false);
+  const pointChangedByUser = useRef(resumed?.point != null);
+  // A resumed address is the citizen's, whether typed or looked up, so a lookup for
+  // the resumed pin must not replace it (as in the new-report form).
+  const addressTouched = useRef(Boolean(resumed?.address.trim()));
 
   function handlePointChange(newPoint: Point) {
     pointChangedByUser.current = true;
@@ -446,30 +505,30 @@ function EditReport({
     return errors;
   }
 
-  // Only what differs from the saved report is sent.
-  function changedFields() {
-    const changes: Record<string, unknown> = {};
-    if (title.trim() !== report.title) changes.title = title.trim();
-    if (description.trim() !== report.description) changes.description = description.trim();
-    if (Number(categoryId) !== report.category?.id) changes.category_id = Number(categoryId);
-    if (
-      pointChangedByUser.current &&
-      (point.lat !== report.latitude || point.lng !== report.longitude)
-    ) {
-      changes.latitude = point.lat;
-      changes.longitude = point.lng;
-    }
-    const cleanAddress = address.trim();
-    if (cleanAddress !== (report.address_text ?? "")) {
-      changes.address_text = cleanAddress || null;
-    }
-    if (primaryId !== savedPrimary || categoryChanged) changes.primary_problem_id = Number(primaryId);
-    if (secondaryId !== savedSecondary) changes.secondary_problem_id = secondaryId ? Number(secondaryId) : null;
-    return changes;
-  }
+  // RS-5 (#69): the form as a draft. Only what differs from the saved report is
+  // sent, and an edit that changes nothing keeps no draft.
+  const draft: EditReportDraft = {
+    version: 1,
+    basedOn: report.updated_at,
+    title,
+    description,
+    categoryId,
+    primaryId,
+    secondaryId,
+    address,
+    point: pointChangedByUser.current ? point : null,
+  };
+  const drafts = useDraft({
+    key: draftKey,
+    value: draft,
+    isEmpty: (value) => Object.keys(editReportChanges(value, report)).length === 0,
+    parse: parseEditReportDraft,
+    // The report page offers a stored draft before this form opens.
+    offer: false,
+  });
 
   const errors = validate();
-  const changes = changedFields();
+  const changes = editReportChanges(draft, report);
   // Same rule as every other form: Save is disabled while invalid or unchanged.
   const invalid = Object.keys(errors).length > 0;
   const unchanged = Object.keys(changes).length === 0;
@@ -490,6 +549,7 @@ function EditReport({
 
   function cancelEditing() {
     if (!unchanged && !window.confirm("Discard your changes to this report?")) return;
+    drafts.clear();
     onCancel();
   }
 
@@ -509,6 +569,7 @@ function EditReport({
 
     const updated = await run(changes);
     if (updated) {
+      drafts.clear();
       toast("Report updated.");
       onDone();
     }

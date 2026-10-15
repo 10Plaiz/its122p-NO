@@ -55,7 +55,7 @@ Open work lives in GitHub Issues; each Partial row names its issue.
 | RS-2 | Show only the problem types that apply to the selected category. | Medium | Done: the form lists only the chosen category's problem types. |
 | RS-3 | Allow editing a submitted report, with the change recorded in its history. | Medium | Done for the owner while the report is pending; the history names the edited fields. |
 | RS-4 | Record a primary (required) and a secondary (optional) problem type for each report. | Medium | Done: one required main problem and one optional other problem. |
-| RS-5 | Keep a draft of the report form (text and pin) and warn before unsaved input is lost. | Medium | Partial: the new-report form keeps a draft and warns before losing input. Open: a draft for the edit form (#69). |
+| RS-5 | Keep a draft of the report form (text and pin) and warn before unsaved input is lost. | Medium | Done: the new-report form and the pending-report edit form keep a draft in this tab (not attached files) through a reload or an idle sign-out, and warn before losing input. An edit draft is dropped with a notice once the report leaves pending or changes (#69). |
 | RS-6 | Let a citizen add a comment to their own report at any status; it appears in the report history and reaches the assigned staff member. | High | Done: the reporter comments at any status; the assigned Staff member and every Administrator are notified; 10 an hour. |
 
 ## 4. Staff Workflow

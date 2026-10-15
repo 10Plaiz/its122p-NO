@@ -1,5 +1,6 @@
 import { MAKATI_ERROR, isInsideMakati } from "../../server/lib/makati-boundary.js";
 import type { ProblemType, ProblemTypeGroup } from "./submission-types.js";
+import type { Report } from "./types.js";
 
 // The report form's rules, shared by the new-report wizard and the edit form.
 // Mirrors createSchema, editSchema and cancelSchema in
@@ -117,31 +118,33 @@ export function isNewReportDraftEmpty(draft: NewReportDraft) {
 // A stored draft may come from an older build or have been edited by hand, so each
 // field is checked and anything unexpected falls back to empty rather than breaking
 // the form.
-export function parseNewReportDraft(raw: unknown): NewReportDraft | null {
-  if (!raw || typeof raw !== "object") return null;
-  const stored = raw as Record<string, unknown>;
-  if (stored.version !== 1) return null;
+function storedText(stored: Record<string, unknown>, key: string, max: number) {
+  const value = stored[key];
+  return typeof value === "string" ? value.slice(0, max) : "";
+}
 
-  const text = (key: string, max: number) => {
-    const value = stored[key];
-    return typeof value === "string" ? value.slice(0, max) : "";
-  };
-  const id = (key: string) => {
-    const value = stored[key];
-    return typeof value === "string" && /^\d+$/.test(value) ? value : "";
-  };
+function storedId(stored: Record<string, unknown>, key: string) {
+  const value = stored[key];
+  return typeof value === "string" && /^\d+$/.test(value) ? value : "";
+}
 
+function storedPoint(stored: Record<string, unknown>) {
   const point = stored.point as { lat?: unknown; lng?: unknown } | null | undefined;
-  const validPoint =
-    point &&
+  return point &&
     typeof point.lat === "number" &&
     typeof point.lng === "number" &&
     Number.isFinite(point.lat) &&
     Number.isFinite(point.lng) &&
     Math.abs(point.lat) <= 90 &&
     Math.abs(point.lng) <= 180
-      ? { lat: point.lat, lng: point.lng }
-      : null;
+    ? { lat: point.lat, lng: point.lng }
+    : null;
+}
+
+export function parseNewReportDraft(raw: unknown): NewReportDraft | null {
+  if (!raw || typeof raw !== "object") return null;
+  const stored = raw as Record<string, unknown>;
+  if (stored.version !== 1) return null;
 
   const step =
     typeof stored.step === "number" && Number.isInteger(stored.step) ? Math.min(Math.max(stored.step, 0), 2) : 0;
@@ -149,12 +152,89 @@ export function parseNewReportDraft(raw: unknown): NewReportDraft | null {
   return {
     version: 1,
     step,
-    point: validPoint,
-    address: text("address", ADDRESS_MAX),
-    title: text("title", TITLE_MAX),
-    description: text("description", DESCRIPTION_MAX),
-    categoryId: id("categoryId"),
-    primaryId: id("primaryId"),
-    secondaryId: id("secondaryId"),
+    point: storedPoint(stored),
+    address: storedText(stored, "address", ADDRESS_MAX),
+    title: storedText(stored, "title", TITLE_MAX),
+    description: storedText(stored, "description", DESCRIPTION_MAX),
+    categoryId: storedId(stored, "categoryId"),
+    primaryId: storedId(stored, "primaryId"),
+    secondaryId: storedId(stored, "secondaryId"),
   };
+}
+
+// RS-5 (#69): what the edit form on /reports/:id keeps in its draft. The key
+// carries the account and the report, so neither another account nor another
+// report is ever offered it. `point` is set only once the citizen moves the pin.
+export type EditReportDraft = {
+  version: 1;
+  // The report's updated_at when editing began. A report changed since then drops
+  // the draft rather than restore it over newer saved values.
+  basedOn: string;
+  title: string;
+  description: string;
+  categoryId: string;
+  primaryId: string;
+  secondaryId: string;
+  address: string;
+  point: { lat: number; lng: number } | null;
+};
+
+export const EDIT_REPORT_DRAFT_KEY = "kamoti.draft.edit-report";
+
+export function editReportDraftKey(userId: string, reportId: string) {
+  return `${EDIT_REPORT_DRAFT_KEY}.${userId}.${reportId}`;
+}
+
+export function parseEditReportDraft(raw: unknown): EditReportDraft | null {
+  if (!raw || typeof raw !== "object") return null;
+  const stored = raw as Record<string, unknown>;
+  if (stored.version !== 1 || typeof stored.basedOn !== "string" || !stored.basedOn) return null;
+
+  return {
+    version: 1,
+    basedOn: stored.basedOn,
+    title: storedText(stored, "title", TITLE_MAX),
+    description: storedText(stored, "description", DESCRIPTION_MAX),
+    categoryId: storedId(stored, "categoryId"),
+    primaryId: storedId(stored, "primaryId"),
+    secondaryId: storedId(stored, "secondaryId"),
+    address: storedText(stored, "address", ADDRESS_MAX),
+    point: storedPoint(stored),
+  };
+}
+
+// The PATCH body for an edit: only what differs from the saved report. An empty
+// object means nothing changed, so Save stays disabled and no draft is kept.
+export function editReportChanges(draft: EditReportDraft, report: Report) {
+  const savedPrimary = report.primary_problem ? String(report.primary_problem.id) : "";
+  const savedSecondary = report.secondary_problem ? String(report.secondary_problem.id) : "";
+  const categoryChanged = Number(draft.categoryId) !== report.category?.id;
+  const changes: Record<string, unknown> = {};
+  if (draft.title.trim() !== report.title) changes.title = draft.title.trim();
+  if (draft.description.trim() !== report.description) changes.description = draft.description.trim();
+  if (categoryChanged) changes.category_id = Number(draft.categoryId);
+  if (draft.point && (draft.point.lat !== report.latitude || draft.point.lng !== report.longitude)) {
+    changes.latitude = draft.point.lat;
+    changes.longitude = draft.point.lng;
+  }
+  const cleanAddress = draft.address.trim();
+  if (cleanAddress !== (report.address_text ?? "")) changes.address_text = cleanAddress || null;
+  if (draft.primaryId !== savedPrimary || categoryChanged) changes.primary_problem_id = Number(draft.primaryId);
+  if (draft.secondaryId !== savedSecondary) changes.secondary_problem_id = draft.secondaryId ? Number(draft.secondaryId) : null;
+  return changes;
+}
+
+export const EDIT_DRAFT_NOT_PENDING = "Your unsaved edits were discarded because this report is no longer pending.";
+export const EDIT_DRAFT_CHANGED = "Your unsaved edits were discarded because this report changed since they were made.";
+
+// What the report page does with a stored edit draft: offer it back, or drop it.
+// A notice says why when the report can no longer take it; a draft that changes
+// nothing, or cannot be read, is dropped quietly.
+export function checkEditDraft(stored: unknown, report: Report): { offer: EditReportDraft | null; notice: string | null } {
+  const draft = parseEditReportDraft(stored);
+  if (!draft) return { offer: null, notice: null };
+  if (report.status !== "pending") return { offer: null, notice: EDIT_DRAFT_NOT_PENDING };
+  if (draft.basedOn !== report.updated_at) return { offer: null, notice: EDIT_DRAFT_CHANGED };
+  if (Object.keys(editReportChanges(draft, report)).length === 0) return { offer: null, notice: null };
+  return { offer: draft, notice: null };
 }
