@@ -206,7 +206,14 @@ disposable database after all migrations are applied:
 psql "$TEST_DATABASE_URL" -X -v ON_ERROR_STOP=1 -f supabase/tests/api_access.sql
 psql "$TEST_DATABASE_URL" -X -v ON_ERROR_STOP=1 -f tests/database/atomic-actions.sql
 psql "$TEST_DATABASE_URL" -X -v ON_ERROR_STOP=1 -f tests/database/submission-limits.sql
+psql "$TEST_DATABASE_URL" -X -v ON_ERROR_STOP=1 -f tests/database/auth-rate-limits.sql
 ```
+
+The fast suite never reaches a database. `bunfig.toml` preloads
+`tests/fast/preload.ts`, which sets placeholder Supabase settings and counts the
+account rate limits in memory. The API itself counts them in Postgres, so a
+local API needs `20261015000100_auth_rate_limits.sql` applied; without it,
+sign-in answers `503`.
 
 It creates synthetic records inside a transaction and rolls them back. Do not
 run it against a database that is not approved for testing. `atomic-actions.sql`

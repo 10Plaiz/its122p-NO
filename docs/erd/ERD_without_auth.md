@@ -1,13 +1,14 @@
 # KAMOTI ERD (app tables only)
 
-The database as implemented by the 21 migrations in
+The database as implemented by the 22 migrations in
 [`supabase/migrations/`](../../supabase/migrations/): the app's own tables in
 the `public` schema. Supabase's `auth.users` table, which every `profiles` row
 extends, is left out. Checked against those migrations on 2026-10-15: every
 table and column below is created there, and nothing else is.
 
-The shared project records the first 18 migrations (#49). No issue yet records
-the three from `20261005000100` on there.
+The shared project records the first 18 migrations (#49). The owner reports
+`20261005000100` to `20261006000200` are applied there too.
+`20261015000100_auth_rate_limits.sql` waits for its pull request.
 
 For the version that includes `auth.users`, see [ERD_with_auth.md](ERD_with_auth.md).
 
@@ -321,6 +322,18 @@ Table citizen_submission_events {
   }
 
   Note: 'Shared quota ledger. Expired rows are removed in bounded batches. Service role only; no foreign keys.'
+}
+
+Table auth_rate_counters {
+  key text [pk, note: 'SHA-256 of the limit name and its subject (client, email, or account)']
+  hits integer [not null, note: '0-100000']
+  reset_at timestamptz [not null, note: 'End of the fixed window']
+
+  indexes {
+    reset_at [name: 'auth_rate_counters_reset_idx']
+  }
+
+  Note: 'Shared sign-in, code, refresh, and comment limits (KI-14). Expired rows are removed in bounded batches. Service role only; no foreign keys.'
 }
 
 // ------------------------------------------------------------- relationships

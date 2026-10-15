@@ -27,9 +27,9 @@ Evidence labels:
 | New passwords: 8 to 72 characters with lowercase, uppercase, digit, and punctuation | `passwordRule` in `src/server/lib/validate.ts` | Hosted (#50) |
 | Signup and recovery use single-use six-digit email codes with a one-hour expiry | `accounts-email.ts`, `supabase/templates/` | Hosted (#50); Local (Mailpit, #52) |
 | A password reset signs out every session | `resetPassword` | Hosted (#50) |
-| The refresh token is an `HttpOnly`, `SameSite=Strict` cookie on `/api/auth`, so page scripts cannot read it (KI-12) | `src/server/lib/session-cookie.ts` | Source (`tests/fast/accounts-email.test.ts` ACC-13); security IMP-16 written, not yet run |
+| The refresh token is an `HttpOnly`, `SameSite=Strict` cookie on `/api/auth`, so page scripts cannot read it (KI-12) | `src/server/lib/session-cookie.ts` | Source (`tests/fast/accounts-email.test.ts` ACC-13); Local (security IMP-16) |
 | `/api/auth/refresh` needs the `X-KAMOTI-Session` header, which another site cannot send | `requireSessionHeader` | Source (ACC-13) |
-| Sign-out revokes the session by refresh cookie, even after the access token expired | `/api/auth/logout` | Local (security IMP-10, before the cookie) |
+| Sign-out revokes the session by refresh cookie, even after the access token expired | `/api/auth/logout` | Local (security IMP-10) |
 | A deactivated account gets `403` on every route, at sign-in, and at refresh | `requireAuth`, `accounts-profile.ts` | Local (security IMP-14) |
 | After 15 idle minutes a one-minute warning appears, then the browser signs out and keeps the report draft | `src/web/lib/idle.ts` | Source; browser session tests |
 
@@ -68,7 +68,8 @@ Evidence labels:
 
 | Control | Where | Evidence |
 | :--- | :--- | :--- |
-| Sign-in: 10 failures for one address from one client, 30 from one client, and 20 for one address from any client, in 15 minutes | `src/server/lib/rate-limit.ts` | Source (`tests/fast/accounts.test.ts`) |
+| Sign-in: 10 failures for one address from one client, 30 from one client, and 20 for one address from any client, in 15 minutes | `src/server/lib/rate-limit.ts` | Source (`tests/fast/rate-limit.test.ts`) |
+| Account limits are shared by every API instance and count parallel bursts in full (KI-14) | `auth_rate_limit()`, `20261015000100_auth_rate_limits.sql` | Local (`tests/database/auth-rate-limits.sql`; two API processes refused the 11th failure) |
 | Code requests answer `204` when Supabase withholds an email for a recent request, so they never reveal an account (KI-15) | `src/server/lib/accounts-email.ts` | Source (ACC-12) |
 | Sign-up: 5 an hour per client. Code checks: 10 failures in 15 minutes. Code requests: 5 in 15 minutes. Refresh: 60 in 15 minutes | `rate-limit.ts` | Source |
 | Citizen comments: 10 an hour per account | `limits.citizenComment` | Source |
@@ -94,7 +95,6 @@ Its pull request updates this table.
 | :--- | :--- | :--- | :--- |
 | The access token sits in `localStorage` | An injected script could use it until it expires, within the hour | The CSP limits script sources; React escapes rendered text; XSS-01 to XSS-04 pass | Keep it in memory only, at the cost of a refresh on every reload |
 | `/refresh` still accepts a body token | Only for moving sessions stored before the cookie | It is spent on first use and the browser deletes its copy | Remove the fallback after 7 days in production |
-| Account rate limits are counted per server instance (KI-14) | On Vercel with several warm instances, an attacker gets a multiple of each limit | Supabase Auth applies its own limits behind these | In progress: a Postgres-backed store. Needs a migration |
 | Registration reveals existing accounts | Signing up with a used address answers `409` | The screen tells the person to sign in instead, which helps people who forgot they registered | Answer as if a code were sent |
 | A reset code is spent before the new password is saved (KI-16) | If Supabase refuses the password, the person must ask for a new code | The screen says so, and the send-a-new-code control sits below it | None planned |
 | A proof's PDF check reads only the header | A malformed PDF can be stored | Proofs are private and opened only by Administrators | #62 |
@@ -111,13 +111,12 @@ Its pull request updates this table.
 - The shared project records the first 18 migrations (#49). The owner reports the
   three later ones, from `20261005000100` to `20261006000200`, are applied too
   (15 October 2026); no migration list confirms it yet.
-- The security suite's cookie cases (IMP-10, IMP-14, IMP-16) after KI-12. They
-  need the local Supabase stack, which was not running.
 - A real phone or microphone: speech-to-text runs only where the browser offers it.
 
 ## Evidence
 
 - [Local security run, 15 October 2026](../tests/evidence/security-local-2026-10-15/report.md): 43/43.
+- [Shared limits and cookie sessions, 15 October 2026](../tests/evidence/auth-limits-local-2026-10-15/report.md): 44/44, plus the limiter SQL suite and two API processes.
 - [Release verification, 4 October 2026](../tests/evidence/release-15a7597-20261004/VERIFICATION.md): hosted Auth, Storage, and RLS.
 - [Residency version verification](../tests/evidence/issue61/verification.md).
 - `tests/database/atomic-actions.sql` and `supabase/tests/api_access.sql`. Run them only on a database marked
