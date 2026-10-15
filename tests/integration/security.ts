@@ -837,6 +837,36 @@ async function main(): Promise<void> {
       return total ?? 0;
     };
 
+    // Takes a report through the real workflow to resolved: assigned to fixture
+    // Staff 1, under review, in progress, a repair photo, a closure request, and
+    // an Administrator's approval.
+    const resolveReport = async (reportId: string) => {
+      const { data: staff } = await db.from("profiles").select("id").eq("email", "fixture-staff-1@kamoti.invalid").single();
+      for (const [path, body] of [
+        [`/api/reports/${reportId}/assign`, { staff_id: staff!.id, details: "Security check crew." }],
+        [`/api/reports/${reportId}/status`, { status: "under_review", details: "Checked the report." }],
+        [`/api/reports/${reportId}/status`, { status: "in_progress", details: "Crew sent." }],
+      ] as const) {
+        const step = await api(path, { method: "PATCH", headers: bearer(adminToken), body: JSON.stringify(body) });
+        if (!step.ok) throw new Error(`${path}: expected success, got ${step.status} ${step.body?.error ?? ""}`);
+      }
+      const photo = await multipart(`/api/reports/${reportId}/photos`, staff1Token, pngForm("photo"));
+      if (photo.status !== 201) throw new Error(`Repair photo: expected 201, got ${photo.status}`);
+      const request = await api(`/api/reports/${reportId}/closure-request`, {
+        method: "POST",
+        headers: bearer(staff1Token),
+        body: JSON.stringify({ outcome: "resolved", details: "Repaired for the security check." }),
+      });
+      if (request.status !== 201) throw new Error(`Closure request: expected 201, got ${request.status} ${request.body?.error ?? ""}`);
+      const workflow = await api(`/api/reports/${reportId}/workflow`, { headers: bearer(adminToken) });
+      const review = await api(`/api/reports/${reportId}/closure-review`, {
+        method: "POST",
+        headers: bearer(adminToken),
+        body: JSON.stringify({ decision: "approve", details: "Repair verified.", requested_at: workflow.body.workflow.closure.requested_at }),
+      });
+      if (review.status !== 200) throw new Error(`Closure approval: expected 200, got ${review.status} ${review.body?.error ?? ""}`);
+    };
+
     const securityEmail = `security-${Date.now()}@kamoti.invalid`;
     const securityPassword = `S3curity!${Date.now()}`;
     let securityToken = "";
@@ -915,31 +945,7 @@ async function main(): Promise<void> {
       if (created.status !== 201) throw new Error(`Report: expected 201, got ${created.status} ${created.body?.error ?? ""}`);
       const reportId = created.body.report.id as string;
       securityReportId = reportId;
-
-      const { data: staff } = await db.from("profiles").select("id").eq("email", "fixture-staff-1@kamoti.invalid").single();
-      for (const [path, body] of [
-        [`/api/reports/${reportId}/assign`, { staff_id: staff!.id, details: "Security check crew." }],
-        [`/api/reports/${reportId}/status`, { status: "under_review", details: "Checked the report." }],
-        [`/api/reports/${reportId}/status`, { status: "in_progress", details: "Crew sent." }],
-      ] as const) {
-        const step = await api(path, { method: "PATCH", headers: bearer(adminToken), body: JSON.stringify(body) });
-        if (!step.ok) throw new Error(`${path}: expected success, got ${step.status} ${step.body?.error ?? ""}`);
-      }
-      const photo = await multipart(`/api/reports/${reportId}/photos`, staff1Token, pngForm("photo"));
-      if (photo.status !== 201) throw new Error(`Repair photo: expected 201, got ${photo.status}`);
-      const request = await api(`/api/reports/${reportId}/closure-request`, {
-        method: "POST",
-        headers: bearer(staff1Token),
-        body: JSON.stringify({ outcome: "resolved", details: "Repaired for the security check." }),
-      });
-      if (request.status !== 201) throw new Error(`Closure request: expected 201, got ${request.status} ${request.body?.error ?? ""}`);
-      const workflow = await api(`/api/reports/${reportId}/workflow`, { headers: bearer(adminToken) });
-      const review = await api(`/api/reports/${reportId}/closure-review`, {
-        method: "POST",
-        headers: bearer(adminToken),
-        body: JSON.stringify({ decision: "approve", details: "Repair verified.", requested_at: workflow.body.workflow.closure.requested_at }),
-      });
-      if (review.status !== 200) throw new Error(`Closure approval: expected 200, got ${review.status} ${review.body?.error ?? ""}`);
+      await resolveReport(reportId);
 
       const rate = () => api(`/api/feedback/${reportId}`, { method: "POST", headers: bearer(securityToken), body: JSON.stringify({ rating: 5 }) });
       const both = (await Promise.all([rate(), rate()])).map((res) => res.status).sort();
@@ -1043,6 +1049,83 @@ async function main(): Promise<void> {
       const late = await multipart(`/api/reports/${securityReportId}/photos`, securityToken, pngForm("photo"));
       const lateCode = ((await late.json()) as { details?: { code?: string } }).details?.code;
       if (late.status !== 403 || lateCode !== undefined) throw new Error(`After approval, a photo on a resolved report: expected 403 for its status, got ${late.status} ${lateCode}`);
+    });
+
+    await runCase("IMP-18", "Residency Approval", "an approved citizen files a report; back in review they keep history, edits, comments, feedback, notifications, exports, and withdrawal, but no new report (#64)", async () => {
+      if (!securityReportId) throw new Error("IMP-13 did not create the synthetic citizen's report");
+      const { data: start } = await db.from("profiles").select("residency_status").eq("id", securityId).single();
+      if (start?.residency_status !== "verified") throw new Error(`IMP-17 did not leave the citizen approved (${start?.residency_status})`);
+      const groups = (await api("/api/reports/meta/problem-types", { headers: bearer(securityToken) })).body.groups as { category_id: number; problem_types: { id: number }[] }[];
+      const problem = groups.find((group) => group.category_id === testCategory.id)?.problem_types[0];
+      if (!problem) throw new Error(`No problem type for category ${testCategory.id}`);
+      const reportBody = (title: string) => JSON.stringify({ title, description: "Filed by the synthetic citizen for the #64 check.",
+        category_id: testCategory.id, primary_problem_id: problem.id, latitude: 14.5547, longitude: 121.0244 });
+      const file = async (title: string) => {
+        const filed = await api("/api/reports", { method: "POST", headers: bearer(securityToken), body: reportBody(title) });
+        if (filed.status !== 201 || filed.body?.report?.status !== "pending") {
+          throw new Error(`After approval, "${title}": expected 201 and pending, got ${filed.status} ${filed.body?.report?.status ?? filed.body?.error ?? ""}`);
+        }
+        return filed.body.report.id as string;
+      };
+
+      // Approved: complete reports are saved. One stays pending (to edit and
+      // withdraw later); the other is resolved, to be rated later.
+      const reportId = await file("[TEST] Filed after approval");
+      const resolvedId = await file("[TEST] Resolved, rated in review");
+      await resolveReport(resolvedId);
+
+      // Only the street changes, so the address alone sends the citizen back to review (#59).
+      const moved = await api("/api/auth/me", {
+        method: "PATCH",
+        headers: bearer(securityToken),
+        body: JSON.stringify({ first_name: "Security", last_name: "Check", barangay: "Bel-Air", address_line: "3 Review Street" }),
+      });
+      if (moved.status !== 200 || moved.body?.user?.residency_status !== "pending") {
+        throw new Error(`Address change: expected 200 and pending, got ${moved.status} ${moved.body?.user?.residency_status}`);
+      }
+      const reports = await count("reports", "citizen_id", securityId);
+      const refused = await api("/api/reports", { method: "POST", headers: bearer(securityToken), body: reportBody("[TEST] Refused in review") });
+      if (refused.status !== 403 || refused.body?.details?.code !== "residency_pending") {
+        throw new Error(`In review, a new report: expected 403 residency_pending, got ${refused.status} ${refused.body?.details?.code}`);
+      }
+      if (await count("reports", "citizen_id", securityId) !== reports) throw new Error("A refused report was saved");
+
+      // Everything on reports filed earlier stays open (#59, agreed 2026-10-15),
+      // with the citizen's own content, not an empty answer.
+      const read = async (label: string, path: string) => {
+        const res = await api(path, { headers: bearer(securityToken) });
+        if (res.status !== 200) throw new Error(`In review, ${label}: expected 200, got ${res.status} ${res.body?.error ?? ""}`);
+        return res.body;
+      };
+      const ids = (rows: { id: string }[] | undefined) => new Set((rows ?? []).map((row) => row.id));
+      const history = ids((await read("history", "/api/reports")).reports);
+      if (![reportId, resolvedId, securityReportId].every((id) => history.has(id))) throw new Error("In review, history is missing the citizen's reports");
+      if ((await read("report detail", `/api/reports/${reportId}`)).report?.id !== reportId) throw new Error("In review, the report detail is wrong");
+      if (!((await read("report timeline", `/api/reports/${resolvedId}/updates`)).updates?.length > 0)) throw new Error("In review, the timeline is empty");
+      if (!(await read("rating", `/api/feedback/${securityReportId}`)).feedback) throw new Error("In review, the earlier rating is missing");
+      const listed = (await read("notifications", "/api/notifications")).notifications as unknown[] | undefined;
+      const stored = (await db.from("notifications").select("*", { count: "exact", head: true }).eq("user_id", securityId)).count ?? 0;
+      if (stored === 0 || listed?.length !== Math.min(stored, 50)) throw new Error(`In review, notifications: listed ${listed?.length}, stored ${stored}`);
+      if (!ids((await read("export", "/api/exports/reports?format=csv")).reports).has(reportId)) throw new Error("In review, the export is missing the citizen's report");
+      const edited = await api(`/api/reports/${reportId}`, {
+        method: "PATCH",
+        headers: bearer(securityToken),
+        body: JSON.stringify({ description: "Edited while the address is in review." }),
+      });
+      if (edited.status !== 200 || edited.body?.report?.description !== "Edited while the address is in review.") {
+        throw new Error(`In review, an edit: expected 200 with the new description, got ${edited.status} ${edited.body?.error ?? ""}`);
+      }
+      for (const id of [reportId, securityReportId]) {
+        const comment = await api(`/api/reports/${id}/remarks`, { method: "POST", headers: bearer(securityToken), body: JSON.stringify({ details: "A comment while in review." }) });
+        if (comment.status !== 201) throw new Error(`In review, a comment on ${id === reportId ? "a pending" : "a resolved"} report: expected 201, got ${comment.status} ${comment.body?.error ?? ""}`);
+      }
+      const rated = await api(`/api/feedback/${resolvedId}`, { method: "POST", headers: bearer(securityToken), body: JSON.stringify({ rating: 4 }) });
+      if (rated.status !== 201) throw new Error(`In review, rating a resolved report: expected 201, got ${rated.status} ${rated.body?.error ?? ""}`);
+      if (await count("report_feedback", "report_id", resolvedId) !== 1) throw new Error("The rating given in review was not saved");
+      const withdrawn = await api(`/api/reports/${reportId}/cancel`, { method: "POST", headers: bearer(securityToken), body: JSON.stringify({ details: "Filed by mistake." }) });
+      if (withdrawn.status !== 200 || withdrawn.body?.report?.status !== "cancelled") {
+        throw new Error(`In review, withdrawal: expected 200 and cancelled, got ${withdrawn.status} ${withdrawn.body?.report?.status}`);
+      }
     });
 
     await runCase("IMP-14", "Session Handling", "a deactivated citizen is refused with an old token, at sign-in, and on refresh", async () => {
