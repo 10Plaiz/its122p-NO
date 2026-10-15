@@ -27,7 +27,7 @@ Evidence labels:
 | New passwords: 8 to 72 characters with lowercase, uppercase, digit, and punctuation | `passwordRule` in `src/server/lib/validate.ts` | Hosted (#50) |
 | Signup and recovery use single-use six-digit email codes with a one-hour expiry | `accounts-email.ts`, `supabase/templates/` | Hosted (#50); Local (Mailpit, #52) |
 | A password reset signs out every session | `resetPassword` | Hosted (#50) |
-| The refresh token is an `HttpOnly`, `SameSite=Strict` cookie on `/api/auth`, so page scripts cannot read it (KI-12) | `src/server/lib/session-cookie.ts` | Source (`tests/fast/accounts-email.test.ts` ACC-13); Local (security IMP-16) |
+| The refresh token is an `HttpOnly`, `SameSite=Strict` cookie on `/api/auth`, so page scripts cannot read it; `/refresh` and `/logout` ignore a body token (KI-12, #71) | `src/server/lib/session-cookie.ts` | Source (`tests/fast/accounts-email.test.ts` ACC-13); Local (security IMP-16) |
 | `/api/auth/refresh` needs the `X-KAMOTI-Session` header, which another site cannot send | `requireSessionHeader` | Source (ACC-13) |
 | Sign-out revokes the session by refresh cookie, even after the access token expired | `/api/auth/logout` | Local (security IMP-10) |
 | A deactivated account gets `403` on every route, at sign-in, and at refresh | `requireAuth`, `accounts-profile.ts` | Local (security IMP-14) |
@@ -100,7 +100,6 @@ Its pull request updates this table.
 | Risk | Impact | Why accepted | Fix path |
 | :--- | :--- | :--- | :--- |
 | The access token sits in `localStorage` | An injected script could use it until it expires, within the hour | The CSP limits script sources; React escapes rendered text; XSS-01 to XSS-04 pass | Keep it in memory only, at the cost of a refresh on every reload |
-| `/refresh` still accepts a body token | Only for moving sessions stored before the cookie | It is spent on first use and the browser deletes its copy | Remove it on or after 22 October 2026 (#71) |
 | Registration reveals existing accounts | Signing up with a used address answers `409` | The screen tells the person to sign in instead, which helps people who forgot they registered | Answer as if a code were sent |
 | A reset code is spent before the new password is saved (KI-16) | If Supabase refuses the password, the person must ask for a new code | The screen says so, and the send-a-new-code control sits below it | None planned |
 | Proof checks are not a malware scan | A well-formed image or PDF can still carry a payload aimed at a viewer | Proofs are private, opened only by Administrators through a signed link on the Storage domain; PDFs with scripts, attachments, or passwords are refused; no outside scanning service sees the documents | Owner review of cost and privacy before any scanning service |
