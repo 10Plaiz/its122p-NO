@@ -5,10 +5,10 @@ process.env.SUPABASE_SECRET_KEY ??= "placeholder-secret-key";
 import { describe, expect, it } from "bun:test";
 import { readFileSync } from "node:fs";
 
-// SW-1 area routing (Phase 2 C7): staff ranked by category and barangay, the area
-// list, the barangay filter, and the migration's barangay seed against the app's
-// list. The database lookup itself (barangay_at) is checked on a local Supabase;
-// see PHASE2_PLAN.md.
+// SW-1 area routing: staff ranked by category and barangay, the area list, the
+// barangay filter, and the migration's barangay seed against the app's list. The
+// database lookup itself (barangay_at) needs a local Supabase stack; see
+// docs/LOCAL_DEV.md.
 
 const { areaSchema, rankStaff } = await import("../../src/server/routes/staff.routes.js");
 const { reportExportSchema } = await import("../../src/server/routes/exports.routes.js");
