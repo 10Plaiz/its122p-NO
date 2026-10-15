@@ -210,6 +210,7 @@ psql "$TEST_DATABASE_URL" -X -v ON_ERROR_STOP=1 -f tests/database/submission-lim
 psql "$TEST_DATABASE_URL" -X -v ON_ERROR_STOP=1 -f tests/database/auth-rate-limits.sql
 psql "$TEST_DATABASE_URL" -X -v ON_ERROR_STOP=1 -f tests/database/residency-review.sql
 psql "$TEST_DATABASE_URL" -X -v ON_ERROR_STOP=1 -f tests/database/name-corrections.sql
+psql "$TEST_DATABASE_URL" -X -v ON_ERROR_STOP=1 -f tests/database/proof-retention.sql
 ```
 
 The fast suite never reaches a database. `bunfig.toml` preloads
@@ -255,6 +256,7 @@ psql "$TEST_DATABASE_URL" -X -v ON_ERROR_STOP=1 -f tests/database/atomic-actions
 psql "$TEST_DATABASE_URL" -X -v ON_ERROR_STOP=1 -f tests/database/residency-reviews.sql
 psql "$TEST_DATABASE_URL" -X -v ON_ERROR_STOP=1 -f tests/database/residency-review.sql
 psql "$TEST_DATABASE_URL" -X -v ON_ERROR_STOP=1 -f tests/database/name-corrections.sql
+psql "$TEST_DATABASE_URL" -X -v ON_ERROR_STOP=1 -f tests/database/proof-retention.sql
 psql "$TEST_DATABASE_URL" -X -v ON_ERROR_STOP=1 -f tests/database/submission-limits.sql
 psql "$TEST_DATABASE_URL" -X -v ON_ERROR_STOP=1 -f tests/database/proof-retry-admission.sql
 psql "$TEST_DATABASE_URL" -X -v ON_ERROR_STOP=1 -f tests/database/auth-rate-limits.sql
@@ -281,7 +283,7 @@ browser. It does not use the default headless shell. See the
 [Playwright browser guide](https://playwright.dev/docs/browsers#chromium-new-headless-mode).
 These checks prove dialog conflicts, refresh, and upload retry controls. They
 do not prove hosted Supabase file handling. See [API.md](API.md#residency-reviews)
-for the review contract, retention proposal, and coordinated deployment procedure.
+for the review contract, proof retention, and coordinated deployment procedure.
 
 Run the live quota suite from the repository root with `SUPABASE_URL`,
 `SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY`, and `TEST_DATABASE_URL` set

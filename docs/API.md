@@ -439,12 +439,9 @@ a new submission. A confirmed submission updates the signed-in account.
 A failed refresh keeps the form blocked. A confirmed retry displays the current
 residency result, including a later approval or rejection.
 
-Replaced proofs stay private and keep their original bytes. Existing signed
+Replaced proofs stay private and keep their original bytes until
+[Proof retention](#proof-retention) removes them 30 days later. Existing signed
 links remain tied to their original document until their five-minute expiry.
-This migration installs no automatic deletion. The proposed retention period is
-30 days after replacement, subject to an owner-approved rule. That rule must
-cover audit needs, active signed links, uncertain uploads, and removal failures.
-Do not treat this proposal as approval for indefinite retention or deletion.
 
 ### Deploy the review contract
 
@@ -652,6 +649,7 @@ accepted risks.
 | `GET` | `/api/admin/analytics` | admin |
 | `GET` | `/api/admin/logs` | admin |
 | `POST` | `/api/maintenance/purge-cancelled-photos` | admin. See [Photo retention](#photo-retention) |
+| `POST` | `/api/maintenance/purge-expired-proofs` | admin. See [Proof retention](#proof-retention) |
 | `POST` | `/api/hooks/send-sms` | Supabase Auth only, signed. Dormant. See [Send SMS Hook](#send-sms-hook) |
 | `GET` | `/api/public/reports` | **anyone, no login** |
 | `GET` | `/api/public/stats` | **anyone, no login**: counts above the board |
@@ -726,6 +724,37 @@ are removed in batches of 100. A failed batch returns `500` with the same
 counts. Run the purge again to finish; purged photos are skipped. Every run is
 recorded as `maintenance.photos_purged`. An Administrator starts it from the
 dashboard's Photo retention panel. No scheduled job runs it.
+
+## Proof retention
+
+Owner decision (#70, 2026-10-15): a residency proof file is kept 30 days after
+it stops being current. Rows are never deleted. The database owns the rule:
+`expired_residency_proof_files()` lists the files, and a check constraint and
+the proof-version guard refuse to record a removal early.
+
+| File | Removed | Recorded |
+| :--- | :--- | :--- |
+| A replaced proof | 30 days after `superseded_at` | `residency_proof_versions.file_removed_at`, set once |
+| An upload that never reached an account (a failed or uncertain attachment; no version row) | 30 days after the object was created | No row exists; counted in the audit |
+| An account's current proof | Never | The guard refuses it |
+
+Signed links are issued only for the current proof and last five minutes, so no
+open link points at a listed file. The decision and access audits keep every
+proof's identity and path for good.
+
+`POST /api/maintenance/purge-expired-proofs` takes an optional
+`{ "dry_run": true }`. It returns `{ result }` with `dry_run`,
+`retention_days`, `replaced`, `unattached`, `removed`, `failed`, and `more`.
+Files go first, in batches of 100, then the replaced proofs are recorded. A
+failed batch returns `500` with the same counts; run it again to finish, since
+removing a missing file is a no-op and recorded proofs are skipped. One run
+handles up to 1,000 files of each kind; `more` says to run it again. Every run,
+including a dry run, is recorded as `maintenance.proofs_purged`, and that audit
+is required. An Administrator starts it from the dashboard's Proof retention
+panel. No scheduled job runs it.
+
+Apply `20261015000400_proof_retention.sql` after #67's `20261015000300`, then
+deploy the matching API. The earlier API never calls the new function.
 
 ## Send SMS Hook
 
