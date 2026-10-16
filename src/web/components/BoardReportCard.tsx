@@ -1,19 +1,22 @@
 import type { PublicReport } from "../lib/types.js";
-import { PhotoFrame, StatusBadge, formatDate } from "./ui.js";
+import { StatusBadge, formatDate } from "./ui.js";
+import { BoardPhoto } from "./BoardPhoto.js";
 
 export interface BoardReportCardProps {
   report: PublicReport;
   isSelected: boolean;
   onToggle: (id: string) => void;
+  idPrefix?: string;
 }
 
-export function BoardReportCard({ report, isSelected, onToggle }: BoardReportCardProps) {
-  const panelId = `report-panel-${report.id}`;
-  const headerId = `report-header-${report.id}`;
-  const titleId = `report-title-${report.id}`;
+export function BoardReportCard({ report, isSelected, onToggle, idPrefix = "report" }: BoardReportCardProps) {
+  const panelId = `${idPrefix}-panel-${report.id}`;
+  const headerId = `${idPrefix}-header-${report.id}`;
+  const titleId = `${idPrefix}-title-${report.id}`;
 
   return (
     <article
+      data-report-id={report.id}
       className={`card p-4 flex flex-col gap-3 transition-colors border ${
         isSelected
           ? "border-accent shadow-sm"
@@ -113,13 +116,7 @@ export function BoardReportCard({ report, isSelected, onToggle }: BoardReportCar
             </div>
           )}
 
-          {report.photos?.[0] && (
-            <PhotoFrame
-              src={report.photos[0].url}
-              alt={`Photo of the issue reported as ${report.title}`}
-              imageClassName="h-48"
-            />
-          )}
+          {report.photos.map((photo) => <BoardPhoto key={photo.storage_path} src={photo.url} title={report.title} />)}
         </div>
       )}
     </article>
