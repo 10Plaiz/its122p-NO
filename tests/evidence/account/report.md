@@ -1,5 +1,38 @@
 # Account and registration evidence
 
+## Board fixture integration correction
+
+After integration with main through #84/#85, the focused mobile-marker case
+failed before rendering. Vite reported that the simulated Maps module did not
+export `APIProvider`, which AddressFields imports eagerly. The controlled
+adapter now exports an inert provider that returns its children. Application
+code, assertions, and failure checks are unchanged.
+
+Before the correction, this command failed with one timeout after the missing
+export error:
+
+```text
+bunx playwright test --config tests/evidence/website-board/playwright.config.mjs --grep 'mobile marker'
+```
+
+After the correction, both consumers of the simulated adapter passed:
+
+```text
+bunx playwright test --config tests/evidence/website-board/playwright.config.mjs --grep 'mobile marker|desktop marker'
+  2 passed, 0 failed.
+bun run typecheck:test
+  Passed.
+git diff --check
+  Passed.
+```
+
+The isolated frontend used port 5413 and stopped after the run. No API server
+was started on 4413. API responses and Maps were simulated. Generated
+screenshots were discarded because this correction changes no visual behavior.
+No shared database writes occurred. Existing mail-delivery limits remain open
+in #91, and issues #82/#83 remain outside this correction. Owning application
+documentation needs no change for this test-only export.
+
 Baseline is merged PR #81, commit `98608291d629fe89d8205c40454cca659161f078`.
 The isolated runtime used frontend `http://localhost:5411` and API
 `http://localhost:4411`. The API used intentionally unavailable loopback Supabase
