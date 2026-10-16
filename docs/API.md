@@ -635,7 +635,7 @@ accepted risks.
 | `POST` | `/api/reports/:id/closure-request` | assigned Staff |
 | `POST` | `/api/reports/:id/closure-review` | admin; approval requires a different account from the requester |
 | `POST` | `/api/reports/:id/photos` | owner while `pending` (initial); assigned staff or admin (resolution) |
-| `GET` | `/api/notifications` | signed in |
+| `GET` | `/api/notifications` (newest 50, and the count of every unread one), `/unread` (the count alone, for the menu badge) | signed in |
 | `PATCH` | `/api/notifications/:id/read`, `/read-all` | owner |
 | `GET` `POST` `PATCH` | `/api/admin/users[/:id]` | admin |
 | `GET` | `/api/admin/users/:id/residency-proof` | admin; required access audit |
