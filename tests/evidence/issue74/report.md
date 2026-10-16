@@ -21,7 +21,7 @@ proof step, which asks for a sample document instead of a real one.
 
 | Item | Value |
 | :--- | :--- |
-| Revision | `docs/74-test-site-notice` from `main` at `dae6e24` |
+| Revision | `docs/74-test-site-notice` from `main` at `dae6e24`, rebased on `9860829` (#81's new sign-up form) |
 | Database | Local Supabase CLI stack `kamoti` with Mailpit |
 | Shared project | Not contacted. No account or document was opened |
 
@@ -40,6 +40,6 @@ proof step, which asks for a sample document instead of a real one.
 
 | File | Shows |
 | :--- | :--- |
-| [74-01-register-320.png](74-01-register-320.png) | Sign-up form at 320 px: the notice sits directly above the consent |
+| [74-01-register-320.png](74-01-register-320.png) | Sign-up form at 320 px: the notice sits directly above the consent. Retaken on #81's form; at 320, 375, 768 and 1280 px it stays above the consent with no overflow and no console errors |
 | [74-02-proof-step.png](74-02-proof-step.png) | Proof step at 1280 px: the sample-document notice directly above the file picker, and the footer |
 | [74-03-footer-320.png](74-03-footer-320.png) | Footer at 320 px, wrapping inside the page |
