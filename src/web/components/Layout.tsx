@@ -1,10 +1,10 @@
 import { Suspense, useEffect, useState } from "react";
 import { Link as RouterLink, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { Loading, StatusPill } from "./ui.js";
+import { STUDENT_PROJECT_NOTICE } from "../lib/site-notice.js";
 import { useAuth } from "../lib/auth.js";
 import { PROOF_STEP_PATH, residencyApproved, residencyLocked } from "../lib/residency.js";
 import { useApi } from "../lib/useApi.js";
-import { STUDENT_PROJECT_NOTICE } from "../lib/site-notice.js";
 import { ROLE_LABEL } from "../lib/types.js";
 import type { Notification } from "../lib/types.js";
 
