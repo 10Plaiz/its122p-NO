@@ -8,8 +8,8 @@ import { lastPage, pageItems, parsePage, rangeSummary } from "./pages.js";
 //
 // Page buttons keep their square, compact layout independent of action buttons.
 const PAGE_BUTTON =
-  "inline-flex h-9 min-w-9 cursor-pointer items-center justify-center border border-divider bg-transparent px-2 font-mono text-[12px] tabular-nums text-text hover:bg-neutral-200 active:bg-neutral-300 disabled:cursor-not-allowed disabled:opacity-45";
-const CURRENT_PAGE = "inline-flex h-9 min-w-9 items-center justify-center border border-accent bg-accent px-2 font-mono text-[12px] font-semibold tabular-nums text-bg disabled:opacity-45";
+  "inline-flex h-9 min-w-9 cursor-pointer items-center justify-center border border-divider bg-transparent px-2 font-mono text-[12px] tabular-nums text-text hover:bg-neutral-200";
+const CURRENT_PAGE = "inline-flex h-9 min-w-9 items-center justify-center border border-accent bg-accent px-2 font-mono text-[12px] font-semibold tabular-nums text-bg";
 
 export function NumberedPagination({
   page,
@@ -17,7 +17,6 @@ export function NumberedPagination({
   total,
   onPage,
   label = "Pagination",
-  disabled = false,
 }: {
   page: number;
   perPage: number;
@@ -25,7 +24,6 @@ export function NumberedPagination({
   onPage: (page: number) => void;
   /** Names the nav landmark when a screen has more than one table. */
   label?: string;
-  disabled?: boolean;
 }) {
   const last = lastPage(total, perPage);
   const [jump, setJump] = useState("");
@@ -36,14 +34,12 @@ export function NumberedPagination({
   if (total <= 0) return null;
 
   function go(target: number) {
-    if (disabled) return;
     setError(null);
     if (target !== page) onPage(target);
   }
 
   function submitJump(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (disabled) return;
     const target = parsePage(jump, last);
     if (target === null) {
       setError(`Enter a page from 1 to ${last}.`);
@@ -54,22 +50,19 @@ export function NumberedPagination({
   }
 
   return (
-    <nav aria-label={label} className="pagination" data-pagination>
-      <p className="pagination-range" aria-live="polite" aria-atomic="true">
+    <nav aria-label={label} className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3" data-pagination>
+      <p className="m-0 text-muted font-mono text-[11px] tabular-nums" aria-live="polite">
         {rangeSummary(page, perPage, total)}
       </p>
 
       {last > 1 && (
-        <div className="pagination-controls">
-          <div className="pagination-navigation">
-            <Button type="button" className="min-h-9" disabled={disabled || page <= 1} onClick={() => go(page - 1)}>
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
+          <div className="flex flex-wrap items-center gap-1">
+            <Button type="button" className="min-h-9" disabled={page <= 1} onClick={() => go(page - 1)}>
               Previous
             </Button>
 
-            <span className="pagination-current font-mono text-[12px] tabular-nums" aria-current="page">
-              Page {page.toLocaleString("en-PH")} of {last.toLocaleString("en-PH")}
-            </span>
-            <ul className="pagination-pages m-0 list-none items-center gap-1 p-0">
+            <ul className="m-0 flex list-none flex-wrap items-center gap-1 p-0">
               {pageItems(page, last).map((item, index) =>
                 item === "gap" ? (
                   <li key={`gap-${index}`} aria-hidden="true" className="px-1 font-mono text-[12px] text-muted">
@@ -78,11 +71,11 @@ export function NumberedPagination({
                 ) : (
                   <li key={item}>
                     {item === page ? (
-                      <button type="button" className={CURRENT_PAGE} aria-current="page" aria-label={`Page ${item}, current page`} disabled={disabled}>
+                      <button type="button" className={CURRENT_PAGE} aria-current="page" aria-label={`Page ${item}, current page`}>
                         {item}
                       </button>
                     ) : (
-                      <button type="button" className={PAGE_BUTTON} aria-label={`Page ${item}`} disabled={disabled} onClick={() => go(item)}>
+                      <button type="button" className={PAGE_BUTTON} aria-label={`Page ${item}`} onClick={() => go(item)}>
                         {item}
                       </button>
                     )}
@@ -91,12 +84,12 @@ export function NumberedPagination({
               )}
             </ul>
 
-            <Button type="button" className="min-h-9" disabled={disabled || page >= last} onClick={() => go(page + 1)}>
+            <Button type="button" className="min-h-9" disabled={page >= last} onClick={() => go(page + 1)}>
               Next
             </Button>
           </div>
 
-          <form className="pagination-jump" onSubmit={submitJump} noValidate>
+          <form className="flex items-center gap-2" onSubmit={submitJump} noValidate>
             <label htmlFor={jumpId} className="text-[12px] text-muted whitespace-nowrap">
               Go to page
             </label>
@@ -108,7 +101,6 @@ export function NumberedPagination({
                 type="number"
                 inputMode="numeric"
                 autoComplete="off"
-                disabled={disabled}
                 min={1}
                 max={last}
                 placeholder={`1–${last}`}
@@ -121,7 +113,7 @@ export function NumberedPagination({
                 }}
               />
             </div>
-            <Button type="submit" className="min-h-9" disabled={disabled}>
+            <Button type="submit" className="min-h-9">
               Go
             </Button>
           </form>

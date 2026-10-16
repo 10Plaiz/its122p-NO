@@ -1,14 +1,10 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
-import type { ComponentProps, FormEvent, ReactNode, RefObject } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useEffect, useRef, useState } from "react";
+import type { FormEvent } from "react";
 import { SuffixField } from "../components/SuffixField.js";
 import { ContactNumberField, validateContactNumber } from "../components/ContactNumberField.js";
 import { useToast } from "../components/Toast.js";
 import { Alert, Button, EmptyState, Field, Input, Loading, Select, StatusPill, formatDate, useLeftFields } from "../components/ui.js";
-import { NumberedPagination, TableToolbar, ToolbarItem } from "../components/data-table/index.js";
-import { lastPage, parsePage } from "../components/data-table/pages.js";
-import { useDisclosure } from "../components/data-table/useDisclosure.js";
-import { ModalDialog } from "../components/ModalDialog.js";
+import { TableToolbar, ToolbarItem } from "../components/data-table/index.js";
 import { FilterOption } from "../components/FilterOption.js";
 import { countFilterOptions } from "../lib/filter-counts.js";
 import type { FilterValues } from "../lib/filter-counts.js";
@@ -33,23 +29,14 @@ function userFilterValues(user: Profile): FilterValues {
   };
 }
 
-function formatJoinedDate(value: Profile["created_at"]) {
-  return value && Number.isFinite(Date.parse(value)) ? formatDate(value) : "Not recorded";
-}
-
 export function AdminUsersPage() {
-  const [searchParams, setSearchParams] = useSearchParams();
-  const roleFilter = searchParams.get("role") === "all" ? "" : ROLES.find((role) => role === searchParams.get("role")) ?? "citizen";
-  const residencyDisabled = roleFilter === "staff" || roleFilter === "admin";
-  const residencyFilter = residencyDisabled ? "" : ["pending", "rejected", "verified"].find((status) => status === searchParams.get("residency")) ?? "";
-  const statusFilter = searchParams.get("status") === "all" ? "" : searchParams.get("status") === "deactivated" ? "deactivated" : "active";
-  const search = searchParams.get("search") ?? "";
-  const sort = searchParams.get("sort") === "oldest" ? "oldest" : "newest";
+  const [roleFilter, setRoleFilter] = useState("");
+  const [residencyFilter, setResidencyFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
+  const [search, setSearch] = useState("");
   const { data, error, loading, reload } = useApi<{ users: Profile[] }>("/admin/users");
 
   const [creating, setCreating] = useState(false);
-  const [interacting, setInteracting] = useState<ReadonlySet<string>>(new Set());
-  const resultsRef = useRef<HTMLDivElement>(null);
   const newAccountRef = useRef<HTMLButtonElement>(null);
   const wasCreating = useRef(false);
   useEffect(() => {
@@ -64,36 +51,6 @@ export function AdminUsersPage() {
     const values = userFilterValues(user);
     return Object.entries(selected).every(([name, value]) => !value || values[name] === value);
   });
-  const sortedUsers = [...visibleUsers].sort((left, right) => {
-    const leftJoined = Date.parse(left.created_at ?? "");
-    const rightJoined = Date.parse(right.created_at ?? "");
-    if (!Number.isFinite(leftJoined)) return Number.isFinite(rightJoined) ? 1 : 0;
-    if (!Number.isFinite(rightJoined)) return -1;
-    return sort === "oldest" ? leftJoined - rightJoined : rightJoined - leftJoined;
-  });
-  const perPage = 20;
-  const requestedPage = parsePage(searchParams.get("page") ?? "1", Number.MAX_SAFE_INTEGER) ?? 1;
-  const page = Math.min(requestedPage, lastPage(visibleUsers.length, perPage));
-  const pageUsers = sortedUsers.slice((page - 1) * perPage, page * perPage);
-  const navigationLocked = creating || interacting.size > 0;
-  const onInteractionChange = useCallback((id: string, active: boolean) => {
-    setInteracting((previous) => {
-      if (previous.has(id) === active) return previous;
-      const next = new Set(previous);
-      if (active) next.add(id);
-      else next.delete(id);
-      return next;
-    });
-  }, []);
-  useEffect(() => {
-    if (!data || loading || error || requestedPage === page) return;
-    if (window.location.pathname !== "/admin/users") return;
-    const next = new URLSearchParams(window.location.search);
-    if ((parsePage(next.get("page") ?? "1", Number.MAX_SAFE_INTEGER) ?? 1) !== requestedPage) return;
-    if (page === 1) next.delete("page");
-    else next.set("page", String(page));
-    setSearchParams(next, { replace: true });
-  }, [data, loading, error, requestedPage, page, setSearchParams]);
   const countRows = data && !loading && !error ? searchedUsers.map((user) => ({ id: user.id, values: userFilterValues(user) })) : null;
   const counts = countFilterOptions(countRows, selected);
   // Choosing staff/admin also clears residency, so their counts reflect that action.
@@ -104,24 +61,11 @@ export function AdminUsersPage() {
   } : undefined;
   const filtered = Boolean(roleFilter || residencyFilter || statusFilter || query);
 
-  function setFilter(name: "role" | "residency" | "status" | "search" | "sort", value: string) {
-    // History updates before the next render; rapid control changes must compose.
-    const next = new URLSearchParams(window.location.search);
-    if ((name === "role" || name === "status") && !value) next.set(name, "all");
-    else if ((name === "role" && value === "citizen") || (name === "status" && value === "active") || (name === "sort" && value === "newest")) next.delete(name);
-    else if (value) next.set(name, value);
-    else next.delete(name);
-    next.delete("page");
-    if (name === "role" && (value === "staff" || value === "admin")) next.delete("residency");
-    setSearchParams(next, { replace: name === "search" });
-  }
-
   function clearFilters() {
-    const next = new URLSearchParams(window.location.search);
-    for (const name of ["role", "residency", "status", "search", "page"]) next.delete(name);
-    next.set("role", "all");
-    next.set("status", "all");
-    setSearchParams(next);
+    setRoleFilter("");
+    setResidencyFilter("");
+    setStatusFilter("");
+    setSearch("");
   }
 
   return (
@@ -130,21 +74,25 @@ export function AdminUsersPage() {
         title="User accounts"
         description="Manage access, verify residents, and route staff to their areas."
         action={
-          <Button ref={newAccountRef} type="button" variant="primary" disabled={navigationLocked}
+          <Button ref={newAccountRef} type="button" variant="primary" disabled={creating}
             aria-expanded={creating} aria-controls={creating ? "new-account-form" : undefined} onClick={() => setCreating(true)}>
             New account
           </Button>
         }
         search={
           <Field label="Search" htmlFor="user-search">
-            <Input id="user-search" disabled={navigationLocked} type="search" autoComplete="off" maxLength={100}
-              placeholder="Name, email, or mobile…" value={search} onChange={(event) => setFilter("search", event.target.value)} />
+            <Input id="user-search" type="search" autoComplete="off" maxLength={100}
+              placeholder="Name, email, or mobile…" value={search} onChange={(event) => setSearch(event.target.value)} />
           </Field>
         }
       >
         <ToolbarItem>
           <Field label="Role" htmlFor="role-filter">
-            <Select id="role-filter" disabled={navigationLocked} value={roleFilter} onChange={(event) => setFilter("role", event.target.value)}>
+            <Select id="role-filter" value={roleFilter} onChange={(event) => {
+              const next = event.target.value;
+              setRoleFilter(next);
+              if (next === "staff" || next === "admin") setResidencyFilter("");
+            }}>
               <FilterOption value="" label="Every role" counts={roleCounts} />
               {ROLES.map((role) => (
                 <FilterOption key={role} value={role} label={ROLE_LABEL[role]} counts={roleCounts} />
@@ -152,34 +100,24 @@ export function AdminUsersPage() {
             </Select>
           </Field>
         </ToolbarItem>
-        <ToolbarItem wide>
+        <ToolbarItem>
           <Field label="Residency" htmlFor="residency-filter">
-            <Select id="residency-filter" value={residencyFilter} disabled={residencyDisabled || navigationLocked}
-              aria-describedby="residency-filter-note" onChange={(event) => setFilter("residency", event.target.value)}>
+            <Select id="residency-filter" value={residencyFilter} disabled={roleFilter === "staff" || roleFilter === "admin"}
+              aria-describedby="residency-filter-note" onChange={(event) => setResidencyFilter(event.target.value)}>
               <FilterOption value="" label="Any residency" counts={counts.residency} />
               <FilterOption value="pending" label="Proof waiting for review" counts={counts.residency} />
               <FilterOption value="rejected" label="Proof rejected" counts={counts.residency} />
               <FilterOption value="verified" label="Verified resident" counts={counts.residency} />
             </Select>
           </Field>
-          <span className={residencyDisabled ? "mt-1 block text-muted text-[12px]" : "sr-only"} id="residency-filter-note">
-            Residency applies to citizens. Choose Every role or Citizen to use this filter.
-          </span>
+          <span className="sr-only" id="residency-filter-note">Residency applies to citizens. Choose Every role or Citizen to use this filter.</span>
         </ToolbarItem>
         <ToolbarItem>
           <Field label="Account status" htmlFor="user-status-filter">
-            <Select id="user-status-filter" disabled={navigationLocked} value={statusFilter} onChange={(event) => setFilter("status", event.target.value)}>
+            <Select id="user-status-filter" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
               <FilterOption value="" label="Any status" counts={counts.status} />
               <FilterOption value="active" label="Active" counts={counts.status} />
               <FilterOption value="deactivated" label="Deactivated" counts={counts.status} />
-            </Select>
-          </Field>
-        </ToolbarItem>
-        <ToolbarItem>
-          <Field label="Date joined" htmlFor="user-joined-sort">
-            <Select id="user-joined-sort" value={sort} disabled={navigationLocked} onChange={(event) => setFilter("sort", event.target.value)}>
-              <option value="newest">Newest first</option>
-              <option value="oldest">Oldest first</option>
             </Select>
           </Field>
         </ToolbarItem>
@@ -195,68 +133,47 @@ export function AdminUsersPage() {
       </Alert>}
       {loading && <Loading label="Loading users" />}
 
-      {!loading && !error && data && <div className="flex flex-wrap items-center justify-between gap-2">
-        <p role="status" className="m-0 text-muted text-[13px]">{visibleUsers.length} {visibleUsers.length === 1 ? "account" : "accounts"} matching your filters</p>
-        {filtered && <Button type="button" variant="ghost" disabled={navigationLocked} onClick={clearFilters}>Clear filters</Button>}
-      </div>}
+      {!loading && !error && data && (
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p role="status" className="m-0 text-muted text-[13px]">
+            {visibleUsers.length} {visibleUsers.length === 1 ? "account" : "accounts"}{filtered ? visibleUsers.length === 1 ? " matches your filters" : " match your filters" : " in total"}
+          </p>
+          {filtered && <Button type="button" variant="ghost" onClick={clearFilters}>Clear filters</Button>}
+        </div>
+      )}
       {!loading && !error && visibleUsers.length === 0 && (
         <EmptyState title={filtered ? "No accounts match your filters" : "No user accounts yet"}>
           {filtered ? "Try another name, email, or mobile number, or clear the filters." : "Citizens appear here after registering. Use New account to add staff or an administrator."}
         </EmptyState>
       )}
       {!loading && !error && visibleUsers.length > 0 && (
-        <div ref={resultsRef} className="relative overflow-x-auto" role="region" aria-label="User account columns" tabIndex={0}>
+        <div className="relative overflow-x-auto">
           <table className="table account-table w-full" role="table" aria-label="User accounts">
             <caption className="sr-only">User accounts matching the selected filters.</caption>
-            <colgroup>
-              <col className="account-col-name" />
-              <col className="account-col-email" />
-              <col className="account-col-phone" />
-              <col className="account-col-joined" />
-              <col className="account-col-role" />
-              <col className="account-col-residency" />
-              <col className="account-col-status" />
-              <col className="account-col-actions" />
-            </colgroup>
             <thead role="rowgroup">
               <tr role="row">
-                <th scope="col">Name</th>
-                <th scope="col">Email</th>
-                <th scope="col">Phone</th>
-                <th scope="col">Date joined</th>
+                <th scope="col">Account</th>
                 <th scope="col">Role</th>
                 <th scope="col">Residency</th>
                 <th scope="col">Status</th>
-                <th scope="col" className="account-actions">Actions</th>
+                <th scope="col">Actions</th>
               </tr>
             </thead>
             <tbody role="rowgroup">
-              {pageUsers.map((user) => (
-                <UserRow key={user.id} user={user} onDone={reload} onInteractionChange={onInteractionChange} />
+              {visibleUsers.map((user) => (
+                <UserRow key={user.id} user={user} onDone={reload} />
               ))}
             </tbody>
           </table>
         </div>
       )}
-      {!loading && !error && visibleUsers.length > 0 && <div className="flex flex-col gap-2">
-        <NumberedPagination label="User accounts pagination" page={page} perPage={perPage} total={visibleUsers.length}
-          disabled={navigationLocked} onPage={(nextPage) => {
-            const next = new URLSearchParams(window.location.search);
-            if (nextPage === 1) next.delete("page");
-            else next.set("page", String(nextPage));
-            setSearchParams(next);
-            resultsRef.current?.scrollIntoView({ block: "start" });
-          }} />
-        {navigationLocked && <p className="m-0 text-muted text-[12px]">Close the open account panel before changing pages.</p>}
-      </div>}
     </div>
   );
 }
 
-function UserRow({ user, onDone, onInteractionChange }: { user: Profile; onDone: () => void; onInteractionChange: (id: string, active: boolean) => void }) {
+function UserRow({ user, onDone }: { user: Profile; onDone: () => void }) {
   const toast = useToast();
   const { user: currentUser } = useAuth();
-  const [viewingDetails, setViewingDetails] = useState(false);
   const [editing, setEditing] = useState(false);
   const [reviewing, setReviewing] = useState(false);
   const [confirmingActivation, setConfirmingActivation] = useState(false);
@@ -265,8 +182,6 @@ function UserRow({ user, onDone, onInteractionChange }: { user: Profile; onDone:
   const specializationsId = `specializations-row-${user.id}`;
   const [role, setRole] = useState<Role>(user.role);
   const active = user.is_active !== false;
-  const awaitingReview = active && user.role === "citizen" && residencyStep(user) === "pending";
-  const actions = useDisclosure();
 
   const isSelf = currentUser?.id === user.id;
 
@@ -277,15 +192,10 @@ function UserRow({ user, onDone, onInteractionChange }: { user: Profile; onDone:
   const phone = useAction((verified: boolean) =>
     api.patch<{ user: Profile }>(`/admin/users/${user.id}/phone-verified`, { verified }),
   );
-  useEffect(() => {
-    onInteractionChange(user.id, viewingDetails || editing || reviewing || confirmingActivation || specializing || pending || phone.pending);
-    return () => onInteractionChange(user.id, false);
-  }, [user.id, viewingDetails, editing, reviewing, confirmingActivation, specializing, pending, phone.pending, onInteractionChange]);
 
   async function setPhoneVerified(verified: boolean) {
     if (phone.pending || pending) return;
     if (await phone.run(verified)) {
-      setViewingDetails(false);
       toast(verified ? "Mobile number marked as verified." : "Mobile number marked as not verified.");
       onDone();
     }
@@ -305,79 +215,145 @@ function UserRow({ user, onDone, onInteractionChange }: { user: Profile; onDone:
   return (
     <>
       <tr role="row">
-        <th scope="row" role="rowheader" className="account-identity">
-          <span className="account-value" title={user.name}>{user.name}</span>
-          {isSelf && <span className="account-secondary">Your account</span>}
-        </th>
-        <td role="cell" data-label="Email" className="account-email">
-          <span className="account-value text-muted" title={user.email} translate="no">{user.email}</span>
-        </td>
-        <td role="cell" data-label="Phone" className="account-number">
-          <span className={`account-value${user.contact_number ? "" : " text-muted"}`} title={user.contact_number ?? undefined} translate="no">
-            {user.contact_number || "Not provided"}
-          </span>
-          {user.contact_number && <span className="account-secondary" aria-live="polite">{phone.pending ? "Saving…" : user.phone_verified_at ? "Confirmed by staff" : "Not confirmed"}</span>}
-        </td>
-        <td role="cell" data-label="Date joined" className="account-number">
-          <span className="account-value text-muted">{formatJoinedDate(user.created_at)}</span>
+        <td role="cell" className="account-identity">
+          <div className="mb-2 flex flex-col items-start gap-1">
+            <span className="text-[14px] font-semibold">{user.name}</span>
+            <span className="break-all font-mono text-[11px]" translate="no">{user.email}</span>
+            <span className="text-muted text-[11px]">Joined {formatDate(user.created_at ?? null)}</span>
+          </div>
+          {user.contact_number ? (
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px]">
+              <span className="font-mono" translate="no">{user.contact_number}</span>
+              <StatusPill tone={user.phone_verified_at ? "success" : "warning"}>
+                {user.phone_verified_at ? "Number verified" : "Number not verified"}
+              </StatusPill>
+              <Button
+                type="button"
+                variant="ghost"
+                className="!px-0 text-[11px]"
+                disabled={phone.pending || pending}
+                aria-busy={phone.pending}
+                onClick={() => setPhoneVerified(!user.phone_verified_at)}
+              >
+                {phone.pending ? "Saving…" : user.phone_verified_at ? "Mark not verified" : "Mark verified"}
+                <span className="sr-only"> (mobile number of {user.name})</span>
+              </Button>
+              {phone.error && <span role="alert" className="text-danger">{phone.error.message}</span>}
+            </div>
+          ) : (
+            <span className="text-muted text-[12px]">No mobile number</span>
+          )}
         </td>
         <td role="cell" data-label="Role">
-          <span className="tag tag-neutral">{ROLE_LABEL[user.role]}</span>
+          {editing ? (
+            <Field label="New role" htmlFor={`role-${user.id}`} error={error?.fieldErrors.role}>
+              <Select id={`role-${user.id}`} aria-label={`Role for ${user.name}`} value={role} disabled={pending}
+                onChange={(event) => {
+                  const next = ROLES.find((value) => value === event.target.value);
+                  if (next) setRole(next);
+                  setError(null);
+                }}>
+                {ROLES.map((option) => <option key={option} value={option}>{ROLE_LABEL[option]}</option>)}
+              </Select>
+            </Field>
+          ) : (
+            <span className="tag tag-neutral">{ROLE_LABEL[user.role]}</span>
+          )}
         </td>
-        <td role="cell" data-label="Residency">
-          <AccountResidency user={user} />
+        <td role="cell" data-label="Residency" className="text-[13px]">
+          {user.role === "citizen" ? (
+            <div className="flex flex-col items-start gap-1">
+              <StatusPill tone={residencyStep(user) === "verified" ? "success" : "warning"}>
+                {residencyStep(user) === "pending" ? "Awaiting review" : RESIDENCY_LABEL[residencyStep(user)]}
+              </StatusPill>
+              <Button type="button" variant="ghost" className="!px-0 text-[12px]" disabled={pending || phone.pending} onClick={() => setReviewing(true)}>
+                Review<span className="sr-only"> residency of {user.name}</span>
+              </Button>
+            </div>
+          ) : (
+            <span className="text-muted">—</span>
+          )}
+          {reviewing && (
+            <ResidencyReview
+              user={user}
+              onClose={() => setReviewing(false)}
+              onDone={() => {
+                setReviewing(false);
+                onDone();
+              }}
+            />
+          )}
         </td>
         <td role="cell" data-label="Status">
           <StatusPill tone={active ? "success" : "neutral"}>{active ? "Active" : "Deactivated"}</StatusPill>
         </td>
-        <td role="cell" data-label="Actions" className="account-actions">
-          <div ref={actions.rootRef}>
-            <Button type="button" variant="ghost" className="btn-icon account-action-trigger" disabled={pending || phone.pending}
-              aria-busy={pending || phone.pending}
-              aria-label={`Actions for ${user.name}`} title={`Actions for ${user.name}`} {...actions.triggerProps}>
-              <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                <circle cx="4" cy="10" r="1.5" /><circle cx="10" cy="10" r="1.5" /><circle cx="16" cy="10" r="1.5" />
-              </svg>
-            </Button>
-            {actions.open && <AccountActionsPopover id={actions.panelId} triggerRef={actions.triggerProps.ref} onClose={actions.close}>
-              <AccountAction icon="details" variant={active && !awaitingReview ? "primary" : "secondary"}
-                onClick={() => { actions.close(true); setViewingDetails(true); }}>
-                View details<span className="sr-only"> for {user.name}</span>
-              </AccountAction>
-              {user.role === "citizen" && <AccountAction icon="review" variant={awaitingReview ? "primary" : "secondary"}
-                onClick={() => { actions.close(true); setReviewing(true); }}>
-                Review residency<span className="sr-only"> of {user.name}</span>
-              </AccountAction>}
-              {user.role === "staff" && <AccountAction icon="routing" variant="secondary" aria-expanded={specializing}
-                aria-controls={specializing ? specializationsId : undefined}
-                onClick={() => { actions.close(true); setSpecializing((open) => !open); }}>
-                {specializing ? "Close routing" : "Manage routing"}<span className="sr-only"> for {user.name}: specializations and areas</span>
-              </AccountAction>}
-              <hr className="account-actions-divider" />
-              <AccountAction icon="role" variant="secondary" disabled={isSelf} aria-describedby={isSelf ? `self-restriction-${user.id}` : undefined}
-                onClick={() => { actions.close(true); setRole(user.role); setError(null); setEditing(true); }}>
-                Change role<span className="sr-only"> for {user.name}</span>
-              </AccountAction>
-              <AccountAction icon={active ? "deactivate" : "reactivate"} variant={active ? "danger-outline" : "primary"} disabled={isSelf}
-                aria-describedby={isSelf ? `self-restriction-${user.id}` : undefined}
-                onClick={() => { actions.close(true); setError(null); setConfirmingActivation(true); }}>
-                {active ? "Deactivate" : "Reactivate"}<span className="sr-only"> {user.name}</span>
-              </AccountAction>
-              {isSelf && <p className="account-actions-note">Role and deactivation changes are unavailable for your own account.</p>}
-            </AccountActionsPopover>}
+        <td role="cell" data-label="Actions">
+          <div className="flex gap-2 flex-wrap">
+            {editing ? (
+              <>
+                <Button
+                  type="button"
+                  variant="primary"
+                  disabled={pending || phone.pending || role === user.role}
+                  aria-busy={pending}
+                  onClick={() => save({ role }, `Role updated for ${user.name}.`)}
+                >
+                  {pending ? "Saving…" : "Save role"}
+                </Button>
+                {/* Restores the dropdown as well as closing it. Leaving the picked role in
+                    state meant reopening the row showed a change nobody had saved, and the
+                    next Save applied it. */}
+                <Button
+                  type="button"
+                  disabled={pending}
+                  onClick={() => {
+                    setRole(user.role);
+                    setEditing(false);
+                    setError(null);
+                  }}
+                >
+                  Cancel
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button type="button" disabled={isSelf || pending || phone.pending}
+                  aria-describedby={isSelf ? `self-restriction-${user.id}` : undefined}
+                  onClick={() => { setRole(user.role); setError(null); setEditing(true); }}>
+                  Change role
+                  <span className="sr-only"> for {user.name}</span>
+                </Button>
+                {user.role === "staff" && (
+                  <Button
+                    type="button"
+                    aria-expanded={specializing}
+                    aria-controls={specializing ? specializationsId : undefined}
+                    disabled={pending || phone.pending}
+                    onClick={() => setSpecializing((open) => !open)}
+                  >
+                    {specializing ? "Close routing" : "Routing"}
+                    <span className="sr-only"> for {user.name}: specializations and areas</span>
+                  </Button>
+                )}
+                {/* Accounts are deactivated, never deleted, so their reports and
+                    activity history survive. */}
+                <Button
+                  type="button"
+                  variant={active ? "danger-outline" : "secondary"}
+                  disabled={pending || phone.pending || isSelf}
+                  aria-describedby={isSelf ? `self-restriction-${user.id}` : undefined}
+                  onClick={() => { setError(null); setConfirmingActivation(true); }}
+                >
+                  {active ? "Deactivate" : "Reactivate"}
+                  <span className="sr-only"> {user.name}</span>
+                </Button>
+              </>
+            )}
           </div>
-          {isSelf && <p id={`self-restriction-${user.id}`} className="sr-only">
+          {isSelf && <p id={`self-restriction-${user.id}`} className="mb-0 mt-2 text-muted text-[12px]">
             This is your own account. You cannot change your own role or deactivate it.
           </p>}
-          {viewingDetails && <AccountDetails user={user} pending={phone.pending} error={phone.error}
-            onPhoneVerify={() => { void setPhoneVerified(!user.phone_verified_at); }}
-            onClose={() => { if (!phone.pending) { setViewingDetails(false); phone.setError(null); } }} />}
-          {editing && <RoleChangeDialog user={user} role={role} pending={pending} error={error} onRoleChange={(next) => {
-            setRole(next);
-            setError(null);
-          }} onClose={() => { if (!pending) { setRole(user.role); setEditing(false); setError(null); } }}
-            onSave={() => { void save({ role }, `Role updated for ${user.name}.`); }} />}
-          {reviewing && <ResidencyReview user={user} onClose={() => setReviewing(false)} onDone={() => { setReviewing(false); onDone(); }} />}
+          {error && !confirmingActivation && <p role="alert" className="mb-0 text-[12px] text-danger">{error.message}</p>}
           {confirmingActivation && <ActivationConfirmation user={user} pending={pending} error={error?.message}
             onClose={() => { if (!pending) { setConfirmingActivation(false); setError(null); } }}
             onConfirm={async () => {
@@ -387,7 +363,7 @@ function UserRow({ user, onDone, onInteractionChange }: { user: Profile; onDone:
       </tr>
       {specializing && (
         <tr id={specializationsId} role="row" className="account-routing-row">
-          <td role="cell" colSpan={8} className="bg-neutral-200/60">
+          <td role="cell" colSpan={5} className="bg-neutral-200/60">
             <div className="grid gap-3 lg:grid-cols-2 items-start">
               <SpecializationEditor staffId={user.id} staffName={user.name} />
               <AreaEditor staffId={user.id} staffName={user.name} />
@@ -399,148 +375,6 @@ function UserRow({ user, onDone, onInteractionChange }: { user: Profile; onDone:
   );
 }
 
-function AccountResidency({ user }: { user: Profile }) {
-  if (user.role !== "citizen") return <span className="text-muted">Not applicable</span>;
-  const step = residencyStep(user);
-  return <StatusPill tone={step === "verified" ? "success" : "warning"}>
-    {step === "pending" ? "Awaiting review" : RESIDENCY_LABEL[step]}
-  </StatusPill>;
-}
-
-const accountActionIcons = {
-  details: <><rect x="3" y="3" width="18" height="18" rx="1" /><circle cx="9" cy="9" r="2" /><path d="M5 17c0-4 8-4 8 0M15 8h3M15 12h3M15 16h3" /></>,
-  review: <><path d="m12 3 8 3v6c0 5-8 9-8 9s-8-4-8-9V6l8-3Z" /><path d="m8 12 3 3 5-6" /></>,
-  routing: <><path d="M5 20v-5c0-3 2-4 7-4s7-1 7-4V4M5 4v7M2 7l3-3 3 3M16 7l3-3 3 3" /></>,
-  role: <><circle cx="9" cy="7" r="3" /><path d="M3 21v-3a6 6 0 0 1 12 0v3M17 5h4M17 9h4M18 15h3M19 13v4" /></>,
-  deactivate: <><circle cx="12" cy="12" r="9" /><path d="M8 12h8" /></>,
-  reactivate: <><circle cx="12" cy="12" r="9" /><path d="M8 12h8M12 8v8" /></>,
-};
-
-function AccountAction({ icon, children, className = "", ...props }: ComponentProps<typeof Button> & { icon: keyof typeof accountActionIcons }) {
-  return <Button type="button" className={`account-action-item ${className}`} {...props}>
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      {accountActionIcons[icon]}
-    </svg>
-    <span className="account-action-label">{children}</span>
-  </Button>;
-}
-
-function AccountActionsPopover({ id, triggerRef, onClose, children }: {
-  id: string;
-  triggerRef: RefObject<HTMLButtonElement | null>;
-  onClose: (restoreFocus?: boolean) => void;
-  children: ReactNode;
-}) {
-  const panelRef = useRef<HTMLDivElement>(null);
-  useLayoutEffect(() => {
-    const panel = panelRef.current;
-    const trigger = triggerRef.current;
-    if (!panel || !trigger) return;
-    panel.showPopover();
-    const anchor = trigger.getBoundingClientRect();
-    const bounds = panel.getBoundingClientRect();
-    const style = getComputedStyle(panel);
-    const inset = Number.parseFloat(style.getPropertyValue("--space-4"));
-    const gap = Number.parseFloat(style.getPropertyValue("--space-2"));
-    const left = Math.max(inset, Math.min(anchor.right - bounds.width, window.innerWidth - bounds.width - inset));
-    const below = anchor.bottom + gap;
-    const top = below + bounds.height <= window.innerHeight - inset ? below : Math.max(inset, anchor.top - gap - bounds.height);
-    panel.style.left = `${left}px`;
-    panel.style.top = `${top}px`;
-    panel.querySelector<HTMLButtonElement>("button:not(:disabled)")?.focus({ preventScroll: true });
-    const closeWithoutScrolling = () => {
-      if (panel.contains(document.activeElement)) trigger.focus({ preventScroll: true });
-      onClose();
-    };
-    const closeOnScroll = (event: Event) => {
-      if (event.target instanceof Node && panel.contains(event.target)) return;
-      const currentAnchor = trigger.getBoundingClientRect();
-      if (currentAnchor.top !== anchor.top || currentAnchor.left !== anchor.left) closeWithoutScrolling();
-    };
-    window.addEventListener("resize", closeWithoutScrolling);
-    window.addEventListener("scroll", closeOnScroll, true);
-    return () => {
-      window.removeEventListener("resize", closeWithoutScrolling);
-      window.removeEventListener("scroll", closeOnScroll, true);
-      if (panel.matches(":popover-open")) panel.hidePopover();
-    };
-  }, [triggerRef, onClose]);
-
-  return <div ref={panelRef} id={id} popover="manual" role="group" aria-label="Account actions" className="account-actions-menu"
-    onBlur={(event) => {
-      if (event.relatedTarget instanceof Node && !event.currentTarget.contains(event.relatedTarget) && event.relatedTarget !== triggerRef.current) onClose();
-    }}>
-    {children}
-  </div>;
-}
-
-function AccountDetails({ user, pending, error, onPhoneVerify, onClose }: {
-  user: Profile;
-  pending: boolean;
-  error: ApiError | null;
-  onPhoneVerify: () => void;
-  onClose: () => void;
-}) {
-  const closeRef = useRef<HTMLButtonElement>(null);
-  const details: { label: string; value: ReactNode; wide?: boolean }[] = [
-    { label: "Name", value: user.name, wide: true },
-    { label: "Email", value: <span translate="no">{user.email}</span>, wide: true },
-    { label: "Phone", wide: true, value: user.contact_number ? <div className="account-phone-verification">
-      <div className="account-phone-status"><span translate="no">{user.contact_number}</span>
-        <StatusPill tone={user.phone_verified_at ? "success" : "neutral"}>{user.phone_verified_at ? "Confirmed by staff" : "Not confirmed"}</StatusPill>
-      </div>
-      <p className="m-0 text-muted">Confirm this number after verifying it by another means.</p>
-      <Button type="button" disabled={pending} aria-busy={pending} onClick={onPhoneVerify}>
-        {pending ? "Saving…" : user.phone_verified_at ? "Mark phone not verified" : "Mark phone verified"}
-      </Button>
-      {error && <Alert title="Could not update phone verification">{error.message}</Alert>}
-    </div> : "Not provided" },
-    { label: "Date joined", value: formatJoinedDate(user.created_at) },
-    { label: "Role", value: <span className="tag tag-neutral">{ROLE_LABEL[user.role]}</span> },
-    { label: "Residency", value: <AccountResidency user={user} /> },
-    { label: "Status", value: <StatusPill tone={user.is_active !== false ? "success" : "neutral"}>{user.is_active !== false ? "Active" : "Deactivated"}</StatusPill> },
-  ];
-  return <ModalDialog className="account-dialog" labelledBy={`account-details-title-${user.id}`} pending={pending} initialFocusRef={closeRef} onClose={onClose}>
-    <h4 className="dialog-title" id={`account-details-title-${user.id}`}>Account details</h4>
-    <dl className="account-details">
-      {details.map(({ label, value, wide }) => <div key={label} className={wide ? "account-details-wide" : undefined}><dt>{label}</dt><dd>{value}</dd></div>)}
-    </dl>
-    <div className="dialog-actions"><Button ref={closeRef} type="button" disabled={pending} onClick={onClose}>Close</Button></div>
-  </ModalDialog>;
-}
-
-function RoleChangeDialog({ user, role, pending, error, onRoleChange, onClose, onSave }: {
-  user: Profile;
-  role: Role;
-  pending: boolean;
-  error: ApiError | null;
-  onRoleChange: (role: Role) => void;
-  onClose: () => void;
-  onSave: () => void;
-}) {
-  const selectRef = useRef<HTMLSelectElement>(null);
-  return <ModalDialog className="account-dialog" labelledBy={`role-title-${user.id}`} pending={pending} initialFocusRef={selectRef} onClose={onClose}>
-    <h4 className="dialog-title" id={`role-title-${user.id}`}>Change role for {user.name}</h4>
-    <p className="account-current-role">Current role <span className="tag tag-neutral">{ROLE_LABEL[user.role]}</span></p>
-    <form aria-label={`Change role for ${user.name}`} onSubmit={(event) => { event.preventDefault(); if (!pending && role !== user.role) onSave(); }}>
-      <Field label="New role" htmlFor={`role-${user.id}`} error={error?.fieldErrors.role}>
-        <select className="input" ref={selectRef} id={`role-${user.id}`} aria-label={`Role for ${user.name}`} value={role} disabled={pending}
-          onChange={(event) => {
-            const next = ROLES.find((value) => value === event.target.value);
-            if (next) onRoleChange(next);
-          }}>
-          {ROLES.map((option) => <option key={option} value={option}>{ROLE_LABEL[option]}</option>)}
-        </select>
-      </Field>
-      {error && <Alert title="Could not change role">{error.message}</Alert>}
-      <div className="dialog-actions">
-        <Button type="button" disabled={pending} onClick={onClose}>Cancel</Button>
-        <Button type="submit" variant="primary" disabled={pending || role === user.role} aria-busy={pending}>{pending ? "Saving…" : "Save role"}</Button>
-      </div>
-    </form>
-  </ModalDialog>;
-}
-
 function ActivationConfirmation({ user, pending, error, onClose, onConfirm }: {
   user: Profile;
   pending: boolean;
@@ -548,18 +382,46 @@ function ActivationConfirmation({ user, pending, error, onClose, onConfirm }: {
   onClose: () => void;
   onConfirm: () => void;
 }) {
+  const dialogRef = useRef<HTMLDialogElement>(null);
   const cancelRef = useRef<HTMLButtonElement>(null);
   const active = user.is_active !== false;
 
+  useEffect(() => {
+    const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const dialog = dialogRef.current;
+    dialog?.showModal();
+    cancelRef.current?.focus();
+    return () => { dialog?.close(); previous?.focus(); };
+  }, []);
+
   return (
-    <ModalDialog className="account-dialog" labelledBy={`activation-title-${user.id}`} describedBy={`activation-description-${user.id}`}
-      pending={pending} initialFocusRef={cancelRef} onClose={onClose}>
+    <dialog ref={dialogRef} className="dialog account-confirmation max-h-[90vh] overflow-y-auto"
+      aria-labelledby={`activation-title-${user.id}`} aria-describedby={`activation-description-${user.id}`} aria-busy={pending}
+      onCancel={(event) => { event.preventDefault(); if (!pending) onClose(); }}
+      onKeyDown={(event) => {
+        if (event.key !== "Tab") return;
+        const controls = event.currentTarget.querySelectorAll<HTMLButtonElement>("button:not(:disabled)");
+        const first = controls[0];
+        const last = controls[controls.length - 1];
+        if (event.shiftKey && document.activeElement === first) {
+          event.preventDefault();
+          last?.focus();
+        } else if (!event.shiftKey && document.activeElement === last) {
+          event.preventDefault();
+          first?.focus();
+        }
+      }}
+      onClick={(event) => {
+        if (event.target !== event.currentTarget || pending) return;
+        const bounds = event.currentTarget.getBoundingClientRect();
+        if (event.clientX < bounds.left || event.clientX > bounds.right || event.clientY < bounds.top || event.clientY > bounds.bottom) onClose();
+      }}>
       <h4 className="dialog-title" id={`activation-title-${user.id}`}>{active ? "Deactivate" : "Reactivate"} {user.name}?</h4>
       <div className="dialog-body">
-        <p id={`activation-description-${user.id}`} className="m-0">
+        <p id={`activation-description-${user.id}`} className="m-0 text-[14px]">
           {active ? "This person will lose access to KAMOTI. Their reports and activity history will be kept." : "This person will be able to sign in again with their current role."}
         </p>
-        <p className="mt-3 break-all text-[13px]">{user.email}</p>
+        <p className="mt-3 break-all font-mono text-[12px]">{user.email}</p>
         {error && <Alert title={`Could not ${active ? "deactivate" : "reactivate"} the account`}>{error}</Alert>}
       </div>
       <div className="dialog-actions flex-wrap">
@@ -568,7 +430,7 @@ function ActivationConfirmation({ user, pending, error, onClose, onConfirm }: {
           {pending ? "Saving…" : active ? "Deactivate account" : "Reactivate account"}
         </Button>
       </div>
-    </ModalDialog>
+    </dialog>
   );
 }
 

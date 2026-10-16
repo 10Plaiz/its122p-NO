@@ -1,4 +1,3 @@
-import { ModalDialog } from "./ModalDialog.js";
 import { useEffect, useRef, useState } from "react";
 import { useToast } from "./Toast.js";
 import { Alert, Button, Field, StatusPill, Textarea, formatDate, useLeftFields } from "./ui.js";
@@ -104,7 +103,22 @@ export function ResidencyReview({
     review.setError(null);
   }
 
-  useEffect(() => () => { requestVersion.current++; }, []);
+  useEffect(() => {
+    const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    closeRef.current?.focus();
+    return () => {
+      requestVersion.current++;
+      previous?.focus();
+    };
+  }, []);
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && !review.pending) onClose();
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onClose, review.pending]);
 
   async function openProof() {
     if (blocked || proofView.kind === "loading") return;
@@ -172,8 +186,14 @@ export function ResidencyReview({
   }, [review.error]);
 
   return (
-    <ModalDialog className="account-dialog" labelledBy="residency-dialog-title"
-      pending={review.pending || refresh.pending} initialFocusRef={closeRef} onClose={onClose}>
+    <div className="dialog-backdrop z-[1100] overscroll-contain" role="presentation" onClick={onClose}>
+      <div
+        className="dialog max-h-[90vh] overflow-y-auto"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="residency-dialog-title"
+        onClick={(event) => event.stopPropagation()}
+      >
         <h4 id="residency-dialog-title" className="dialog-title">
           Residency of {user.name}
         </h4>
@@ -318,7 +338,7 @@ export function ResidencyReview({
               >
                 {review.pending ? "Saving…" : "Reject and ask again"}
               </Button>
-              <Button type="button" onClick={() => chooseMode("review")} disabled={review.pending || refresh.pending}>
+              <Button type="button" onClick={() => chooseMode("review")} disabled={review.pending}>
                 Back
               </Button>
             </>
@@ -332,7 +352,7 @@ export function ResidencyReview({
               >
                 {review.pending ? "Saving…" : "Approve without a document"}
               </Button>
-              <Button type="button" onClick={() => chooseMode("review")} disabled={review.pending || refresh.pending}>
+              <Button type="button" onClick={() => chooseMode("review")} disabled={review.pending}>
                 Back
               </Button>
             </>
@@ -353,12 +373,13 @@ export function ResidencyReview({
                   Reject…
                 </Button>
               )}
-              <Button ref={closeRef} type="button" variant="ghost" onClick={onClose} disabled={review.pending || refresh.pending}>
+              <Button ref={closeRef} type="button" variant="ghost" onClick={onClose} disabled={review.pending}>
                 Close
               </Button>
             </>
           )}
         </div>
-    </ModalDialog>
+      </div>
+    </div>
   );
 }

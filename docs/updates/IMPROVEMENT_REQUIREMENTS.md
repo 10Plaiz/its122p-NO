@@ -84,7 +84,7 @@ Later UI review notes are quoted verbatim in their implementing pull requests.
 
 | ID | Requirement | Priority | Status |
 | :--- | :--- | :--- | :--- |
-| TB-1 | Add Google-style numbered pagination with a jump-to-page control. | Medium | Done: numbered pages with a jump-to-page box. Admin Users also paginates its filtered client-side account response at 20 rows, keeps page state in the URL, and uses compact mobile navigation. |
+| TB-1 | Add Google-style numbered pagination with a jump-to-page control. | Medium | Done: numbered pages with a jump-to-page box. |
 | TB-2 | Let users hide and show columns, including a completion-date column. | Medium | Done: column choice per table, kept in the browser; a Closed date column. |
 | TB-3 | Place filter and search at the top right of the table. | Low | Done: search sits at the right edge of each table toolbar, after filters. |
 | TB-4 | Export table data to PDF and CSV, respecting the current filters and visible columns. | Medium | Done: CSV and PDF with the screen's filters and visible columns, up to 5,000 rows. |

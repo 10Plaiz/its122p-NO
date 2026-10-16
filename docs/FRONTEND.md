@@ -193,20 +193,11 @@ are in the components cascade layer in `src/web/styles/ds.css`.
   and a capsule shape; role and category tags retain square corners.
 - List toolbars place search after filters and utility menus, at the right edge.
   This is also their keyboard order. Controls wrap to full width on phones.
-- Admin Users presents name, email, phone, date joined, role, residency, status,
-  and a compact actions menu. It uses responsive account cards below 768 px and
-  contained horizontal scrolling at tablet widths. Search, role, residency,
-  status, joined-date order, and page stay in the URL. The default view is
-  active Citizens ordered newest first. Filtering or changing order returns to
-  page one; Clear filters preserves the selected order. Proof waiting for review
-  counts only pending accounts with an uploaded proof. Selecting Staff or
-  Administrator clears and disables residency; their role-option counts reflect
-  that reset.
-- A row's Actions menu opens account details, residency review for Citizens,
-  routing for Staff, role change, and activation confirmation without expanding
-  the row. Phone confirmation is available from account details. Native dialogs
-  preserve the saved role until a request succeeds, restore focus when closed,
-  and do not dismiss or submit twice while a mutation is pending.
+- Admin Users groups account details into one column and stacks rows below
+  768 px. Search, account status, role, residency, and their counts use the
+  existing complete users response locally. Proof waiting for review counts
+  only pending accounts with an uploaded proof. Selecting Staff or Administrator
+  clears and disables residency; their role-option counts reflect that reset.
 - The residency review dialog keeps one account snapshot. Proof access and
   decisions send its review version. A conflict keeps the dialog open and blocks
   decisions until **Refresh review** succeeds. Refresh loads the current address
