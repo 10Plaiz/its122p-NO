@@ -67,7 +67,9 @@ including when fields are empty, so browser autofill can still submit the form.
 | Staff | `/staff/queue` | Process assigned reports |
 | Administrator | `/admin` | Manage reports, users, categories, analytics, and logs |
 
-All signed-in roles receive the notification link. The community board remains
+All signed-in roles receive the notification link. Its badge counts every unread
+notification and rechecks on each page change, when the tab regains focus, and
+as soon as a notification is marked read or opened from the inbox (#83). The community board remains
 available without an account. Navigation visibility is a presentation choice;
 the server remains responsible for access control. What each role may do is
 listed once, in [API.md](API.md#roles-and-permissions).

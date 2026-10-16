@@ -53,6 +53,7 @@ for (const scenario of scenarios) {
       if (url.pathname === "/api/categories") return reply({ categories: [{ id: 1, name: "Roads", is_active: true }] });
       if (url.pathname === "/api/feedback/summary/staff") return reply({ summary: { average: null, count: 0 } });
       if (url.pathname === "/api/notifications") return reply({ notifications: [], total: 0, page: 1, per_page: 20 });
+      if (url.pathname === "/api/notifications/unread") return reply({ unread: 0 });
       if (url.pathname === "/api/staff") return reply({ staff: [] });
       throw new Error(`Unexpected simulated request: ${url.pathname}`);
     });

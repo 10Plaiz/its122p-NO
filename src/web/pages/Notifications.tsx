@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { Alert, Button, EmptyState, Loading, StatusPill } from "../components/ui.js";
-import { api } from "../lib/api.js";
+import { markAllNotificationsRead, markNotificationRead } from "../lib/notifications.js";
 import { useAuth } from "../lib/auth.js";
 import { useAction, useApi } from "../lib/useApi.js";
 import type { Notification, Role } from "../lib/types.js";
@@ -27,21 +27,16 @@ export function NotificationsPage() {
     "/notifications",
   );
 
-  // read-all answers 204 with no body, so it reports success explicitly rather than
-  // leaving the caller to test an empty response.
-  const markAll = useAction(async () => {
-    await api.patch<void>("/notifications/read-all");
-    return true;
-  });
-
-  const markOne = useAction((id: number) =>
-    api.patch<{ notification: Notification }>(`/notifications/${id}/read`),
-  );
+  // Both also bring the menu badge up to date (#83).
+  const markAll = useAction(markAllNotificationsRead);
+  const markOne = useAction(markNotificationRead);
 
   const notifications = data?.notifications ?? [];
+  // Every unread notification, for the heading and Mark all as read. The Unread
+  // tab lists only the newest 50, so it counts what it can show (#83).
   const unread = data?.unread ?? 0;
-  const displayedNotifications =
-    filter === "unread" ? notifications.filter((n) => !n.is_read) : notifications;
+  const unreadListed = notifications.filter((n) => !n.is_read);
+  const displayedNotifications = filter === "unread" ? unreadListed : notifications;
 
   return (
     <div className="flex flex-col gap-7 sm:gap-8">
@@ -102,13 +97,13 @@ export function NotificationsPage() {
                 checked={filter === "unread"}
                 onChange={() => setFilter("unread")}
               />
-              Unread ({unread})
+              Unread ({unreadListed.length})
             </label>
           </div>
         </div>
       )}
 
-      {filter === "unread" && unread === 0 && notifications.length > 0 && (
+      {filter === "unread" && unreadListed.length === 0 && notifications.length > 0 && (
         <div className="card p-6 bg-surface border border-divider flex flex-col items-center justify-center text-center gap-3 py-10">
           <div className="w-10 h-10 border-2 border-success-700 text-success flex items-center justify-center font-bold text-lg">
             ✓
@@ -240,6 +235,11 @@ function NotificationCard({ notification, role, onMarkRead, isPending }: Notific
                 to={reportTarget}
                 className="mt-auto pt-2.5 inline-flex items-center gap-1.5 text-[12px] font-semibold text-accent hover:underline focus-visible:outline-2 focus-visible:outline-accent select-text whitespace-nowrap"
                 aria-label={`Open report #${notification.report_id}`}
+                // Opening the report reads the notification (#83). The page is left
+                // at once, so a failure only leaves it unread.
+                onClick={() => {
+                  if (!notification.is_read) markNotificationRead(notification.id).catch(() => {});
+                }}
               >
                 Open report <span aria-hidden="true">&rarr;</span>
               </Link>
