@@ -96,5 +96,7 @@ Measure the rendered foreground against its actual background.
 
 Check public and authenticated views at 320, 375, 414, 768, and desktop widths.
 Verify navigation, filtering, validation, and confirmation dialogs through the
-running website. Keep wide-table scrolling inside its container. Do not rely on
-a build or a token contrast calculation alone as proof of runtime behavior.
+running website. Keep wide-table scrolling inside its container. Text that users
+type, such as a report's title, description, or address, must wrap inside its
+box even when it holds one very long word. Do not rely on a build or a token
+contrast calculation alone as proof of runtime behavior.

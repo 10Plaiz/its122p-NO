@@ -12,7 +12,12 @@ h1, h2, h3, h4 { font-family: var(--font-heading); font-weight: var(--font-headi
 .grayscale{filter:grayscale(1) contrast(1.08)}
 
 *, *::before, *::after { box-sizing: border-box; }
-body { margin: 0; font-size: 15px; line-height: 1.55; font-weight: 400; }
+/* A word longer than its box, such as a pasted link or a held key, breaks instead
+   of running out of it. Headings use `anywhere` below, which also lets them shrink. */
+body { margin: 0; font-size: 15px; line-height: 1.55; font-weight: 400; overflow-wrap: break-word; }
+/* Without this a grid's single phone column grows to fit its widest word, and the
+   rule above never gets to break it. A min-w-* utility on an item still wins. */
+.grid > * { min-width: 0; }
 h1, h2, h3, h4, h5, h6 {
   font-family: var(--font-heading); font-weight: var(--font-heading-weight);
   line-height: 1.12; letter-spacing: -0.015em; margin: 0 0 var(--space-2);
