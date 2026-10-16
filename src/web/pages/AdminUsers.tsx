@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
+import { SuffixField } from "../components/SuffixField.js";
 import { ContactNumberField, validateContactNumber } from "../components/ContactNumberField.js";
 import { useToast } from "../components/Toast.js";
 import { Alert, Button, EmptyState, Field, Input, Loading, Select, StatusPill, formatDate, useLeftFields } from "../components/ui.js";
@@ -11,7 +12,7 @@ import { ApiError, api } from "../lib/api.js";
 import { useAuth } from "../lib/auth.js";
 import { useAction, useApi } from "../lib/useApi.js";
 import { ROLES, ROLE_LABEL } from "../lib/types.js";
-import { NAME_PART_MAX, SUFFIXES, validateNameParts } from "../lib/names.js";
+import { NAME_PART_MAX, canonicalSuffix, validateNameParts } from "../lib/names.js";
 import { PASSWORD_MAX, validatePassword } from "../lib/passwords.js";
 import { PasswordRules } from "../components/PasswordRules.js";
 import { ResidencyReview } from "../components/ResidencyReview.js";
@@ -497,7 +498,7 @@ function CreateUser({ onDone, onCancel }: { onDone: () => void; onCancel: () => 
       first_name: values.first.trim(),
       ...(middle ? { middle_name: middle } : {}),
       last_name: values.last.trim(),
-      ...(values.suffix ? { suffix: values.suffix } : {}),
+      ...(canonicalSuffix(values.suffix) ? { suffix: canonicalSuffix(values.suffix) } : {}),
       email: values.email.trim(),
       password: values.password,
       role: values.role,
@@ -556,20 +557,8 @@ function CreateUser({ onDone, onCancel }: { onDone: () => void; onCancel: () => 
           />
         </Field>
 
-        <Field label="Suffix" htmlFor="new-suffix" hint="Optional." error={shown.suffix}>
-          <Select
-            id="new-suffix"
-            value={values.suffix}
-            onChange={(event) => setValues((v) => ({ ...v, suffix: event.target.value }))}
-          >
-            <option value="">None</option>
-            {SUFFIXES.map((suffix) => (
-              <option key={suffix} value={suffix}>
-                {suffix}
-              </option>
-            ))}
-          </Select>
-        </Field>
+        <SuffixField id="new-suffix" value={values.suffix} error={shown.suffix}
+          onChange={(suffix) => setValues((current) => ({ ...current, suffix }))} />
 
         <Field label="Email" htmlFor="new-email" error={shown.email} count={values.email.length} max={254}>
           <Input
@@ -628,7 +617,7 @@ function CreateUser({ onDone, onCancel }: { onDone: () => void; onCancel: () => 
 
       {error && <Alert title="Could not create the account">{error.message}</Alert>}
 
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap justify-center gap-2">
         <Button type="submit" variant="primary" disabled={pending || invalid} aria-busy={pending}>
           {pending ? "Creating…" : "Create account"}
         </Button>

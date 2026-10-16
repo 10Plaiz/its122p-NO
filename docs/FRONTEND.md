@@ -36,9 +36,17 @@ attribute, including privacy consent. Middle name, suffix, and contact number
 remain optional. The form shows validation errors after leaving a field and
 keeps **Create account** disabled until all values are valid and consent is given.
 On wider screens, the name fields use two rows of two columns. Email, contact
-number, barangay, street address, and password remain full width, with password
-rules below the input. Mobile keeps the same field order in one column.
-Consent and submission form the final group.
+number, barangay, house/unit number, street/address, and password remain full
+width, with password rules below the input. Mobile keeps the same field order
+in one column. Consent and submission form the final group.
+Suffix is typable with suggestions and canonicalizes to the six supported
+values. House/unit number is optional; street/address is required. Google
+street suggestions use the selected barangay as query context within Makati
+bounds, and manual entry always remains available. The API still receives one
+combined `address_line`. Existing combined addresses stay intact in the
+street/address field rather than being split by guessing. Shared contact fields
+cap typing and pasted digits at 11, retain the `09` rule, and explain when paste
+formatting or excess digits were removed.
 
 Sign-in and registration share `AuthPanel` for headings, field styling, and larger
 red required markers. Sign-in uses a compact card centered in the space between
@@ -97,11 +105,19 @@ are in the components cascade layer in `src/web/styles/ds.css`.
   privacy consent. It then asks for a six-digit email code. A correct code signs
   the Citizen in and opens the residency-proof step. Password recovery verifies
   a separate recovery code before changing the password and ending old sessions.
+- A returning registrant can continue email verification without repeating
+  signup or sending a replacement password. Email confirmation and residency
+  review remain separate. Resend feedback says a code was requested for an
+  eligible account; it does not claim the mail arrived. Current delivery and
+  code redemption need service-backed verification in #91.
 - The session can refresh a refused access token. After 15 minutes without
   activity, the interface warns the user and gives one minute to stay signed in.
   If the user remains idle, it signs out and saves an open report draft, new or
   edit, in this tab's session storage. A draft keeps text and the pin, but not an
   attached file.
+- Tabs share the login, refresh coordination, activity clock, and sign-out.
+  An already-open signed-out tab adopts a new login after fetching the current
+  profile and checking that the token is still current. Drafts remain per tab.
 - Client validation mirrors server validation where immediate field feedback is
   useful. Server validation remains authoritative.
 - An action button is disabled while its form is invalid or sending, and an

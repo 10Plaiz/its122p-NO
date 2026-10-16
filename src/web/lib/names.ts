@@ -22,6 +22,11 @@ export const LAST_NAME_ERROR = "Enter the last name.";
 export const MIDDLE_NAME_ERROR = "Enter the full middle name, not an initial.";
 export const SUFFIXES = ["Jr.", "Sr.", "II", "III", "IV", "V"] as const;
 
+export function canonicalSuffix(value: string): string {
+  const entered = value.trim();
+  return SUFFIXES.find((suffix) => suffix.replace(".", "").toLowerCase() === entered.replace(/\.$/, "").toLowerCase()) ?? entered;
+}
+
 // "D" or "D." on its own. Mirrors INITIAL_PATTERN on the server.
 const INITIAL_PATTERN = /^\p{L}\.?$/u;
 
@@ -48,5 +53,7 @@ export function validateNameParts(values: NameValues): Record<string, string> {
   if (first) errors.first_name = first;
   if (middle) errors.middle_name = middle;
   if (last) errors.last_name = last;
+  const suffix = canonicalSuffix(values.suffix);
+  if (suffix && !SUFFIXES.some((allowed) => allowed === suffix)) errors.suffix = "Use Jr., Sr., II, III, IV, or V, or leave it blank.";
   return errors;
 }

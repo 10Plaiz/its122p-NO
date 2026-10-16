@@ -32,6 +32,7 @@ Evidence labels:
 | Sign-out revokes the session by refresh cookie, even after the access token expired | `/api/auth/logout` | Local (security IMP-10) |
 | A deactivated account gets `403` on every route, at sign-in, and at refresh | `requireAuth`, `accounts-profile.ts` | Local (security IMP-14) |
 | After 15 idle minutes a one-minute warning appears, then the browser signs out and keeps the report draft | `src/web/lib/idle.ts` | Source; browser session tests |
+| An already-open signed-out tab adopts a new shared login only after fetching its authenticated profile and checking that the token is still current | `src/web/lib/auth.tsx` | Controlled browser regression (#86); shared refresh, idle activity, and sign-out scenarios |
 
 ### Authorization
 

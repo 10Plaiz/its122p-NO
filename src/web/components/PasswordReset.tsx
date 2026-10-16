@@ -78,11 +78,11 @@ export function PasswordReset({
           <Alert title="Could not send a reset code">{request.error.message}</Alert>
         )}
 
-        <Button type="submit" variant="primary" block disabled={request.pending || Boolean(emailError)}>
+        <Button type="submit" variant="primary" className="w-full justify-center text-center" disabled={request.pending || Boolean(emailError)}>
           {request.pending ? "Sending…" : "Send reset code"}
         </Button>
 
-        <Button type="button" variant="ghost" className="self-start" onClick={onCancel}>
+        <Button type="button" variant="ghost" className="w-full justify-center text-center" onClick={onCancel}>
           Back to sign in
         </Button>
       </form>
@@ -130,7 +130,7 @@ export function PasswordReset({
           <Alert title="Could not change your password">{reset.error.message}</Alert>
         )}
 
-        <Button type="submit" variant="primary" block disabled={reset.pending || Boolean(codeError || passwordError)}>
+        <Button type="submit" variant="primary" className="w-full justify-center text-center" disabled={reset.pending || Boolean(codeError || passwordError)}>
           {reset.pending ? "Changing password…" : "Change password"}
         </Button>
       </form>
@@ -140,7 +140,7 @@ export function PasswordReset({
       <Button
         type="button"
         variant="ghost"
-        className="self-start"
+        className="w-full justify-center text-center"
         onClick={() => {
           setCode("");
           setPassword("");
