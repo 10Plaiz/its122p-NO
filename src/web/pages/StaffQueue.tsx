@@ -16,13 +16,13 @@ import { RatingAverage } from "../components/FeedbackSummary.js";
 import { BarangayFilter } from "../components/BarangayFilter.js";
 import { FilterCountsFeedback, FilterOption } from "../components/FilterOption.js";
 import { countFilterOptions } from "../lib/filter-counts.js";
+import { STATUS_FILTER_LABEL, type StatusFilter } from "../lib/status-filter.js";
 import { reportFilterValues, useFilterRows } from "../lib/useFilterRows.js";
 import { describeFilters } from "../lib/export.js";
 import type { Column } from "../lib/table-types.js";
 import { useApi } from "../lib/useApi.js";
 import { STATUSES, STATUS_LABEL, closurePendingOf } from "../lib/types.js";
-import type { Paged, Report } from "../lib/types.js";
-import { STATUS_FILTER_LABEL, type StatusFilter } from "../lib/status-filter.js";
+import type { Paged, Report, ReportStatus } from "../lib/types.js";
 
 const PER_PAGE = 20;
 const TABLE_ID = "staff-queue";
