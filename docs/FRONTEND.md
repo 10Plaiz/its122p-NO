@@ -122,6 +122,11 @@ are in the components cascade layer in `src/web/styles/ds.css`.
   If the user remains idle, it signs out and saves an open report draft, new or
   edit, in this tab's session storage. A draft keeps text and the pin, but not an
   attached file.
+- A guest gets the same warning after the same idle time, with "Stay here" and
+  "Leave now". If the guest stays idle, the page returns to the start, which
+  clears a half-filled sign-in or registration form. The guest clock starts when
+  the tab opens, and after a reset it waits for new activity, so a guest left on
+  the start page is not warned again.
 - Tabs share the login, refresh coordination, activity clock, and sign-out.
   An already-open signed-out tab adopts a new login after fetching the current
   profile and checking that the token is still current. Drafts remain per tab.

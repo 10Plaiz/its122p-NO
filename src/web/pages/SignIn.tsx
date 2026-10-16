@@ -7,7 +7,7 @@ import { PasswordReset } from "../components/PasswordReset.js";
 import { Alert, Button, Field, Input, focusFirstError, PasswordInput } from "../components/ui.js";
 import { homePathFor, useAuth } from "../lib/auth.js";
 import { EMAIL_NOT_CONFIRMED, validateEmail } from "../lib/codes.js";
-import { IDLE_LIMIT_MS } from "../lib/idle.js";
+import { idleLimitText } from "../lib/idle.js";
 import { useAction } from "../lib/useApi.js";
 
 type SignInLocationState = {
@@ -138,7 +138,7 @@ export function SignInPage() {
         <Notice title="Password changed" success>Sign in with your new password.</Notice>
       ) : ended === "idle" ? (
         <Notice title="Signed out">
-          {`You were signed out after ${IDLE_LIMIT_MS / 60_000} minutes without activity. Sign in to continue where you left off.`}
+          {`You were signed out after ${idleLimitText()} without activity. Sign in to continue where you left off.`}
         </Notice>
       ) : ended === "expired" ? (
         <Notice title="Session ended">Your session has ended. Sign in again to continue.</Notice>

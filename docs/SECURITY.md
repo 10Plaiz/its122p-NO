@@ -31,7 +31,7 @@ Evidence labels:
 | `/api/auth/refresh` needs the `X-KAMOTI-Session` header, which another site cannot send | `requireSessionHeader` | Source (ACC-13) |
 | Sign-out revokes the session by refresh cookie, even after the access token expired | `/api/auth/logout` | Local (security IMP-10) |
 | A deactivated account gets `403` on every route, at sign-in, and at refresh | `requireAuth`, `accounts-profile.ts` | Local (security IMP-14) |
-| After 15 idle minutes a one-minute warning appears, then the browser signs out and keeps the report draft | `src/web/lib/idle.ts` | Source; browser session tests |
+| After 1 idle minute (15 normally; lowered to test on the live site) a one-minute warning appears, then the browser signs out and keeps the report draft. A guest gets the same warning, then returns to the start page, which clears a half-filled form | `src/web/lib/idle.ts`, `src/web/components/IdleTimeoutDialog.tsx` | Source; browser session tests; guest browser test in `public.browser.ts` |
 | An already-open signed-out tab adopts a new shared login only after fetching its authenticated profile and checking that the token is still current | `src/web/lib/auth.tsx` | Controlled browser regression (#86); shared refresh, idle activity, and sign-out scenarios |
 
 ### Authorization

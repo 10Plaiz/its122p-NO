@@ -1,7 +1,9 @@
 // UA-9: idle sign-out. After 1 minute with no activity in any tab, a warning
-// counts down 60 seconds, then the session ends. Times are compared as timestamps
-// rather than counted by an interval, so a laptop that slept through the deadline
-// signs out the moment it wakes instead of resuming a paused countdown.
+// counts down 60 seconds, then the session ends. A guest gets the same warning,
+// then is sent back to the start, which clears any half-filled form. Times are
+// compared as timestamps rather than counted by an interval, so a laptop that
+// slept through the deadline acts the moment it wakes instead of resuming a
+// paused countdown.
 
 export const IDLE_LIMIT_MS = 1 * 60 * 1000;
 export const WARNING_MS = 60 * 1000;
@@ -24,11 +26,28 @@ export function idlePhase(lastActivity: number, now: number): IdlePhase {
   return { phase: "active" };
 }
 
+// When a guest's idle clock started, or null while it is paused. Activity from
+// before this tab opened does not count, so a guest opening the site after a
+// long break is not sent home at once. After a reset the clock waits for new
+// activity, so a guest left on the start page is not warned over and over.
+export function guestIdleStart(activity: number, openedAt: number, resetAt: number | null): number | null {
+  const start = Math.max(activity, openedAt);
+  return resetAt !== null && start <= resetAt ? null : start;
+}
+
+// "1 minute", "15 minutes".
+export function idleLimitText(): string {
+  const minutes = IDLE_LIMIT_MS / 60_000;
+  return `${minutes} ${minutes === 1 ? "minute" : "minutes"}`;
+}
+
 // A screen reader hears the countdown at these points only; every second would
 // drown out anything else on the page.
-export function countdownAnnouncement(secondsLeft: number): string | null {
+export function countdownAnnouncement(secondsLeft: number, guest = false): string | null {
   if (secondsLeft === 60 || secondsLeft === 30 || secondsLeft === 10) {
-    return `You will be signed out in ${secondsLeft} seconds.`;
+    return guest
+      ? `This page will reset in ${secondsLeft} seconds.`
+      : `You will be signed out in ${secondsLeft} seconds.`;
   }
   return null;
 }
@@ -66,7 +85,8 @@ export function clearActivity() {
 }
 
 // Falls back to this tab's own last write when storage is unavailable, and to
-// `now` when nothing was ever recorded (a session from before this existed).
-export function lastActivity(now: number): number {
-  return readActivity() ?? (lastWritten || now);
+// `fallback` when nothing was ever recorded: `now` for a session from before this
+// existed, 0 for a guest, whose clock then starts when the tab opened.
+export function lastActivity(fallback: number): number {
+  return readActivity() ?? (lastWritten || fallback);
 }

@@ -31,3 +31,30 @@ test.describe("Student project notice (#74)", () => {
     await captureEvidence(page, "74-register-notice.png");
   });
 });
+
+// UA-9: a guest left idle is warned, then returned to the start, which clears a
+// half-filled form on a shared computer.
+test.describe("Guest idle reset (UA-9)", () => {
+  test("UA-9: an idle guest can stay, and is later returned to the start with the form cleared", async ({ page }) => {
+    await page.clock.install();
+    await page.goto("/register");
+    await page.locator("#first-name").fill("Idle Guest");
+
+    await page.clock.runFor(61_000);
+    const dialog = page.getByRole("alertdialog");
+    await expect(dialog).toBeVisible();
+    await expect(dialog).toContainText("no activity for 1 minute.");
+    await page.getByRole("button", { name: "Stay here", exact: true }).click();
+    await expect(dialog).toHaveCount(0);
+    await expect(page.locator("#first-name")).toHaveValue("Idle Guest");
+
+    await page.clock.runFor(122_000);
+    await expect(page).toHaveURL(/\/$/);
+    await expect(dialog).toHaveCount(0);
+    await expect(page.locator("#first-name")).toHaveCount(0);
+
+    // Left on the start page, the guest is not warned again until they come back.
+    await page.clock.runFor(180_000);
+    await expect(dialog).toHaveCount(0);
+  });
+});

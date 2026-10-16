@@ -10,7 +10,7 @@ import { describe, expect, it } from "bun:test";
 const { CODE_ERROR: SERVER_CODE_ERROR, verificationCode } = await import("../../src/server/lib/validate.js");
 const { ACCOUNT_ERROR_CODES } = await import("../../src/server/lib/accounts-errors.js");
 const { CODE_ERROR, EMAIL_NOT_CONFIRMED, normalizeCode, validateCode } = await import("../../src/web/lib/codes.js");
-const { IDLE_LIMIT_MS, WARNING_MS, countdownAnnouncement, idlePhase } = await import("../../src/web/lib/idle.js");
+const { IDLE_LIMIT_MS, WARNING_MS, countdownAnnouncement, guestIdleStart, idleLimitText, idlePhase } = await import("../../src/web/lib/idle.js");
 
 describe("ACC-09 the code field accepts what the server accepts (UA-5, UA-12)", () => {
   it("agrees with the server on every sample, message for message", () => {
@@ -59,5 +59,28 @@ describe("ACC-10 idle sign-out warns at 1 minute and ends at 2 (UA-9)", () => {
       "You will be signed out in 30 seconds.",
       "You will be signed out in 10 seconds.",
     ]);
+  });
+
+  it("tells a guest the page will reset instead of signing out", () => {
+    expect(countdownAnnouncement(30, true)).toBe("This page will reset in 30 seconds.");
+    expect(countdownAnnouncement(29, true)).toBeNull();
+  });
+
+  it("names the limit with the right plural", () => {
+    expect(idleLimitText()).toBe("1 minute");
+  });
+});
+
+describe("Guest idle reset starts from activity or tab open, and pauses after a reset (UA-9)", () => {
+  const opened = 1_000_000_000_000;
+
+  it("ignores activity from before the tab opened", () => {
+    expect(guestIdleStart(opened - 24 * 60 * 60 * 1000, opened, null)).toBe(opened);
+    expect(guestIdleStart(opened + 5_000, opened, null)).toBe(opened + 5_000);
+  });
+
+  it("pauses after a reset until there is newer activity", () => {
+    expect(guestIdleStart(opened, opened, opened)).toBeNull();
+    expect(guestIdleStart(opened + 1, opened, opened)).toBe(opened + 1);
   });
 });
