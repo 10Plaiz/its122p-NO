@@ -237,12 +237,18 @@ belong to [API.md](API.md).
 - **Staff routing (SW-1).** On Users, a Staff row's Routing control opens the
   specialization and area editors. Saving replaces the whole set; removed
   categories or barangays are switched off, not deleted.
-- **Tables and exports (TB-1 to TB-4).** Report and log tables show numbered
+- **Tables and exports (TB-1 to TB-5).** Report and log tables show numbered
   pages with a jump-to-page box; the current page is not kept in the URL. Column
   menus remember each table's columns in this browser only. Export offers CSV or
   PDF of every matching row up to 5,000, with the screen's filters and visible
   columns, and says when rows were left out. PDFs replace characters the
   built-in font cannot print, such as arrows and emoji; CSV keeps them.
+  My reports, Staff queue, and Admin reports offer Refresh for rows and filter
+  counts while preserving filters, sort, and current page. My reports and Admin
+  reports default to newest; Staff defaults to oldest. Each offers newest/oldest,
+  and Admin retains its status sort. Changing order returns to page one, and
+  exports use that order. Loading or failed lists hide old rows and pagination
+  and disable exports; Refresh and Retry counts provide separate recovery paths.
 - **Photos.** Report photos open full size in a lightbox that closes with
   Escape or a backdrop click and returns focus to the photo. A photo removed by
   the retention purge shows that it was removed after the retention period.

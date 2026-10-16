@@ -87,6 +87,7 @@ Later UI review notes are quoted verbatim in their implementing pull requests.
 | TB-2 | Let users hide and show columns, including a completion-date column. | Medium | Done: column choice per table, kept in the browser; a Closed date column. |
 | TB-3 | Place filter and search at the top right of the table. | Low | Done: search sits at the right edge of each table toolbar, after filters. |
 | TB-4 | Export table data to PDF and CSV, respecting the current filters and visible columns. | Medium | Done: CSV and PDF with the screen's filters and visible columns, up to 5,000 rows. |
+| TB-5 | Refresh citizen, staff, and administrator report tables and choose newest or oldest order. | Medium | Done (#88): Refresh reloads rows and filter counts while retaining filters, sort, and page. Staff keeps its oldest default; other report tables keep newest, and Admin retains status sort. Focused controlled-response browser cases passed for all three roles, including loading, errors, retries, paging, CSV order, and mobile layout. |
 
 ## 7. Feedback
 
