@@ -22,6 +22,7 @@ export function Button({
 export function Field({
   label,
   labelAction,
+  required = false,
   hint,
   error,
   htmlFor,
@@ -31,6 +32,7 @@ export function Field({
 }: {
   label: ReactNode;
   labelAction?: ReactNode;
+  required?: boolean;
   hint?: string;
   error?: string;
   htmlFor?: string;
@@ -39,6 +41,18 @@ export function Field({
   max?: number;
   children: ReactNode;
 }) {
+  const fieldLabel = (
+    <>
+      {label}
+      {required && (
+        <>
+          {" "}<span aria-hidden="true" className="text-danger text-[1.15em]">*</span>
+          <span className="sr-only"> (required)</span>
+        </>
+      )}
+    </>
+  );
+
   // Hidden while the field is empty: a row of "0 / 150" under every untouched
   // control is noise, and the count only means anything once there is something
   // to count.
@@ -74,11 +88,11 @@ export function Field({
     <div className="field flex flex-col gap-1.5">
       {labelAction ? (
         <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-          <label className="field-label" htmlFor={htmlFor}>{label}</label>
+          <label className="field-label" htmlFor={htmlFor}>{fieldLabel}</label>
           {labelAction}
         </div>
       ) : (
-        <label className="field-label" htmlFor={htmlFor}>{label}</label>
+        <label className="field-label" htmlFor={htmlFor}>{fieldLabel}</label>
       )}
       {control}
 

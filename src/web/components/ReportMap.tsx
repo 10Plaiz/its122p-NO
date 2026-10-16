@@ -107,7 +107,7 @@ export function ReportMap({
   invalidateTrigger?: unknown;
 }) {
   return (
-    <MapFrame>
+    <MapFrame unavailable={<p>Use List View to read reports when the map is unavailable.</p>}>
       <Map
         mapId={googleMapId()}
         defaultCenter={DEFAULT_CENTER}
