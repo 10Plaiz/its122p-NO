@@ -19,7 +19,7 @@ import { present, type Report } from "../services/reports.common.js";
 import { REPORT_ROW_FIELDS } from "../services/reports.rows.js";
 import { applyLogFilters, logFilterFields, logSelect } from "../lib/log-filters.js";
 import { scopeReportQuery } from "../services/reports.access.js";
-import { STATUSES } from "../services/reports.workflow.js";
+import { STATUS_FILTERS, filterReportStatus } from "../services/reports.workflow.js";
 
 // Table exports. These return the rows behind a table, every matching one rather
 // than a page of them, and the browser turns them into a CSV or PDF of the columns
@@ -32,7 +32,7 @@ router.use(requireAuth, requireResidency);
 // The same filters GET /api/reports accepts, minus paging, plus the format.
 export const reportExportSchema = z.object({
   ...searchFields,
-  status: z.enum(STATUSES).optional(),
+  status: z.enum(STATUS_FILTERS).optional(),
   category_id: z.coerce.number().int().positive().optional(),
   barangay: z.enum(BARANGAYS).optional(),
   format: z.enum(EXPORT_FORMATS).default("csv"),
@@ -76,7 +76,7 @@ router.get("/reports", async (req, res) => {
     // The role scope comes first and never from user input, so a filter can only
     // narrow what this caller was already allowed to see.
     query = scopeReportQuery(query, user);
-    if (status) query = query.eq("status", status);
+    if (status) query = filterReportStatus(query, status);
     if (category_id) query = query.eq("category_id", category_id);
     if (barangay) query = query.eq("barangay", barangay);
     if (from) query = query.gte("submitted_at", from);

@@ -11,7 +11,7 @@ import { assertResidencyApproved, currentUser, requireAuth, requireResidency } f
 import { findReport, present, type Report } from "../services/reports.common.js";
 import { REPORT_ROW_FIELDS } from "../services/reports.rows.js";
 import { assertCanUpdate, assertCanView, scopeReportQuery } from "../services/reports.access.js";
-import { STATUSES } from "../services/reports.workflow.js";
+import { STATUS_FILTERS, filterReportStatus } from "../services/reports.workflow.js";
 import submissionRoutes from "./reports.submission.routes.js";
 import workflowRoutes from "./reports.workflow.routes.js";
 
@@ -24,10 +24,10 @@ const router = Router();
 // UA-8: a citizen locked to the proof upload reaches none of this.
 router.use(requireAuth, requireResidency);
 
-const listSchema = z.object({
+export const listSchema = z.object({
   ...searchFields,
   ...pageFields(20, 50),
-  status: z.enum(STATUSES).optional(),
+  status: z.enum(STATUS_FILTERS).optional(),
   category_id: z.coerce.number().int().positive().optional(),
   // SW-1: the barangay the pin is in (set by the database from the pin).
   barangay: z.enum(BARANGAYS).optional(),
@@ -45,7 +45,7 @@ router.get("/", async (req, res) => {
   // The role scope is applied first and never from user input, so a search or filter
   // can only ever narrow what this caller was already allowed to see.
   query = scopeReportQuery(query, currentUser(req));
-  if (status) query = query.eq("status", status);
+  if (status) query = filterReportStatus(query, status);
   if (category_id) query = query.eq("category_id", category_id);
   if (barangay) query = query.eq("barangay", barangay);
   if (from) query = query.gte("submitted_at", from);

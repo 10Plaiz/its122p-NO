@@ -139,7 +139,9 @@ are in the components cascade layer in `src/web/styles/ds.css`.
   filters, sort, and page. The list remains available when Maps cannot load.
 - Admin Reports and My Reports open at Pending. The Staff queue opens at Under
   review. Any status remains selectable, and Clear filters shows every status
-  rather than reinstating the initial selection.
+  rather than reinstating the initial selection. Admin Reports and the Staff
+  queue also offer Awaiting verification: closure requests no Administrator has
+  decided yet. Those reports are counted under their own status too (#82).
 - Dropdown filters include result counts, such as `Pending (12)`. Each option
   counts the rows that would match that choice and the other active filters.
   Search and activity-log dates restrict these counts too. Sort controls only

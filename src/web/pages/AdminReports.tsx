@@ -21,7 +21,8 @@ import { describeFilters } from "../lib/export.js";
 import type { Column } from "../lib/table-types.js";
 import { useApi } from "../lib/useApi.js";
 import { SORTS, STATUSES, STATUS_LABEL } from "../lib/types.js";
-import type { Category, Paged, Report, ReportStatus, Sort } from "../lib/types.js";
+import type { Category, Paged, Report, Sort } from "../lib/types.js";
+import { STATUS_FILTER_LABEL, type StatusFilter } from "../lib/status-filter.js";
 
 const PER_PAGE = 20;
 const TABLE_ID = "admin-reports";
@@ -113,7 +114,7 @@ export function AdminReportsPage() {
       name: "reports",
       filters: describeFilters([
         ["Search", filters.q ? `“${filters.q}”` : null],
-        ["Status", status ? STATUS_LABEL[status as ReportStatus] : null],
+        ["Status", status ? STATUS_FILTER_LABEL[status as StatusFilter] : null],
         ["Category", categoryName],
         ["Barangay", barangay || null],
         ["Sort", sortLabel(sort)],
@@ -142,7 +143,7 @@ export function AdminReportsPage() {
           </Field>
         }
       >
-        <ToolbarItem>
+        <ToolbarItem wide>
           <Field label="Status" htmlFor="status">
             <Select
               id="status"
@@ -156,6 +157,7 @@ export function AdminReportsPage() {
               {STATUSES.map((key) => (
                 <FilterOption key={key} value={key} label={STATUS_LABEL[key]} counts={counts.status} />
               ))}
+              <FilterOption value="awaiting_verification" label={STATUS_FILTER_LABEL.awaiting_verification} counts={counts.status} />
             </Select>
           </Field>
         </ToolbarItem>

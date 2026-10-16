@@ -17,6 +17,7 @@ import { RatingAverage } from "../components/FeedbackSummary.js";
 import { BarangayFilter } from "../components/BarangayFilter.js";
 import { FilterCountsFeedback, FilterOption } from "../components/FilterOption.js";
 import { countFilterOptions } from "../lib/filter-counts.js";
+import { STATUS_FILTER_LABEL, type StatusFilter } from "../lib/status-filter.js";
 import { reportFilterValues, useFilterRows } from "../lib/useFilterRows.js";
 import { describeFilters } from "../lib/export.js";
 import type { Column } from "../lib/table-types.js";
@@ -97,7 +98,7 @@ export function StaffQueuePage() {
       name: "queue",
       filters: describeFilters([
         ["Search", filters.q ? `“${filters.q}”` : null],
-        ["Status", status ? STATUS_LABEL[status as ReportStatus] : null],
+        ["Status", status ? STATUS_FILTER_LABEL[status as StatusFilter] : null],
         ["Barangay", barangay || null],
         ["Sort", sortLabel(sort)],
       ]),
@@ -127,7 +128,7 @@ export function StaffQueuePage() {
           </Field>
         }
       >
-        <ToolbarItem>
+        <ToolbarItem wide>
           <Field label="Status" htmlFor="status">
             <Select
               id="status"
@@ -141,6 +142,7 @@ export function StaffQueuePage() {
               {STATUSES.map((key) => (
                 <FilterOption key={key} value={key} label={STATUS_LABEL[key]} counts={counts.status} />
               ))}
+              <FilterOption value="awaiting_verification" label={STATUS_FILTER_LABEL.awaiting_verification} counts={counts.status} />
             </Select>
           </Field>
         </ToolbarItem>
