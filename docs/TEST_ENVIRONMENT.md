@@ -70,9 +70,10 @@ The repository owns the deployment specification in [`vercel.json`](../vercel.js
 
 ## Database migrations status
 
-On 15 October 2026 the migration owner confirmed all 23 files in
-[`supabase/migrations/`](../supabase/migrations/) applied, ending with
-`20261015000200_residency_review_evidence.sql`. Check the current state with
+All 25 files in [`supabase/migrations/`](../supabase/migrations/) are applied,
+ending with `20261015000400_proof_retention.sql` (#76). The migration owner
+confirmed the first 23 on 15 October 2026; on 16 October a read-only schema
+check found the column and functions that the last two add. Check the current state with
 `bunx supabase migration list`; see [API.md](API.md#database-migrations).
 
 The Phase 4 baseline had the first six:
