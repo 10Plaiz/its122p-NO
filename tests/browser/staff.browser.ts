@@ -66,10 +66,22 @@ test.describe("Staff functional workflows (FUNC-02, FUNC-03, FUNC-06, FUNC-07)",
     await page.getByRole("button", { name: "Request resolution" }).click();
     await expect(page.getByText("Waiting for verification")).toBeVisible();
     await expect(page.getByText("Awaiting verification", { exact: true })).toBeVisible();
+
+    // #82: the request can be found by its own filter, in My queue and Admin Reports.
+    const awaiting = page.locator('#status option[value="awaiting_verification"]');
+    await page.goto("/staff/queue");
+    await expect(awaiting).toHaveText(/^Awaiting verification \([1-9]/);
+    await page.locator("#status").selectOption("awaiting_verification");
+    await expect(page.getByRole("link", { name: title }).first()).toBeVisible();
     await signOut(page);
 
-    // The administrator approves it.
+    // The administrator finds it under Awaiting verification and approves it.
     await signIn(page, USERS.admin, FIXTURE_PASSWORD);
+    await page.goto("/admin/reports");
+    await expect(page.locator("#status")).toHaveValue("pending");
+    await expect(awaiting).toHaveText(/^Awaiting verification \([1-9]/);
+    await page.locator("#status").selectOption("awaiting_verification");
+    await expect(page.getByRole("link", { name: title }).first()).toBeVisible();
     await page.goto(`/staff/reports/${reportId}`);
     await expect(page.getByRole("heading", { name: "Verify resolution" })).toBeVisible();
     await page.fill("#verify-comment", "Photo shows the repair. Approved.");

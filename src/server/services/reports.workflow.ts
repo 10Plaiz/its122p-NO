@@ -96,6 +96,25 @@ export function closurePending(workflow: Pick<WorkflowRow, "closure_requested_at
   return Boolean(workflow.closure_requested_at) && !workflow.verified_at;
 }
 
+// #82: the Status filter also offers "awaiting verification", which is not a
+// stored status but closurePending as a query. A waiting report keeps its status,
+// so filtering by in_progress or under_review still lists it.
+export const STATUS_FILTERS = [...STATUSES, "awaiting_verification"] as const;
+export type StatusFilter = (typeof STATUS_FILTERS)[number];
+
+type StatusFilterable<Q> = {
+  eq(column: string, value: unknown): Q;
+  in(column: string, values: readonly unknown[]): Q;
+  not(column: string, operator: string, value: unknown): Q;
+  is(column: string, value: null): Q;
+};
+
+// The list and the export both filter through here, so a file holds what the screen shows.
+export function filterReportStatus<Q extends StatusFilterable<Q>>(query: Q, status: StatusFilter): Q {
+  if (status !== "awaiting_verification") return query.eq("status", status);
+  return query.in("status", REQUESTABLE).not("closure_requested_at", "is", null).is("verified_at", null);
+}
+
 export type DelayStage = ReportStatus | "awaiting_verification";
 
 // How long the report has waited at its current stage, and whether that is past the

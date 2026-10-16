@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { ApiError, api, toQuery } from "./api.js";
 import type { Query } from "./api.js";
 import type { FilterRow, FilterValues } from "./filter-counts.js";
+import { statusFilterValues } from "./status-filter.js";
 import type { ActivityLog, Paged, PublicReport, Report } from "./types.js";
 
 type CountState =
@@ -11,7 +12,7 @@ type CountState =
 
 export function reportFilterValues(report: Report | PublicReport): FilterValues {
   return {
-    status: report.status,
+    status: statusFilterValues(report),
     category: String("category_id" in report ? report.category_id : report.category?.id ?? ""),
     barangay: report.barangay ?? "",
   };
