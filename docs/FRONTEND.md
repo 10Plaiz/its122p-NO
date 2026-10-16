@@ -115,6 +115,12 @@ are in the components cascade layer in `src/web/styles/ds.css`.
 - The public board stores filters and paging in the URL so filtered views are
   shareable and browser navigation restores them. It opens at Under review;
   an explicit `status=all` preserves a chosen Any status view on reload.
+- The public board has a larger responsive map and a written status-pin legend.
+  Pins cover the current results page. Selecting one expands, focuses, and
+  reveals its report in the desktop list. On phones it opens a bottom report
+  panel over the map; Close or Escape returns focus to the marker. Refresh board
+  reloads reports, headline totals, and filter counts while preserving the URL,
+  filters, sort, and page. The list remains available when Maps cannot load.
 - Admin Reports and My Reports open at Pending. The Staff queue opens at Under
   review. Any status remains selectable, and Clear filters shows every status
   rather than reinstating the initial selection.
@@ -140,10 +146,20 @@ are in the components cascade layer in `src/web/styles/ds.css`.
   rest of the page remains usable.
 - The report form keeps reverse-geocoded addresses editable. Coordinates remain
   the report location when the third-party lookup is unavailable.
-- The report map supports pointer placement and a keyboard path: arrow keys move
-  the map, then Place pin at map center selects its coordinates. Google Maps and
-  Places provide the map and location search. The API also rejects pins outside
-  Makati. If Places fails, the user can still select a pin on the map.
+- The report picker keeps a pin at the map center. Panning, place search, and
+  device location prepare a candidate; **Confirm location** selects it after the
+  map stops moving. Moving the map clears confirmation in new reports and
+  pending-report edits. Arrow keys provide the same pan-then-confirm path.
+  The initial map center is unconfirmed. Google Maps and Places provide the map
+  and search; without Places, panning still works. Without the map, device
+  coordinates can still be confirmed. Both the picker and API reject pins
+  outside Makati. Report categories include roadside public infrastructure;
+  coordinates are not snapped to roads.
+- Required report inputs have red asterisks and accessible required text.
+  Address or landmark, the other problem, and photo remain optional. Successful
+  submission shows one awaiting-review message with the title and reference
+  while opening the Pending report. Reloading detail does not repeat it;
+  Under review notifications belong to the actual workflow transition.
 - Assignment dialogs move focus inside, contain Tab navigation, close with Escape,
   and return focus to the Assign control. Staff contact offers calling through
   `tel:` only.
@@ -230,6 +246,9 @@ belong to [API.md](API.md).
 - **Photos.** Report photos open full size in a lightbox that closes with
   Escape or a backdrop click and returns focus to the photo. A photo removed by
   the retention purge shows that it was removed after the retention period.
+  Every public-board photo can also be enlarged. Closing a photo opened from
+  the mobile report panel keeps that panel open. Missing public photos show a
+  readable fallback and a retry control.
 - **Proof retention (#70).** The dashboard's Proof retention panel checks, then
   after a confirmation removes, residency proof files 30 days after they stopped
   being current. It reports replaced proofs and stored files no proof record

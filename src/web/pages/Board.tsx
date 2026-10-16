@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { ReportMap } from "../components/ReportMap.js";
 import {
@@ -11,6 +11,8 @@ import {
   Select,
 } from "../components/ui.js";
 import { BoardReportCard } from "../components/BoardReportCard.js";
+import { BoardLegend } from "../components/BoardLegend.js";
+import { BoardReportPanel } from "../components/BoardReportPanel.js";
 import { BarangayFilter } from "../components/BarangayFilter.js";
 import { FilterCountsFeedback, FilterOption } from "../components/FilterOption.js";
 import { countFilterOptions } from "../lib/filter-counts.js";
@@ -57,6 +59,27 @@ export function BoardPage() {
   const { q, status, categoryId, barangay, sort, page, pane } = readParams(params);
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [mobileReportId, setMobileReportId] = useState<string | null>(null);
+  const listRef = useRef<HTMLDivElement>(null);
+  const mapRef = useRef<HTMLDivElement>(null);
+  const markerFocus = useRef<Element | null>(null);
+
+  function selectMarker(id: string) {
+    setSelectedId(id);
+    if (window.matchMedia("(min-width: 1024px)").matches) {
+      requestAnimationFrame(() => {
+        const header = document.getElementById(`report-header-${id}`);
+        header?.focus({ preventScroll: true });
+        const card = header?.closest("article");
+        const list = listRef.current;
+        if (card && list) list.scrollTop += card.getBoundingClientRect().top - list.getBoundingClientRect().top;
+      });
+    } else {
+      markerFocus.current = document.activeElement;
+      mapRef.current?.scrollIntoView({ block: "start" });
+      setMobileReportId(id);
+    }
+  }
 
   // Typing stays local; only the settled term reaches the URL and the API.
   const [search, setSearch] = useState(q);
@@ -99,14 +122,34 @@ export function BoardPage() {
     [q, status, categoryId, barangay, sort, page],
   );
 
-  const { data, error, loading } = useApi<Paged<"reports", PublicReport>>("/public/reports", query);
-  const { data: stats } = useApi<PublicStats>("/public/stats");
+  const { data, error, loading, reload } = useApi<Paged<"reports", PublicReport>>("/public/reports", query);
+  const { data: stats, loading: statsLoading, error: statsError, reload: reloadStats } = useApi<PublicStats>("/public/stats");
   const { data: categoryData } = useApi<{ categories: Category[] }>("/categories");
   const countQuery = useMemo(() => ({ q }), [q]);
   const countRows = useFilterRows<"reports", PublicReport>({ path: "/public/reports", collection: "reports", query: countQuery, perPage: 100, valuesOf: reportFilterValues });
   const counts = useMemo(() => countFilterOptions(countRows.rows, { status, category: categoryId, barangay }), [countRows.rows, status, categoryId, barangay]);
 
   const reports = useMemo(() => data?.reports ?? [], [data]);
+  const mobileReport = reports.find((report) => report.id === mobileReportId);
+  const closePanel = useCallback(() => setMobileReportId(null), []);
+
+  useEffect(() => {
+    setSelectedId(null);
+    setMobileReportId(null);
+  }, [q, status, categoryId, barangay, sort, page, pane]);
+
+  useEffect(() => {
+    const desktop = window.matchMedia("(min-width: 1024px)");
+    const closeOnDesktop = () => { if (desktop.matches) setMobileReportId(null); };
+    desktop.addEventListener("change", closeOnDesktop);
+    return () => desktop.removeEventListener("change", closeOnDesktop);
+  }, []);
+
+  function refreshBoard() {
+    reload();
+    reloadStats();
+    countRows.reload();
+  }
 
   // Every refetch hands back a fresh array, so the map is re-aimed on what changed
   // rather than on that new identity: same reports, same key, and the visitor keeps
@@ -152,7 +195,8 @@ export function BoardPage() {
         .join(" · ");
 
   return (
-    <div className="flex flex-col gap-6">
+    <>
+    <div className="flex flex-col gap-6" inert={mobileReport ? true : undefined}>
       <header className="flex flex-col gap-1">
         <h2>Public transparency board</h2>
         <p className="text-muted text-[13px]">
@@ -239,6 +283,16 @@ export function BoardPage() {
 
       <FilterCountsFeedback loading={countRows.loading} error={countRows.error} onRetry={countRows.reload} />
 
+      <div className="flex flex-wrap items-center gap-3">
+        <Button type="button" onClick={refreshBoard} disabled={loading || statsLoading || countRows.loading}>
+          {loading || statsLoading || countRows.loading ? "Updating board…" : "Refresh board"}
+        </Button>
+        <span className="text-muted text-[12px]" role="status">{summary}</span>
+      </div>
+      {statsError && <Alert title="Could not update board totals">{statsError.message} Try Refresh board again.</Alert>}
+
+      <BoardLegend />
+
       {error && <Alert title="Could not load the board">{error.message}</Alert>}
 
       {/* Which pane a narrow screen shows. Below lg only: both render together above it.
@@ -269,11 +323,12 @@ export function BoardPage() {
         </div>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
         {/* Map above the list on mobile (when Map View active), side by side from lg */}
         <div
+          ref={mapRef}
           data-testid="board-map-container"
-          className={`border-2 border-divider h-[360px] lg:h-[560px] ${
+          className={`min-w-0 border-2 border-divider h-[65dvh] min-h-[400px] max-h-[720px] lg:h-[680px] ${
             pane === "list" ? "hidden lg:block" : "block"
           }`}
         >
@@ -281,7 +336,7 @@ export function BoardPage() {
             reports={reports}
             fitKey={fitKey}
             selectedId={selectedId}
-            onSelect={setSelectedId}
+            onSelect={selectMarker}
             invalidateTrigger={pane}
           />
         </div>
@@ -290,8 +345,9 @@ export function BoardPage() {
             absolutely positioned `sr-only` text. Without it those spans resolve against
             the page, escape the overflow clip, and stretch the page far below the footer. */}
         <div
+          ref={listRef}
           data-testid="board-list-container"
-          className={`relative flex flex-col gap-3 lg:max-h-[560px] lg:overflow-y-auto ${
+          className={`relative min-w-0 flex flex-col gap-3 lg:max-h-[680px] lg:overflow-y-auto ${
             pane === "map" ? "hidden lg:flex" : "flex"
           }`}
         >
@@ -357,6 +413,8 @@ export function BoardPage() {
         </div>
       </div>
     </div>
+    {mobileReport && <BoardReportPanel key={mobileReport.id} report={mobileReport} onClose={closePanel} returnFocus={markerFocus.current} />}
+    </>
   );
 }
 
