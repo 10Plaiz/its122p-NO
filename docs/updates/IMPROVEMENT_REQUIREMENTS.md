@@ -3,6 +3,7 @@
 Source: instructor review notes ([scattered_notes.md](scattered_notes.md)).
 Scope: improvements to the current KAMOTI web application (Makati LGU infrastructure reporting).
 Open work lives in GitHub Issues; each Partial row names its issue.
+Later UI review notes are quoted verbatim in their implementing pull requests.
 
 ## Legends
 
@@ -92,6 +93,15 @@ Open work lives in GitHub Issues; each Partial row names its issue.
 | ID | Requirement | Priority | Status |
 | :--- | :--- | :--- | :--- |
 | FB-1 | Let the citizen rate and comment on a resolved report, and route that feedback to the assigned staff member. | Medium | Done: one rating per resolved report, shown to the assigned Staff member; averages on the queue and dashboard. |
+
+## 8. Public board
+
+| ID | Requirement | Priority | Status |
+| :--- | :--- | :--- | :--- |
+| PB-1 | Explain public map symbols and provide a larger responsive map. | Medium | Done (#84): written status-pin legend using the existing palette, larger map, and a current-results-page scope explanation. Checked in Chromium with simulated Maps and API responses; live Google rendering was not rerun. |
+| PB-2 | Reveal the public report selected through its map marker. | Medium | Done (#84): desktop selection expands, focuses, and scrolls to the matching card. Phones open a bottom report panel with Close, Escape, and focus restoration. |
+| PB-3 | Let visitors enlarge public report photos. | Medium | Done (#84): every public photo opens in the existing lightbox; keyboard and backdrop dismissal, focus restoration, missing images, and retry were exercised. |
+| PB-4 | Refresh the public board while retaining its selected view. | Medium | Done (#84): reports, totals, and filter counts reload without changing URL filters, sort, or page. Existing newest/oldest sorting remains. Focused error, empty, and paging scenarios passed with controlled API responses. |
 
 ## Implementation Notes
 
