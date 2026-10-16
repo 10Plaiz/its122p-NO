@@ -52,6 +52,11 @@ export function AdminReportsPage() {
   const countRows = useFilterRows<"reports", Report>({ path: "/reports", collection: "reports", query: countQuery, perPage: 50, valuesOf: reportFilterValues });
   const counts = useMemo(() => countFilterOptions(countRows.rows, { status, category: categoryId, barangay }), [countRows.rows, status, categoryId, barangay]);
 
+  function refreshReports() {
+    reload();
+    countRows.reload();
+  }
+
   const columns = useMemo<Column<Report>[]>(
     () => [
       reportColumn.reference,
@@ -86,7 +91,7 @@ export function AdminReportsPage() {
   );
   const { visible, setShown, reset } = useColumnVisibility(TABLE_ID, columns);
 
-  const reports = data?.reports ?? [];
+  const reports = !loading && !error ? data?.reports ?? [] : [];
   const filtered = search.trim() !== "" || status !== "" || categoryId !== "" || barangay !== "";
 
   function clearFilters() {
@@ -210,12 +215,15 @@ export function AdminReportsPage() {
         </ToolbarItem>
 
         <ColumnMenu columns={columns} visible={visible} onToggle={setShown} onReset={reset} />
-        <ExportMenu onExport={onExport} disabled={!data || data.total === 0} />
+        <ExportMenu onExport={onExport} disabled={loading || !!error || !data || data.total === 0} />
+        <Button type="button" onClick={refreshReports} disabled={loading || countRows.loading} aria-busy={loading || countRows.loading}>
+          {loading || countRows.loading ? "Refreshing…" : "Refresh"}
+        </Button>
       </TableToolbar>
 
       <FilterCountsFeedback loading={countRows.loading} error={countRows.error} onRetry={countRows.reload} />
 
-      {error && <Alert title="Could not load reports">{error.message}</Alert>}
+      {!loading && error && <Alert title="Could not load reports">{error.message}</Alert>}
       {loading && <Loading label="Loading reports" />}
 
       {!loading && !error && reports.length === 0 && (
@@ -238,7 +246,7 @@ export function AdminReportsPage() {
         />
       )}
 
-      {data && (
+      {!loading && !error && data && (
         <NumberedPagination
           page={data.page}
           perPage={data.per_page}
@@ -254,8 +262,7 @@ export function AdminReportsPage() {
           onClose={closeAssign}
           onDone={() => {
             setAssigning(null);
-            reload();
-            countRows.reload();
+            refreshReports();
           }}
         />
       )}
