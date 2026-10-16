@@ -1,13 +1,17 @@
 import { useState } from "react";
 import type { ChangeEvent, FormEvent } from "react";
+import { RequiredMark } from "../components/AuthPanel.js";
+import { AddressFields } from "../components/AddressFields.js";
+import { SuffixField } from "../components/SuffixField.js";
+import { composeAddress } from "../lib/address.js";
 import { ContactNumberField, validateContactNumber } from "../components/ContactNumberField.js";
 import { ResidencyProofStep } from "../components/ResidencyProofStep.js";
 import { useToast } from "../components/Toast.js";
 import { Alert, Button, Field, Input, Select, StatusPill, useLeftFields } from "../components/ui.js";
 import { api } from "../lib/api.js";
 import { useAuth } from "../lib/auth.js";
-import { ADDRESS_MAX, BARANGAYS, BARANGAY_ERROR, validateAddressLine } from "../lib/barangays.js";
-import { NAME_PART_MAX, SUFFIXES, validateNameParts } from "../lib/names.js";
+import { BARANGAYS, BARANGAY_ERROR, validateAddressLine } from "../lib/barangays.js";
+import { NAME_PART_MAX, canonicalSuffix, validateNameParts } from "../lib/names.js";
 import { RESIDENCY_LABEL, residencyStep } from "../lib/residency.js";
 import { useAction } from "../lib/useApi.js";
 import type { Profile } from "../lib/types.js";
@@ -22,7 +26,7 @@ type AccountProfile = Profile & {
   suffix?: string | null;
 };
 
-type Values = { first: string; middle: string; last: string; suffix: string; contact: string; barangay: string; address: string };
+type Values = { first: string; middle: string; last: string; suffix: string; contact: string; barangay: string; house: string; address: string };
 
 function valuesOf(user: AccountProfile): Values {
   return {
@@ -32,6 +36,7 @@ function valuesOf(user: AccountProfile): Values {
     suffix: user.suffix ?? "",
     contact: user.contact_number ?? "",
     barangay: user.barangay ?? "",
+    house: "",
     address: user.address_line ?? "",
   };
 }
@@ -42,7 +47,7 @@ function validate(values: Values) {
   const contactError = validateContactNumber(values.contact);
   if (contactError) errors.contact_number = contactError;
   if (!values.barangay) errors.barangay = BARANGAY_ERROR;
-  const address = validateAddressLine(values.address);
+  const address = validateAddressLine(values.address) ?? validateAddressLine(composeAddress(values.house, values.address));
   if (address) errors.address_line = address;
   return errors;
 }
@@ -144,7 +149,7 @@ function EditDetails({
   const errors = validate(values);
   const invalid = Object.keys(errors).length > 0;
   const unchanged = (Object.keys(saved) as (keyof Values)[]).every((key) => saved[key].trim() === values[key].trim());
-  const addressChanging = values.barangay !== saved.barangay || values.address.trim() !== saved.address.trim();
+  const addressChanging = values.barangay !== saved.barangay || composeAddress(values.house, values.address) !== saved.address.trim();
   const nameChanging = (["first", "middle", "last", "suffix"] as const).some((key) => values[key].trim() !== saved[key].trim());
   // A Citizen's own name change also returns the decision to review, because the
   // approval checked the name on the document (#67, owner 2026-10-15). A rejection
@@ -181,10 +186,10 @@ function EditDetails({
       first_name: values.first.trim(),
       ...(middle ? { middle_name: middle } : {}),
       last_name: values.last.trim(),
-      ...(values.suffix ? { suffix: values.suffix } : {}),
+      ...(canonicalSuffix(values.suffix) ? { suffix: canonicalSuffix(values.suffix) } : {}),
       ...(contact ? { contact_number: contact } : {}),
       barangay: values.barangay,
-      address_line: values.address.trim(),
+      address_line: composeAddress(values.house, values.address),
     });
     if (!result) return;
     onSaved(result.user);
@@ -203,29 +208,21 @@ function EditDetails({
       <h6 id="edit-title" className="!m-0">
         Edit details
       </h6>
+      <p className="!m-0 text-muted text-[12px]">Fields marked with <RequiredMark /> are required.</p>
 
       <fieldset className="m-0 flex flex-col gap-4 border-0 p-0">
         <legend className="mb-1 font-mono text-[10px] font-semibold uppercase tracking-wider text-muted">Your name</legend>
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="First name" htmlFor="first-name" error={shown.first_name}>
-            <Input id="first-name" name="first_name" autoComplete="given-name" maxLength={NAME_PART_MAX} value={values.first} onChange={set("first")} />
+          <Field label={<>First name <RequiredMark /></>} htmlFor="first-name" error={shown.first_name}>
+            <Input id="first-name" name="first_name" required autoComplete="given-name" maxLength={NAME_PART_MAX} value={values.first} onChange={set("first")} />
           </Field>
-          <Field label="Middle name" htmlFor="middle-name" hint="Optional. The full name, not an initial." error={shown.middle_name}>
+          <Field label="Middle name" htmlFor="middle-name" hint="The full name, not an initial." error={shown.middle_name}>
             <Input id="middle-name" name="middle_name" autoComplete="additional-name" maxLength={NAME_PART_MAX} value={values.middle} onChange={set("middle")} />
           </Field>
-          <Field label="Last name" htmlFor="last-name" error={shown.last_name}>
-            <Input id="last-name" name="last_name" autoComplete="family-name" maxLength={NAME_PART_MAX} value={values.last} onChange={set("last")} />
+          <Field label={<>Last name <RequiredMark /></>} htmlFor="last-name" error={shown.last_name}>
+            <Input id="last-name" name="last_name" required autoComplete="family-name" maxLength={NAME_PART_MAX} value={values.last} onChange={set("last")} />
           </Field>
-          <Field label="Suffix" htmlFor="suffix" hint="Optional." error={shown.suffix}>
-            <Select id="suffix" name="suffix" autoComplete="honorific-suffix" value={values.suffix} onChange={set("suffix")}>
-              <option value="">None</option>
-              {SUFFIXES.map((suffix) => (
-                <option key={suffix} value={suffix}>
-                  {suffix}
-                </option>
-              ))}
-            </Select>
-          </Field>
+          <SuffixField id="suffix" value={values.suffix} onChange={(suffix) => setValues((current) => ({ ...current, suffix }))} error={shown.suffix} />
         </div>
       </fieldset>
 
@@ -243,8 +240,8 @@ function EditDetails({
 
       <fieldset className="m-0 flex flex-col gap-4 border-0 p-0">
         <legend className="mb-1 font-mono text-[10px] font-semibold uppercase tracking-wider text-muted">Where you live</legend>
-        <Field label="Barangay" htmlFor="barangay" error={shown.barangay}>
-          <Select id="barangay" name="barangay" value={values.barangay} onChange={set("barangay")}>
+        <Field label={<>Barangay <RequiredMark /></>} htmlFor="barangay" error={shown.barangay}>
+          <Select id="barangay" name="barangay" required value={values.barangay} onChange={set("barangay")}>
             <option value="">Choose your barangay</option>
             {BARANGAYS.map((name) => (
               <option key={name} value={name}>
@@ -253,16 +250,9 @@ function EditDetails({
             ))}
           </Select>
         </Field>
-        <Field
-          label="House number and street"
-          htmlFor="address"
-          hint="Used only to confirm you live in Makati."
-          error={shown.address_line}
-          count={values.address.length}
-          max={ADDRESS_MAX}
-        >
-          <Input id="address" name="address_line" autoComplete="street-address" maxLength={ADDRESS_MAX} value={values.address} onChange={set("address")} />
-        </Field>
+        <AddressFields house={values.house} street={values.address} barangay={values.barangay} error={shown.address_line}
+            onHouseChange={(house) => setValues((current) => ({ ...current, house }))}
+            onStreetChange={(address) => setValues((current) => ({ ...current, address }))} />
       </fieldset>
 
       {/* Said before saving, not after: the consequence should not be a surprise. */}
@@ -276,7 +266,7 @@ function EditDetails({
 
       {error && Object.keys(error.fieldErrors).length === 0 && <Alert title="Could not save your details">{error.message}</Alert>}
 
-      <div className="flex flex-wrap gap-3">
+      <div className="flex flex-wrap justify-center gap-3">
         <Button type="submit" variant="primary" disabled={pending || invalid || unchanged}>
           {pending ? "Saving…" : "Save details"}
         </Button>

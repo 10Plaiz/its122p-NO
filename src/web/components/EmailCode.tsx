@@ -78,14 +78,14 @@ export function ResendCode({
 
   return (
     <div className="flex flex-col gap-2">
-      <div className="flex flex-wrap items-center gap-3">
+      <div className="flex flex-wrap items-center justify-center gap-3">
         <Button type="button" variant="ghost" onClick={handleClick} disabled={pending || cooling}>
           {pending ? "Sending…" : "Send a new code"}
         </Button>
         {cooling && <span className="text-muted text-[12px] tabular-nums">Available in {wait}&nbsp;s</span>}
       </div>
       <p role="status" className="text-[12px] text-muted break-words">
-        {sent ? `A new code is on its way to ${email}. Check your spam folder if it does not arrive in a minute.` : ""}
+        {sent ? `A new code was requested for ${email}. If there is an eligible account, check your inbox and spam folder. Wait a minute before trying again.` : ""}
       </p>
       {error && <Alert title="Could not send a new code">{error.message}</Alert>}
     </div>
@@ -123,7 +123,7 @@ export function EmailCodeStep({
   return (
     <div className="flex flex-col gap-4">
       <p className="text-[13px] leading-relaxed break-words">
-        {justSent ? "We sent a 6-digit code to " : "Your email address is not confirmed yet. Enter the 6-digit code we sent to "}
+        {justSent ? "We sent a 6-digit code to " : "To continue a registration, enter the 6-digit code sent to "}
         <strong translate="no">{email}</strong>
         {justSent ? ". Enter it below to finish creating your account." : " when you registered, or send a new one."}
       </p>
@@ -133,14 +133,15 @@ export function EmailCodeStep({
 
         {error && !error.fieldErrors.token && <Alert title="Could not confirm your email">{error.message}</Alert>}
 
-        <Button type="submit" variant="primary" block disabled={pending || Boolean(codeError)}>
+        <Button type="submit" variant="primary" className="w-full justify-center text-center" disabled={pending || Boolean(codeError)}>
           {pending ? "Checking…" : "Confirm email"}
         </Button>
       </form>
 
+      <p className="!m-0 text-muted text-[12px]">Confirming your email is separate from residency review. Continuing an existing registration keeps your original password and details.</p>
       <ResendCode email={email} send={() => resendCode(email)} sentAtStart={justSent} />
 
-      <Button type="button" variant="ghost" className="self-start" onClick={onBack}>
+      <Button type="button" variant="ghost" className="w-full justify-center text-center" onClick={onBack}>
         {backLabel}
       </Button>
     </div>
