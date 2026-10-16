@@ -70,6 +70,7 @@ export function Layout() {
   const locked = residencyLocked(user);
   // Issue #59: a citizen whose proof awaits review cannot file yet.
   const awaiting = !locked && user?.role === "citizen" && !residencyApproved(user);
+  const signInPage = location.pathname === "/signin";
 
   function handleSignOut() {
     signOut();
@@ -77,7 +78,7 @@ export function Layout() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className={`${signInPage ? "min-h-svh" : "min-h-screen"} flex flex-col`}>
       <header className="nav flex-wrap">
         <NavLink to="/" className="nav-brand">
           KAMOTI
@@ -125,7 +126,9 @@ export function Layout() {
         </nav>
       </header>
 
-      <main className="flex-1 w-full max-w-6xl mx-auto px-4 py-6 md:py-8">
+      <main className={signInPage
+        ? "flex flex-1 w-full items-center justify-center p-6 md:p-10"
+        : "flex-1 w-full max-w-6xl mx-auto px-4 py-6 md:py-8"}>
         {locked && location.pathname !== "/register" && (
           <div role="status" className="mb-6 flex flex-wrap items-center gap-x-3 gap-y-1 border border-warning-700 bg-warning-100 p-3 text-[13px]">
             <span>Finish setting up your account to use KAMOTI.</span>

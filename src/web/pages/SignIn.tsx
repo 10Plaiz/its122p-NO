@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
+import { AuthPanel, RequiredMark } from "../components/AuthPanel.js";
 import { EmailCodeStep } from "../components/EmailCode.js";
 import { PasswordReset } from "../components/PasswordReset.js";
 import { Alert, Button, Field, Input, focusFirstError, PasswordInput } from "../components/ui.js";
@@ -98,8 +99,7 @@ export function SignInPage() {
 
   if (resetting) {
     return (
-      <div className="max-w-sm mx-auto flex flex-col gap-6 py-4">
-        <h2>Reset your password</h2>
+      <AuthPanel title="Reset your password" variant="card">
         <PasswordReset
           initialEmail={email.trim()}
           onCancel={() => navigate("/signin", { replace: true, state })}
@@ -111,28 +111,29 @@ export function SignInPage() {
             navigate("/signin", { replace: true, state: { ...state, email: resetEmail } });
           }}
         />
-      </div>
+      </AuthPanel>
     );
   }
 
   if (confirming) {
     return (
-      <div className="max-w-sm mx-auto flex flex-col gap-6 py-4">
-        <h2>Confirm your email</h2>
+      <AuthPanel title="Confirm your email" variant="card">
         <EmailCodeStep
           email={email.trim()}
           justSent={false}
           backLabel="Back to sign in"
           onBack={() => setConfirming(false)}
         />
-      </div>
+      </AuthPanel>
     );
   }
 
   return (
-    <div className="max-w-sm mx-auto flex flex-col gap-6 py-4">
-      <h2>Sign in</h2>
-
+    <AuthPanel
+      title="Sign in"
+      introduction="One form for all three roles. Your role decides which screens load after sign-in."
+      variant="card"
+    >
       {passwordChanged ? (
         <Notice title="Password changed" success>Sign in with your new password.</Notice>
       ) : ended === "idle" ? (
@@ -144,11 +145,12 @@ export function SignInPage() {
       ) : null}
 
       <form className="flex flex-col gap-4" onSubmit={handleSubmit} noValidate>
-        <Field label="Email" htmlFor="email" error={shownEmailError}>
+        <Field label={<>Email <RequiredMark /></>} htmlFor="email" error={shownEmailError}>
           <Input
             id="email"
             name="email"
             type="email"
+            required
             autoComplete="email"
             spellCheck={false}
             value={email}
@@ -156,34 +158,33 @@ export function SignInPage() {
           />
         </Field>
 
-        <Field label="Password" htmlFor="password" error={shownPasswordError}>
+        <Field
+          label={<>Password <RequiredMark /></>}
+          labelAction={<Link to="/signin?step=reset" state={state} className="text-[13px]">Forgot your password?</Link>}
+          htmlFor="password"
+          error={shownPasswordError}
+        >
           <PasswordInput
             id="password"
             name="password"
+            required
             autoComplete="current-password"
             value={password}
             onChange={(event) => setPassword(event.target.value)}
           />
         </Field>
 
-        <Link to="/signin?step=reset" state={state} className="self-start text-[13px]">
-          Forgot your password?
-        </Link>
-
         {error && error.code !== EMAIL_NOT_CONFIRMED && <Alert title="Could not sign you in">{error.message}</Alert>}
 
-        <Button type="submit" variant="primary" block disabled={pending}>
-          {pending ? "Signing in…" : "Sign in"}
-        </Button>
+        <div className="flex flex-col gap-4 pt-2">
+          <Button type="submit" variant="primary" className="min-h-11 w-full justify-center text-center" disabled={pending}>
+            {pending ? "Signing in…" : "Sign in"}
+          </Button>
+          <p className="m-0 text-center text-muted text-[13px]">
+            No account yet? <Link to="/register">Register</Link>
+          </p>
+        </div>
       </form>
-
-      <p className="text-muted text-[13px]">
-        No account yet? <Link to="/register">Register</Link>
-      </p>
-
-      <p className="text-muted font-mono text-[10px] leading-relaxed border-t border-divider pt-3">
-        One form for all three roles. Your role decides which screens load after sign-in.
-      </p>
-    </div>
+    </AuthPanel>
   );
 }

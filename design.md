@@ -46,6 +46,7 @@ The report map and status badges follow the same mapping.
 
 Red must not identify routine primary actions, active navigation, categories,
 unread notifications, chart bars, saved drafts, or normal report progress.
+Required-field asterisks also use the danger color, with their meaning explained in text.
 Use the danger button variant for cancellation, deactivation, retirement,
 permanent removal, and rejection actions. Dismissal buttons such as Cancel,
 Back, Close, and Keep it remain neutral.

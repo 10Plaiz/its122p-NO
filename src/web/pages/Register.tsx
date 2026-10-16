@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import type { ChangeEvent, FormEvent } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { AuthPanel, RequiredMark } from "../components/AuthPanel.js";
 import { ContactNumberField, validateContactNumber } from "../components/ContactNumberField.js";
 import { EmailCodeStep } from "../components/EmailCode.js";
 import { PasswordRules } from "../components/PasswordRules.js";
@@ -138,37 +139,35 @@ export function RegisterPage() {
 
   if (sentTo) {
     return (
-      <div className="max-w-md mx-auto flex flex-col gap-6 py-4">
-        <h2>Confirm your email</h2>
+      <AuthPanel title="Confirm your email">
         <EmailCodeStep
           email={sentTo}
           justSent
           backLabel="Use a different email"
           onBack={() => setSentTo(null)}
         />
-      </div>
+      </AuthPanel>
     );
   }
 
   return (
-    <div className="max-w-md mx-auto flex flex-col gap-6 py-4">
-      <h2>Register</h2>
-      <p className="text-muted text-[13px]">
-        For people who live in Makati. Public sign-up always creates a citizen account.
-      </p>
-
-      <form className="flex flex-col gap-4" onSubmit={handleSubmit} onBlur={fields.onBlur} noValidate>
-        <fieldset className="m-0 flex flex-col gap-4 border-0 p-0">
-          <legend className="mb-1 font-mono text-[10px] font-semibold uppercase tracking-wider text-muted">Your name</legend>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="First name" htmlFor="first-name" error={shown.first_name}>
-              <Input id="first-name" name="first_name" autoComplete="given-name" maxLength={NAME_PART_MAX} value={values.first} onChange={set("first")} />
+    <AuthPanel
+      title="Register"
+      introduction="For people who live in Makati. Public sign-up always creates a citizen account."
+      requiredFields
+    >
+      <form className="flex flex-col gap-8" onSubmit={handleSubmit} onBlur={fields.onBlur} noValidate>
+        <fieldset className="m-0 min-w-0 flex flex-col gap-4 border-0 p-0">
+          <legend className="mb-3 text-sm font-semibold text-muted">Your name</legend>
+          <div className="grid items-start gap-4 sm:grid-cols-2">
+            <Field label={<>First name <RequiredMark /></>} htmlFor="first-name" error={shown.first_name}>
+              <Input id="first-name" name="first_name" required autoComplete="given-name" maxLength={NAME_PART_MAX} value={values.first} onChange={set("first")} />
             </Field>
             <Field label="Middle name" htmlFor="middle-name" hint="Optional. The full name, not an initial." error={shown.middle_name}>
               <Input id="middle-name" name="middle_name" autoComplete="additional-name" maxLength={NAME_PART_MAX} value={values.middle} onChange={set("middle")} />
             </Field>
-            <Field label="Last name" htmlFor="last-name" error={shown.last_name}>
-              <Input id="last-name" name="last_name" autoComplete="family-name" maxLength={NAME_PART_MAX} value={values.last} onChange={set("last")} />
+            <Field label={<>Last name <RequiredMark /></>} htmlFor="last-name" error={shown.last_name}>
+              <Input id="last-name" name="last_name" required autoComplete="family-name" maxLength={NAME_PART_MAX} value={values.last} onChange={set("last")} />
             </Field>
             <Field label="Suffix" htmlFor="suffix" hint="Optional." error={shown.suffix}>
               <Select id="suffix" name="suffix" autoComplete="honorific-suffix" value={values.suffix} onChange={set("suffix")}>
@@ -183,22 +182,25 @@ export function RegisterPage() {
           </div>
         </fieldset>
 
-        <Field label="Email" htmlFor="email" error={shown.email} count={values.email.length} max={254}>
-          <Input id="email" name="email" type="email" autoComplete="email" maxLength={254} spellCheck={false} value={values.email} onChange={set("email")} />
-        </Field>
+        <fieldset className="m-0 min-w-0 flex flex-col gap-4 border-0 p-0">
+          <legend className="mb-3 text-sm font-semibold text-muted">Contact details</legend>
+          <Field label={<>Email <RequiredMark /></>} htmlFor="email" error={shown.email} count={values.email.length} max={254}>
+            <Input id="email" name="email" type="email" required autoComplete="email" maxLength={254} spellCheck={false} value={values.email} onChange={set("email")} />
+          </Field>
 
-        <ContactNumberField
-          id="contact"
-          hint="Optional. 11 digits starting 09. Staff use this only if they need to reach you about the report."
-          error={shown.contact_number}
-          value={values.contact}
-          onChange={(contact) => setValues((current) => ({ ...current, contact }))}
-        />
+          <ContactNumberField
+            id="contact"
+            hint="Optional. 11 digits starting 09. Staff use this only if they need to reach you about the report."
+            error={shown.contact_number}
+            value={values.contact}
+            onChange={(contact) => setValues((current) => ({ ...current, contact }))}
+          />
+        </fieldset>
 
-        <fieldset className="m-0 flex flex-col gap-4 border-0 p-0">
-          <legend className="mb-1 font-mono text-[10px] font-semibold uppercase tracking-wider text-muted">Where you live</legend>
-          <Field label="Barangay" htmlFor="barangay" error={shown.barangay}>
-            <Select id="barangay" name="barangay" value={values.barangay} onChange={set("barangay")}>
+        <fieldset className="m-0 min-w-0 flex flex-col gap-4 border-0 p-0">
+          <legend className="mb-3 text-sm font-semibold text-muted">Where you live</legend>
+          <Field label={<>Barangay <RequiredMark /></>} htmlFor="barangay" error={shown.barangay}>
+            <Select id="barangay" name="barangay" required value={values.barangay} onChange={set("barangay")}>
               <option value="">Choose your barangay</option>
               {BARANGAYS.map((name) => (
                 <option key={name} value={name}>
@@ -208,65 +210,73 @@ export function RegisterPage() {
             </Select>
           </Field>
           <Field
-            label="House number and street"
+            label={<>House number and street <RequiredMark /></>}
             htmlFor="address"
             hint="Used only to confirm you live in Makati."
             error={shown.address_line}
             count={values.address.length}
             max={ADDRESS_MAX}
           >
-            <Input id="address" name="address_line" autoComplete="street-address" maxLength={ADDRESS_MAX} value={values.address} onChange={set("address")} />
+            <Input id="address" name="address_line" required autoComplete="street-address" maxLength={ADDRESS_MAX} value={values.address} onChange={set("address")} />
           </Field>
         </fieldset>
 
-        {/* Capped but not counted: a length readout on a secret is not worth showing. */}
-        <Field label="Password" htmlFor="password" error={shown.password}>
-          <PasswordInput
-            id="password"
-            name="password"
-            autoComplete="new-password"
-            maxLength={PASSWORD_MAX}
-            aria-describedby="password-rules"
-            value={values.password}
-            onChange={set("password")}
-          />
-        </Field>
-        <PasswordRules id="password-rules" value={values.password} />
-
-        <div className="flex flex-col gap-1">
-          <label htmlFor="consent" className="flex items-start gap-2 text-[13px] cursor-pointer">
-            <input
-              id="consent"
-              name="privacy_consent"
-              type="checkbox"
-              className="mt-0.5 h-4 w-4 accent-accent"
-              checked={values.consent}
-              aria-invalid={shown.privacy_consent ? true : undefined}
-              aria-describedby={shown.privacy_consent ? "consent-error" : undefined}
-              onChange={(event) => setValues((current) => ({ ...current, consent: event.target.checked }))}
+        <fieldset className="m-0 min-w-0 flex flex-col gap-3 border-0 p-0">
+          <legend className="mb-3 text-sm font-semibold text-muted">Account security</legend>
+          {/* Capped but not counted: a length readout on a secret is not worth showing. */}
+          <Field label={<>Password <RequiredMark /></>} htmlFor="password" error={shown.password}>
+            <PasswordInput
+              id="password"
+              name="password"
+              required
+              autoComplete="new-password"
+              maxLength={PASSWORD_MAX}
+              aria-describedby="password-rules"
+              value={values.password}
+              onChange={set("password")}
             />
-            <span>
-              I agree that the City of Makati may use my name, contact details, and address to confirm that I live in
-              Makati and to handle my reports, under the Data Privacy Act of 2012 (RA 10173).
-            </span>
-          </label>
-          {shown.privacy_consent && (
-            <span id="consent-error" className="text-[11px] text-danger">
-              {shown.privacy_consent}
-            </span>
-          )}
+          </Field>
+          <PasswordRules id="password-rules" value={values.password} />
+        </fieldset>
+
+        <div className="flex flex-col gap-4 border-t border-divider pt-6">
+          <div className="flex flex-col gap-1">
+            <label htmlFor="consent" className="flex items-start gap-3 text-[13px] leading-relaxed cursor-pointer">
+              <input
+                id="consent"
+                name="privacy_consent"
+                type="checkbox"
+                required
+                className="mt-1 h-5 w-5 shrink-0 accent-accent"
+                checked={values.consent}
+                aria-invalid={shown.privacy_consent ? true : undefined}
+                aria-describedby={shown.privacy_consent ? "consent-error" : undefined}
+                onChange={(event) => setValues((current) => ({ ...current, consent: event.target.checked }))}
+              />
+              <span>
+                I agree that the City of Makati may use my name, contact details, and address to confirm that I live in
+                Makati and to handle my reports, under the Data Privacy Act of 2012 (RA 10173). <RequiredMark />
+              </span>
+            </label>
+            {shown.privacy_consent && (
+              <span id="consent-error" className="text-[11px] text-danger">
+                {shown.privacy_consent}
+              </span>
+            )}
+          </div>
+
+          {error && <Alert title="Could not create your account">{error.message}</Alert>}
+
+          <div className="flex flex-col gap-4 pt-2">
+            <Button type="submit" variant="primary" className="min-h-11 w-full justify-center text-center" disabled={pending || invalid}>
+              {pending ? "Creating account…" : "Create account"}
+            </Button>
+            <p className="m-0 text-center text-muted text-[13px]">
+              Already registered? <Link to="/signin">Sign in</Link>
+            </p>
+          </div>
         </div>
-
-        {error && <Alert title="Could not create your account">{error.message}</Alert>}
-
-        <Button type="submit" variant="primary" block disabled={pending || invalid}>
-          {pending ? "Creating account…" : "Create account"}
-        </Button>
       </form>
-
-      <p className="text-muted text-[13px]">
-        Already registered? <Link to="/signin">Sign in</Link>
-      </p>
-    </div>
+    </AuthPanel>
   );
 }
