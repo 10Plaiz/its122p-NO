@@ -181,6 +181,7 @@ async function adaptApi(page: Page, state: Simulation, persona: "admin" | "citiz
       return reply({ user: state.current });
     }
     if (path === "/api/notifications") return reply({ notifications: [], unread: 0 });
+    if (path === "/api/notifications/unread") return reply({ unread: 0 });
     if (path === "/api/admin/analytics") return reply({
       total_reports: 0,
       by_status: {},

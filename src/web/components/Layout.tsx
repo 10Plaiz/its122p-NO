@@ -3,9 +3,8 @@ import { Link as RouterLink, NavLink, Outlet, useLocation, useNavigate } from "r
 import { Loading, StatusPill } from "./ui.js";
 import { useAuth } from "../lib/auth.js";
 import { PROOF_STEP_PATH, residencyApproved, residencyLocked } from "../lib/residency.js";
-import { useApi } from "../lib/useApi.js";
+import { useUnreadCount } from "../lib/notifications.js";
 import { ROLE_LABEL } from "../lib/types.js";
-import type { Notification } from "../lib/types.js";
 
 // The shell every screen renders inside. The links a visitor sees come from their
 // role, but that is presentation only — each route is guarded, and the server
@@ -43,9 +42,8 @@ function LockedLink({ label, reason = LOCKED_REASON }: { label: string; reason?:
 }
 
 function NotificationLink() {
-  // Signed-in only; the badge is the unread count the notifications route returns.
-  const { data } = useApi<{ notifications: Notification[]; unread: number }>("/notifications");
-  const unread = data?.unread ?? 0;
+  // Signed-in only. The count stays current as notifications are read (#83).
+  const unread = useUnreadCount();
 
   return (
     <NavLink to="/notifications">
