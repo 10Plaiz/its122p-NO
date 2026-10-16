@@ -13,6 +13,7 @@ import {
   ToolbarItem,
   exportReports,
   reportColumn,
+  sortLabel,
   useColumnVisibility,
 } from "../components/data-table/index.js";
 import {
@@ -31,7 +32,7 @@ import { describeFilters } from "../lib/export.js";
 import type { Column } from "../lib/table-types.js";
 import { useApi } from "../lib/useApi.js";
 import { STATUSES, STATUS_LABEL, closurePendingOf } from "../lib/types.js";
-import type { Paged, Report, ReportStatus } from "../lib/types.js";
+import type { Paged, Report, ReportStatus, Sort } from "../lib/types.js";
 
 const PER_PAGE = 20;
 const TABLE_ID = "my-reports";
@@ -41,18 +42,24 @@ const TABLE_ID = "my-reports";
 export function MyReportsPage() {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("pending");
+  const [sort, setSort] = useState<Extract<Sort, "newest" | "oldest">>("newest");
   const [page, setPage] = useState(1);
   const [cancellingReport, setCancellingReport] = useState<Report | null>(null);
 
-  const filters = useMemo(() => ({ q: search.trim(), status }), [search, status]);
+  const filters = useMemo(() => ({ q: search.trim(), status, sort }), [search, status, sort]);
   const query = useMemo(() => ({ ...filters, page, per_page: PER_PAGE }), [filters, page]);
 
   const { data, error, loading, reload } = useApi<Paged<"reports", Report>>("/reports", query);
   const countQuery = useMemo(() => ({ q: search.trim() }), [search]);
   const countRows = useFilterRows<"reports", Report>({ path: "/reports", collection: "reports", query: countQuery, perPage: 50, valuesOf: reportFilterValues });
   const counts = useMemo(() => countFilterOptions(countRows.rows, { status }), [countRows.rows, status]);
-  const reports = data?.reports ?? [];
+  const reports = !loading && !error ? data?.reports ?? [] : [];
   const filtered = search.trim() !== "" || status !== "";
+
+  function refreshReports() {
+    reload();
+    countRows.reload();
+  }
 
   const columns = useMemo<Column<Report>[]>(
     () => [
@@ -94,6 +101,7 @@ export function MyReportsPage() {
       filters: describeFilters([
         ["Search", filters.q ? `“${filters.q}”` : null],
         ["Status", status ? STATUS_LABEL[status as ReportStatus] : null],
+        ["Sort", sortLabel(sort)],
       ]),
     });
   }
@@ -144,16 +152,31 @@ export function MyReportsPage() {
           </Field>
         </ToolbarItem>
 
+        <ToolbarItem>
+          <Field label="Sort" htmlFor="sort">
+            <Select id="sort" value={sort} onChange={(event) => {
+              setSort(event.target.value === "oldest" ? "oldest" : "newest");
+              setPage(1);
+            }}>
+              <option value="newest">{sortLabel("newest")}</option>
+              <option value="oldest">{sortLabel("oldest")}</option>
+            </Select>
+          </Field>
+        </ToolbarItem>
+
         {/* The column menu only changes the table, which phones do not show. */}
         <div className="hidden md:block">
           <ColumnMenu columns={columns} visible={visible} onToggle={setShown} onReset={reset} />
         </div>
-        <ExportMenu onExport={onExport} disabled={!data || data.total === 0} />
+        <ExportMenu onExport={onExport} disabled={loading || !!error || !data || data.total === 0} />
+        <Button type="button" onClick={refreshReports} disabled={loading || countRows.loading} aria-busy={loading || countRows.loading}>
+          {loading || countRows.loading ? "Refreshing…" : "Refresh"}
+        </Button>
       </TableToolbar>
 
       <FilterCountsFeedback loading={countRows.loading} error={countRows.error} onRetry={countRows.reload} />
 
-      {error && <Alert title="Could not load your reports">{error.message}</Alert>}
+      {!loading && error && <Alert title="Could not load your reports">{error.message}</Alert>}
       {loading && <Loading label="Loading your reports" />}
 
       {!loading && !error && reports.length === 0 && (
@@ -264,13 +287,12 @@ export function MyReportsPage() {
           onClose={() => setCancellingReport(null)}
           onDone={() => {
             setCancellingReport(null);
-            reload();
-            countRows.reload();
+            refreshReports();
           }}
         />
       )}
 
-      {data && (
+      {!loading && !error && data && (
         <NumberedPagination
           page={data.page}
           perPage={data.per_page}

@@ -9,6 +9,7 @@ import {
   ToolbarItem,
   exportReports,
   reportColumn,
+  sortLabel,
   useColumnVisibility,
 } from "../components/data-table/index.js";
 import { Alert, Button, Card, EmptyState, Field, Input, Loading, Select, StatusBadge, formatDate } from "../components/ui.js";
@@ -21,7 +22,7 @@ import { describeFilters } from "../lib/export.js";
 import type { Column } from "../lib/table-types.js";
 import { useApi } from "../lib/useApi.js";
 import { STATUSES, STATUS_LABEL, closurePendingOf } from "../lib/types.js";
-import type { Paged, Report, ReportStatus } from "../lib/types.js";
+import type { Paged, Report, ReportStatus, Sort } from "../lib/types.js";
 
 const PER_PAGE = 20;
 const TABLE_ID = "staff-queue";
@@ -32,18 +33,24 @@ export function StaffQueuePage() {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("under_review");
   const [barangay, setBarangay] = useState("");
+  const [sort, setSort] = useState<Extract<Sort, "newest" | "oldest">>("oldest");
   const [page, setPage] = useState(1);
 
   // Oldest first by default: the queue is work to get through, not a news feed.
-  const filters = useMemo(() => ({ q: search.trim(), status, barangay, sort: "oldest" }), [search, status, barangay]);
+  const filters = useMemo(() => ({ q: search.trim(), status, barangay, sort }), [search, status, barangay, sort]);
   const query = useMemo(() => ({ ...filters, page, per_page: PER_PAGE }), [filters, page]);
 
-  const { data, error, loading } = useApi<Paged<"reports", Report>>("/reports", query);
+  const { data, error, loading, reload } = useApi<Paged<"reports", Report>>("/reports", query);
   const countQuery = useMemo(() => ({ q: search.trim() }), [search]);
   const countRows = useFilterRows<"reports", Report>({ path: "/reports", collection: "reports", query: countQuery, perPage: 50, valuesOf: reportFilterValues });
   const counts = useMemo(() => countFilterOptions(countRows.rows, { status, barangay }), [countRows.rows, status, barangay]);
-  const reports = data?.reports ?? [];
+  const reports = !loading && !error ? data?.reports ?? [] : [];
   const filtered = search.trim() !== "" || status !== "" || barangay !== "";
+
+  function refreshReports() {
+    reload();
+    countRows.reload();
+  }
 
   function clearFilters() {
     setSearch("");
@@ -92,7 +99,7 @@ export function StaffQueuePage() {
         ["Search", filters.q ? `“${filters.q}”` : null],
         ["Status", status ? STATUS_LABEL[status as ReportStatus] : null],
         ["Barangay", barangay || null],
-        ["Sort", "Oldest first"],
+        ["Sort", sortLabel(sort)],
       ]),
     });
   }
@@ -101,7 +108,7 @@ export function StaffQueuePage() {
     <div className="flex flex-col gap-6">
       <TableToolbar
         title="My queue"
-        description="Reports assigned to you, oldest first. Open any report to inspect evidence, leave remarks, or advance its status."
+        description="Reports assigned to you. Open any report to inspect evidence, leave remarks, or advance its status."
         search={
           <Field label="Search" htmlFor="q">
             <Input
@@ -149,16 +156,31 @@ export function StaffQueuePage() {
           />
         </ToolbarItem>
 
+        <ToolbarItem>
+          <Field label="Sort" htmlFor="sort">
+            <Select id="sort" value={sort} onChange={(event) => {
+              setSort(event.target.value === "oldest" ? "oldest" : "newest");
+              setPage(1);
+            }}>
+              <option value="newest">{sortLabel("newest")}</option>
+              <option value="oldest">{sortLabel("oldest")}</option>
+            </Select>
+          </Field>
+        </ToolbarItem>
+
         {/* The column menu only changes the table, which phones do not show. */}
         <div className="hidden md:block">
           <ColumnMenu columns={columns} visible={visible} onToggle={setShown} onReset={reset} />
         </div>
-        <ExportMenu onExport={onExport} disabled={!data || data.total === 0} />
+        <ExportMenu onExport={onExport} disabled={loading || !!error || !data || data.total === 0} />
+        <Button type="button" onClick={refreshReports} disabled={loading || countRows.loading} aria-busy={loading || countRows.loading}>
+          {loading || countRows.loading ? "Refreshing…" : "Refresh"}
+        </Button>
       </TableToolbar>
 
       <FilterCountsFeedback loading={countRows.loading} error={countRows.error} onRetry={countRows.reload} />
 
-      {error && <Alert title="Could not load your queue">{error.message}</Alert>}
+      {!loading && error && <Alert title="Could not load your queue">{error.message}</Alert>}
       {loading && <Loading label="Loading your queue" />}
 
       {/* 1n: says why it is empty, not just that it is. */}
@@ -229,12 +251,12 @@ export function StaffQueuePage() {
             visible={visible}
             rows={reports}
             rowKey={(report) => report.id}
-            caption={`Reports assigned to you, oldest first, ${data?.total ?? 0} in total.`}
+            caption={`Reports assigned to you, ${sortLabel(sort).toLowerCase()}, ${data?.total ?? 0} in total.`}
           />
         </>
       )}
 
-      {data && (
+      {!loading && !error && data && (
         <NumberedPagination
           page={data.page}
           perPage={data.per_page}
