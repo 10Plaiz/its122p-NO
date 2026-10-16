@@ -238,3 +238,8 @@ export function checkEditDraft(stored: unknown, report: Report): { offer: EditRe
   if (Object.keys(editReportChanges(draft, report)).length === 0) return { offer: null, notice: null };
   return { offer: draft, notice: null };
 }
+
+// Google may round its camera center by a fraction of a millimetre.
+export function sameReportPoint(a: { lat: number; lng: number }, b: { lat: number; lng: number }): boolean {
+  return Math.abs(a.lat - b.lat) < 1e-8 && Math.abs(a.lng - b.lng) < 1e-8;
+}

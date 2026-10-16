@@ -56,6 +56,7 @@ export async function placePinByLocation(page: Page) {
   await page.context().grantPermissions(["geolocation"]);
   await page.context().setGeolocation(MAKATI_POINT);
   await page.getByRole("button", { name: "Use my location" }).click();
+  await page.getByRole("button", { name: "Confirm location", exact: true }).click();
   await expect(page.getByTestId("selected-coordinates")).toContainText("14.55470");
 }
 

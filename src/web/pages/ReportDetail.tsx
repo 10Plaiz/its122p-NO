@@ -441,7 +441,8 @@ function EditReport({
   const [address, setAddress] = useState(resumed?.address ?? report.address_text ?? "");
   const [primaryId, setPrimaryId] = useState(resumed?.primaryId ?? savedPrimary);
   const [secondaryId, setSecondaryId] = useState(resumed?.secondaryId ?? savedSecondary);
-  const [point, setPoint] = useState<Point>(resumed?.point ?? { lat: report.latitude, lng: report.longitude });
+  const [point, setPoint] = useState<Point | null>(resumed?.point ?? { lat: report.latitude, lng: report.longitude });
+  const [centerRequest, setCenterRequest] = useState<Point | null>(null);
   const [locating, setLocating] = useState(false);
   const fields = useLeftFields();
 
@@ -450,7 +451,8 @@ function EditReport({
   // the resumed pin must not replace it (as in the new-report form).
   const addressTouched = useRef(Boolean(resumed?.address.trim()));
 
-  function handlePointChange(newPoint: Point) {
+  function handlePointChange(newPoint: Point | null) {
+    if (newPoint) setCenterRequest(null);
     pointChangedByUser.current = true;
     setPoint(newPoint);
   }
@@ -476,7 +478,8 @@ function EditReport({
     setLocating(true);
     navigator.geolocation.getCurrentPosition(
       (position) => {
-        handlePointChange({ lat: position.coords.latitude, lng: position.coords.longitude });
+        setCenterRequest({ lat: position.coords.latitude, lng: position.coords.longitude });
+        handlePointChange(null);
         setLocating(false);
       },
       () => setLocating(false),
@@ -501,7 +504,8 @@ function EditReport({
     const errors = validateReportFields({ title, description, categoryId, address, primaryId, secondaryId }, primaryMessage);
     // Only a moved pin is checked, like editSchema. The map shows the reason.
     const outside = pointChangedByUser.current ? pinError(point) : undefined;
-    if (outside) errors.latitude = outside;
+    if (pointChangedByUser.current && !point) errors.latitude = "Confirm the location before saving.";
+    else if (outside) errors.latitude = outside;
     return errors;
   }
 
@@ -729,11 +733,11 @@ function EditReport({
               </Button>
             )}
           </div>
-          <div className="h-[300px] border-2 border-divider">
-            <MapPicker value={point} onChange={handlePointChange} />
+          <div className="h-[440px] border-2 border-divider">
+            <MapPicker value={point} centerRequest={centerRequest} onChange={handlePointChange} />
           </div>
           <p className="text-muted text-[11px] font-mono">
-            {point.lat.toFixed(5)}, {point.lng.toFixed(5)} (drag or tap to adjust)
+            {point ? `${point.lat.toFixed(5)}, ${point.lng.toFixed(5)}` : "Confirm the location before saving."}
           </p>
         </div>
       </div>
