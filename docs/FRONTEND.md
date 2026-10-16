@@ -39,8 +39,12 @@ On wider screens, the name fields use two rows of two columns. Email, contact
 number, barangay, house/unit number, street/address, and password remain full
 width, with password rules below the input. Mobile keeps the same field order
 in one column. Consent and submission form the final group.
-Suffix is typable with suggestions and canonicalizes to the six supported
-values. House/unit number is optional; street/address is required. Google
+Suffix is typable and canonicalizes to the six supported values. Its shared
+suggestion menu groups Jr./Sr. above the generation choices, with a No suffix
+action to clear it. Selection and Escape close the menu and return focus to the
+input; clicking outside or moving focus away also dismisses it. Register,
+My account, and administrator account creation use the same control.
+House/unit number is optional; street/address is required. Google
 street suggestions use the selected barangay as query context within Makati
 bounds, and manual entry always remains available. The API still receives one
 combined `address_line`. Existing combined addresses stay intact in the
