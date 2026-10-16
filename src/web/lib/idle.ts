@@ -3,7 +3,7 @@
 // rather than counted by an interval, so a laptop that slept through the deadline
 // signs out the moment it wakes instead of resuming a paused countdown.
 
-export const IDLE_LIMIT_MS = 15 * 60 * 1000;
+export const IDLE_LIMIT_MS = 1 * 60 * 1000;
 export const WARNING_MS = 60 * 1000;
 
 // Shared by every tab, so working in one keeps the others signed in.
