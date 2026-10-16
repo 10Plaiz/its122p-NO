@@ -1,4 +1,4 @@
-// UA-9: idle sign-out. After 15 minutes with no activity in any tab, a warning
+// UA-9: idle sign-out. After 1 minute with no activity in any tab, a warning
 // counts down 60 seconds, then the session ends. Times are compared as timestamps
 // rather than counted by an interval, so a laptop that slept through the deadline
 // signs out the moment it wakes instead of resuming a paused countdown.

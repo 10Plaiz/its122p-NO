@@ -32,7 +32,7 @@ describe("ACC-09 the code field accepts what the server accepts (UA-5, UA-12)", 
   });
 });
 
-describe("ACC-10 idle sign-out warns at 15 minutes and ends at 16 (UA-9)", () => {
+describe("ACC-10 idle sign-out warns at 1 minute and ends at 2 (UA-9)", () => {
   const start = 1_000_000_000_000;
 
   it("stays active until the limit", () => {
@@ -41,7 +41,7 @@ describe("ACC-10 idle sign-out warns at 15 minutes and ends at 16 (UA-9)", () =>
   });
 
   it("counts down the last minute in whole seconds", () => {
-    expect(IDLE_LIMIT_MS).toBe(15 * 60 * 1000);
+    expect(IDLE_LIMIT_MS).toBe(1 * 60 * 1000);
     expect(idlePhase(start, start + IDLE_LIMIT_MS)).toEqual({ phase: "warning", secondsLeft: 60 });
     expect(idlePhase(start, start + IDLE_LIMIT_MS + 30_500)).toEqual({ phase: "warning", secondsLeft: 30 });
     expect(idlePhase(start, start + IDLE_LIMIT_MS + WARNING_MS - 1)).toEqual({ phase: "warning", secondsLeft: 1 });

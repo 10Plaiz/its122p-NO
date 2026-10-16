@@ -117,7 +117,7 @@ are in the components cascade layer in `src/web/styles/ds.css`.
   review remain separate. Resend feedback says a code was requested for an
   eligible account; it does not claim the mail arrived. Current delivery and
   code redemption need service-backed verification in #91.
-- The session can refresh a refused access token. After 15 minutes without
+- The session can refresh a refused access token. After 1 minute without
   activity, the interface warns the user and gives one minute to stay signed in.
   If the user remains idle, it signs out and saves an open report draft, new or
   edit, in this tab's session storage. A draft keeps text and the pin, but not an
