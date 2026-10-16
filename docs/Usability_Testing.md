@@ -40,11 +40,11 @@ defect issue. Nothing anywhere maps a code back to a person.
 2. Before `USE-S1`, create one evaluation run ID in `YYYYMMDD-HHMM` form. Reuse
    it on all three session capture sheets. Test-created report and category
    names include this ID so a retry never collides with an earlier run.
-3. Check the test project's account list before giving the device to a tester.
-   Continue only when every visible account is one of the documented fixture
-   accounts. If another account is present, stop and ask the deployment owner
-   for a fixture-only test project. Do not delete or deactivate accounts as
-   session setup.
+3. The test project also holds accounts that real people registered on the
+   live site ([#74](TEST_ENVIRONMENT.md#real-accounts-on-the-test-project)).
+   Sign the tester in only to a fixture account. Do not open Admin Users, the
+   residency review queue, or any proof while the tester can see the screen.
+   Do not delete or deactivate accounts as session setup.
 4. Before every session, restore the fixture report states and assignments:
    `bun run fixture -- --target YOUR_PROJECT_REF`.
    This restores the fixture rows, but it does not erase append-only history,

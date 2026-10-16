@@ -6,6 +6,7 @@ import { Alert, Button } from "./ui.js";
 import { api } from "../lib/api.js";
 import { useAuth } from "../lib/auth.js";
 import { PROOF_TYPES, residencyStep, validateProof } from "../lib/residency.js";
+import { SAMPLE_PROOF_NOTICE } from "../lib/site-notice.js";
 import { useAction } from "../lib/useApi.js";
 import { useUnsavedChangesWarning } from "../lib/useDraft.js";
 import type { Profile } from "../lib/types.js";
@@ -104,6 +105,10 @@ export function ResidencyProofStep({ variant = "locked" }: { variant?: "locked" 
       <p className="m-0 text-[13px] text-muted">
         An administrator checks that the name and Makati address match your account, and that the document is readable,
         one of the kinds above, and recent enough.
+      </p>
+      {/* #74: the live site is a student project, so no real document belongs here. */}
+      <p id="sample-proof-notice" className="m-0 text-[13px] text-muted">
+        {SAMPLE_PROOF_NOTICE}
       </p>
 
       <form className="flex flex-col gap-4" onSubmit={handleSubmit} noValidate>

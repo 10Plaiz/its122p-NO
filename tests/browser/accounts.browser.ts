@@ -1,5 +1,6 @@
 import { test, expect, type Browser, type Page } from "@playwright/test";
 import { jsPDF } from "jspdf";
+import { SAMPLE_PROOF_NOTICE } from "../../src/web/lib/site-notice.js";
 import { captureEvidence, expectAwaitingApproval, FIXTURE_PASSWORD, latestCode, mailpitAvailable, signIn, USERS } from "./helpers.js";
 
 // Account flows (UA-5, UA-8, UA-9, UA-12) end to end. They create real accounts and
@@ -68,6 +69,8 @@ test("UA-5: registering sends a 6-digit code; a wrong code is refused, the right
   await citizen.fill("#email-code", code);
   await citizen.getByRole("button", { name: "Confirm email" }).click();
   await citizen.waitForURL(/register\?step=proof/);
+  // #74: the proof step asks for a sample, never a real document.
+  await expect(citizen.locator("#sample-proof-notice")).toHaveText(SAMPLE_PROOF_NOTICE);
   await captureEvidence(citizen, "UA-5-code-confirmed-proof-step.png");
 
   await expectCodeUsedUp(citizen, "/api/auth/verify-email", { email: NEW, token: code });

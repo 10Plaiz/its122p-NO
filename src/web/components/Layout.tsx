@@ -1,6 +1,7 @@
 import { Suspense, useEffect, useState } from "react";
 import { Link as RouterLink, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { Loading, StatusPill } from "./ui.js";
+import { STUDENT_PROJECT_NOTICE } from "../lib/site-notice.js";
 import { useAuth } from "../lib/auth.js";
 import { PROOF_STEP_PATH, residencyApproved, residencyLocked } from "../lib/residency.js";
 import { useUnreadCount } from "../lib/notifications.js";
@@ -139,8 +140,9 @@ export function Layout() {
         </Suspense>
       </main>
 
-      <footer className="border-t-2 border-divider px-4 py-4 text-muted font-mono text-[10px]">
-        KAMOTI &middot; Key Alert and Monitoring for Online Tracking of Infrastructures
+      <footer className="flex flex-col gap-1 border-t-2 border-divider px-4 py-4 text-muted font-mono text-[10px]">
+        <span>KAMOTI &middot; Key Alert and Monitoring for Online Tracking of Infrastructures</span>
+        <span>{STUDENT_PROJECT_NOTICE}</span>
       </footer>
     </div>
   );

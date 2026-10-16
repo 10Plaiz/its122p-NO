@@ -104,7 +104,8 @@ are in the components cascade layer in `src/web/styles/ds.css`.
   sign-in. Role or record ownership 403 responses preserve the session and
   display an on-screen alert.
 - Registration starts with name parts, email, password, barangay, address, and
-  privacy consent. It then asks for a six-digit email code. A correct code signs
+  privacy consent, with a line above the consent saying KAMOTI is a student
+  project (#74). It then asks for a six-digit email code. A correct code signs
   the Citizen in and opens the residency-proof step. Password recovery verifies
   a separate recovery code before changing the password and ending old sessions.
 - A returning registrant can continue email verification without repeating
@@ -314,7 +315,7 @@ above.
 | `FeedbackSummary` | A rating or Staff average, read-only | Dashboard, Staff queue, Staff report, `FeedbackForm` |
 | `FilterOption` | A filter choice with its result count | Report and user list filters |
 | `IdleTimeoutDialog` | Idle warning and sign-out (UA-9) | Every signed-in screen |
-| `Layout` | Page shell and role-based navigation | Every route |
+| `Layout` | Page shell, role-based navigation, and the footer's student-project notice (#74) | Every route |
 | `LocationMap` | One report's pin, read-only | Report detail, Staff report |
 | `MapFrame` | Loads Google Maps where needed and shows Map unavailable on failure | `LocationMap`, `MapPicker`, `ReportMap` |
 | `MapPicker` | Pin placement inside Makati, with place search | New report, Report detail edit |
@@ -325,7 +326,7 @@ above.
 | `PhotoRetention` | Check and remove expired photo files (DM-2) | Dashboard |
 | `ProofRetention` | Check and remove expired residency proof files (#70) | Dashboard |
 | `ReportMap` | Board map of report pins | Board |
-| `ResidencyProofStep` | Proof upload and review state (UA-8) | Register, My account |
+| `ResidencyProofStep` | Proof upload and review state (UA-8); asks for a sample document, not a real one (#74) | Register, My account |
 | `ResidencyReview` | Administrator proof review: version checks, the document checklist, and the no-document exception | Users |
 | `SpecializationEditor` | Categories a Staff member handles (SW-1) | Users |
 | `StatusPin` | Map pin in its status color | `LocationMap`, `ReportMap` |

@@ -19,13 +19,45 @@ documented Vercel request path backed by an approved test Supabase project.
 | **Last verified application** | `20a50ed` | 15 October 2026 ([#64 report](../tests/evidence/issue64/report.md)): hosted checks while production served `df8ee38`; local suites again on `20a50ed`, which adds only web edit-form drafts (#69). The #64 commits change only tests and documentation |
 | **Hosting platform** | Vercel | Vite frontend static assets with serverless Node.js API functions |
 | **Serverless region** | Singapore (`sin1`) | Co-located with Supabase cluster to minimize query roundtrips |
-| **Database target** | Supabase (`chqyxlyrmudmkanqmpil`) | Dedicated development/test project. Intended for synthetic data, but anyone can register on the live site: on 15 October 2026 it held 24 accounts with real addresses, 5 with uploaded proofs (#74) |
-| **Environment purpose** | Phase 4 verification | Functional testing, security checks, and peer usability testing |
+| **Database target** | Supabase (`chqyxlyrmudmkanqmpil`) | Dedicated development/test project. Sign-up is open on the live site, so it holds real people's accounts beside the synthetic data; see [Real accounts on the test project](#real-accounts-on-the-test-project) |
+| **Environment purpose** | Phase 4 verification | Functional testing, security checks, and peer usability testing. It stays up as the team's portfolio after the course |
 | **Configuration owner** | Project Lead / Deployment Owner | Owns Vercel environment variables and Supabase credentials |
 
 All sensitive keys (`SUPABASE_SECRET_KEY`, database passwords, service role keys)
 remain strictly in private environment settings and must never be committed to
 repository files, issue descriptions, logs, or evidence captures.
+
+## Real accounts on the test project
+
+Anyone can register on the live site, and real people have: team members,
+classmates, and guests. Since 16 October 2026 the footer, the sign-up form, and
+the proof step say that KAMOTI is a student project and ask for a sample
+document, not a real one. The consent wording did not change, and the database
+records only when each person consented, not which wording they saw.
+
+On 15 October 2026 the project held 24 accounts with addresses outside
+`kamoti.invalid`. The project lead decided on 16 October 2026 (#74):
+
+| Accounts | Count | Decision |
+| :--- | ---: | :--- |
+| Staff and Administrators | 7 | Team accounts, kept; the team shares them for testing |
+| Citizens awaiting review, no proof | 11 | Kept as they are until the project is retired; they see the upload step |
+| Citizens awaiting review, proof uploaded | 5 | An Administrator reviews them with the four checks (#63) |
+| Citizens, inactive | 1 | Left inactive |
+
+The uploaded documents stay private. An account's current proof is never
+removed (#70), and the project stays up as a portfolio, so they are kept until
+the project is retired; then empty the residency bucket. Open a proof that is
+not synthetic only to review it, never on a shared screen, and keep its contents
+out of issues, evidence, and logs.
+
+- **Who may register:** anyone. Testers and presentation guests use the fixture
+  or demo accounts ([usability procedure](Usability_Testing.md#before-the-session)).
+  A team member who demonstrates sign-up uses their own inbox, for the email
+  code, and a sample proof.
+- **Presenting:** sign in as `demo-makati-admin@kamoti.invalid`, and search
+  Admin Users for `kamoti.invalid` before showing the list, so real names and
+  addresses stay off screen.
 
 ## Vercel deployment configuration
 
@@ -38,9 +70,10 @@ The repository owns the deployment specification in [`vercel.json`](../vercel.js
 
 ## Database migrations status
 
-On 15 October 2026 the migration owner confirmed all 23 files in
-[`supabase/migrations/`](../supabase/migrations/) applied, ending with
-`20261015000200_residency_review_evidence.sql`. Check the current state with
+All 25 files in [`supabase/migrations/`](../supabase/migrations/) are applied,
+ending with `20261015000400_proof_retention.sql` (#76). The migration owner
+confirmed the first 23 on 15 October 2026; on 16 October a read-only schema
+check found the column and functions that the last two add. Check the current state with
 `bunx supabase migration list`; see [API.md](API.md#database-migrations).
 
 The Phase 4 baseline had the first six:

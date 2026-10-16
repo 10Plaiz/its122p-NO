@@ -15,6 +15,7 @@ import { BARANGAYS, BARANGAY_ERROR, validateAddressLine } from "../lib/barangays
 import { NAME_PART_MAX, canonicalSuffix, validateNameParts } from "../lib/names.js";
 import { PASSWORD_MAX, validatePassword } from "../lib/passwords.js";
 import { PROOF_STEP_PATH, residencyLocked } from "../lib/residency.js";
+import { STUDENT_PROJECT_NOTICE } from "../lib/site-notice.js";
 import { useAction } from "../lib/useApi.js";
 
 // Mirrors registerSchema in src/server/routes/auth.routes.ts, message for message.
@@ -228,6 +229,10 @@ export function RegisterPage() {
         </fieldset>
 
         <div className="flex flex-col gap-4 border-t border-divider pt-6">
+          {/* #74: said where people enter their details, as well as in the footer. */}
+          <p id="student-project-notice" className="m-0 text-[13px] text-muted">
+            {STUDENT_PROJECT_NOTICE}
+          </p>
           <div className="flex flex-col gap-1">
             <label htmlFor="consent" className="flex items-start gap-3 text-[13px] leading-relaxed cursor-pointer">
               <input
