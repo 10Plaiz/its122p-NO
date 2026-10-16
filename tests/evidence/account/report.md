@@ -68,6 +68,10 @@ unchanged. The focused browser configuration has no database teardown and
 intercepts all API calls in authenticated scenarios. Public form checks use
 the running frontend directly. Auth responses, code acceptance, resend
 success/failure, and account saves in these scenarios are simulated.
+Every final browser scenario asserts that its tabs emitted no page errors.
+Fixture logins enter through the protected account route, so their redirect
+stays within the account slice. An earlier incomplete dashboard fixture was
+corrected before the final nine-scenario run.
 
 ## Visual evidence
 

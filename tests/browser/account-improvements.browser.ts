@@ -1,6 +1,19 @@
 import { test, expect } from '@playwright/test';
 import type { BrowserContext, Page } from '@playwright/test';
 
+const runtimeErrors = new WeakMap<BrowserContext, string[]>();
+
+test.beforeEach(({ page, context }) => {
+  const errors: string[] = [];
+  runtimeErrors.set(context, errors);
+  page.on('pageerror', (error) => errors.push(error.message));
+  context.on('page', (tab) => tab.on('pageerror', (error) => errors.push(error.message)));
+});
+
+test.afterEach(({ context }) => {
+  expect(runtimeErrors.get(context)).toEqual([]);
+});
+
 const profile = { id: 'account-fixture', name: 'Ana Reyes', first_name: 'Ana', middle_name: null, last_name: 'Reyes', suffix: null, email: 'ana@kamoti.invalid', role: 'citizen', is_active: true, barangay: 'Poblacion', address_line: 'Unit 4B, 12 J.P. Rizal Street', contact_number: null, phone_verified_at: null, residency_status: 'verified', has_residency_proof: true };
 const session = () => ({ user: profile, access_token: 'simulated-session', expires_at: Math.floor(Date.now() / 1000) + 3600 });
 async function fixtures(context: BrowserContext) {
@@ -10,12 +23,12 @@ async function fixtures(context: BrowserContext) {
     if (path === '/api/auth/me') return route.fulfill({ json: { user: profile } });
     if (path === '/api/auth/logout') return route.fulfill({ status: 204 });
     if (path === '/api/reports') return route.fulfill({ json: { reports: [], total: 0, page: 1, page_size: 10 } });
-    if (path === '/api/notifications') return route.fulfill({ json: { notifications: [], unread_count: 0 } });
+    if (path === '/api/notifications') return route.fulfill({ json: { notifications: [], unread: 0 } });
     return route.fulfill({ json: {} });
   });
 }
 async function login(page: Page) {
-  await page.goto('/signin');
+  await page.goto('/account');
   await page.locator('#email').fill(profile.email);
   await page.locator('#password').fill('Original123!');
   await page.getByRole('button', { name: 'Sign in', exact: true }).click();
