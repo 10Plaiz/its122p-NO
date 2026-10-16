@@ -115,6 +115,12 @@ are in the components cascade layer in `src/web/styles/ds.css`.
 - The public board stores filters and paging in the URL so filtered views are
   shareable and browser navigation restores them. It opens at Under review;
   an explicit `status=all` preserves a chosen Any status view on reload.
+- The public board has a larger responsive map and a written status-pin legend.
+  Pins cover the current results page. Selecting one expands, focuses, and
+  reveals its report in the desktop list. On phones it opens a bottom report
+  panel over the map; Close or Escape returns focus to the marker. Refresh board
+  reloads reports, headline totals, and filter counts while preserving the URL,
+  filters, sort, and page. The list remains available when Maps cannot load.
 - Admin Reports and My Reports open at Pending. The Staff queue opens at Under
   review. Any status remains selectable, and Clear filters shows every status
   rather than reinstating the initial selection.
@@ -240,6 +246,9 @@ belong to [API.md](API.md).
 - **Photos.** Report photos open full size in a lightbox that closes with
   Escape or a backdrop click and returns focus to the photo. A photo removed by
   the retention purge shows that it was removed after the retention period.
+  Every public-board photo can also be enlarged. Closing a photo opened from
+  the mobile report panel keeps that panel open. Missing public photos show a
+  readable fallback and a retry control.
 - **Proof retention (#70).** The dashboard's Proof retention panel checks, then
   after a confirmation removes, residency proof files 30 days after they stopped
   being current. It reports replaced proofs and stored files no proof record
