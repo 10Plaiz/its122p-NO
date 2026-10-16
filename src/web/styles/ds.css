@@ -76,7 +76,7 @@ figcaption {
 .btn-block { width: 100%; margin-top: var(--space-2); justify-content: flex-start; text-align: left; }
 
 /* — forms — */
-.field > label {
+.field-label {
   display: block; font-size: 12px; margin-bottom: 5px;
   color: var(--color-muted);
 }

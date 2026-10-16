@@ -21,6 +21,7 @@ export function Button({
 // same way round and the error is announced rather than only coloured.
 export function Field({
   label,
+  labelAction,
   hint,
   error,
   htmlFor,
@@ -28,7 +29,8 @@ export function Field({
   max,
   children,
 }: {
-  label: string;
+  label: ReactNode;
+  labelAction?: ReactNode;
   hint?: string;
   error?: string;
   htmlFor?: string;
@@ -70,7 +72,14 @@ export function Field({
 
   return (
     <div className="field flex flex-col gap-1.5">
-      <label htmlFor={htmlFor}>{label}</label>
+      {labelAction ? (
+        <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+          <label className="field-label" htmlFor={htmlFor}>{label}</label>
+          {labelAction}
+        </div>
+      ) : (
+        <label className="field-label" htmlFor={htmlFor}>{label}</label>
+      )}
       {control}
 
       {(note || showCount) && (

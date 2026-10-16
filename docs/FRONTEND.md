@@ -31,6 +31,26 @@ The route guard controls which screen React renders. It is not an authorization
 boundary. The Express API authenticates every protected request and applies
 record-level permission checks before returning data.
 
+Registration marks required fields with a red `*` and sets their native `required`
+attribute, including privacy consent. Middle name, suffix, and contact number
+remain optional. The form shows validation errors after leaving a field and
+keeps **Create account** disabled until all values are valid and consent is given.
+On wider screens, the name fields use two rows of two columns. Email, contact
+number, barangay, street address, and password remain full width, with password
+rules below the input. Mobile keeps the same field order in one column.
+Consent and submission form the final group.
+
+Sign-in and registration share `AuthPanel` for headings, field styling, and larger
+red required markers. Sign-in uses a compact card centered in the space between
+the header and footer, following the [shadcn login-01 layout](https://ui.shadcn.com/blocks/login).
+The recovery link sits beside the password label, followed by a full-width submit
+button and centered registration link. Its email confirmation and password
+recovery screens use the same card. Registration keeps its wider form layout.
+Both forms stack their full-width submit button above a centered link to the
+other form. Only registration displays the required-fields explanation.
+Sign-in stays enabled until a request is pending,
+including when fields are empty, so browser autofill can still submit the form.
+
 ## Role navigation
 
 | Role | Home after sign-in | Main workspace |
