@@ -1,8 +1,9 @@
 # Public board verification
 
 Verified on 2026-10-16 in the isolated `improve-public-board` worktree, frontend
-5413 and controlled API 4413. All report data and photos are simulated. No
-Supabase credentials, records, or writes were used.
+5413. The original run reused a manually started frontend. The corrective run
+below starts its own frontend and runs no API process. All report data and
+photos are simulated. No Supabase credentials, records, or writes were used.
 
 ## Before and after
 
@@ -53,6 +54,62 @@ focus capture happening after the board became inert. Capturing the marker
 before opening the panel fixed it. The passing browser suite exercises that path.
 
 ## Limits and handoff
+
+### Cold-start correction
+
+Root ran the committed command at `ffcd0cfed6349839ced80abc71c80b0357c12de3`
+without a prestarted server and received:
+
+```text
+Error: Timed out waiting 60000ms from config.webServer.
+```
+
+The corrective owner independently reproduced that same failure before editing.
+Playwright launched Vite from the config directory, `tests/evidence/website-board`,
+rather than the repository root. The earlier passing run reused a manually
+started frontend and did not prove cold-start reproducibility.
+
+The board-only Playwright config now sets `webServer.cwd` to the repository root,
+uses strict port 5413, and refuses existing-server reuse. Its board-only Vite
+config inherits the application configuration but overrides `/api` to
+`http://localhost:4413`. Resolving that config confirmed the application root is
+`src/web` and the only API proxy target is 4413. Root `vite.config.ts` is unchanged.
+Every one of the four tests installs `**/api/**` interception before navigation.
+No API process was started. No request can fall through to an unrelated service
+on port 4000.
+
+The browser uses Playwright's installed Chromium by default. An optional
+`PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH` selects another executable. Install the
+default browser with `bunx playwright install chromium` when needed.
+
+Both 5413 and 4413 had no listeners immediately before this exact command:
+
+```text
+bunx playwright test --config tests/evidence/website-board/playwright.config.mjs
+
+Running 4 tests using 1 worker
+
+  ok 1 tests\browser\board-improvements.browser.ts:49:1 › board sort, filters, refresh, count updates, error and empty recovery (3.4s)
+  ok 2 tests\browser\board-improvements.browser.ts:84:1 › desktop marker reveals its card, photos support keyboard and missing images (3.4s)
+  ok 3 tests\browser\board-improvements.browser.ts:111:1 › mobile marker opens a closable panel, keeps map context and restores focus (3.0s)
+  ok 4 tests\browser\board-improvements.browser.ts:137:1 › missing Maps key retains list, photos, larger map and filters (3.2s)
+
+  4 passed (17.3s)
+```
+
+The command exited 0 without a browser executable override. The omitted startup
+messages were Node warnings that `FORCE_COLOR` overrides `NO_COLOR`.
+Playwright stopped its frontend after the run. Neither reserved port had a
+listener afterward. The existing screenshots are retained from the original
+run because this correction changes only verification configuration.
+
+Corrective checks also passed with `bun run typecheck:web`,
+`node --check tests/evidence/website-board/playwright.config.mjs`,
+`node --check tests/evidence/website-board/vite.config.mjs`, and
+`git diff --check`. The fast-test and production-build results above belong to
+the original implementation round, not this configuration-only correction.
+
+### Remaining limits
 
 The browser spec replaces API responses and the external Maps adapter. Actual
 ReportMap callbacks, Board, cards, panels, lightbox, and focus behavior run in the
