@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { useToast } from "../components/Toast.js";
 import { MapPicker } from "../components/MapPicker.js";
 import type { Point } from "../components/MapPicker.js";
 import { ALLOWED_TYPES, MAX_PHOTO_BYTES, PhotoPicker, formatFileSize, formatMimeType } from "../components/PhotoPicker.js";
@@ -39,7 +40,7 @@ function validateStep(step: number, values: Values): Record<string, string> {
 
   if (step === 0) {
     const outside = pinError(values.point);
-    if (!values.point) errors.point = "Tap the map or use Place pin at map center.";
+    if (!values.point) errors.point = "Pan the map, then choose Confirm location.";
     // The map shows why; this keeps Continue disabled until the pin is moved.
     else if (outside) errors.point = outside;
   }
@@ -115,6 +116,8 @@ function AwaitingApproval() {
 
 function NewReportForm() {
   const navigate = useNavigate();
+  const toast = useToast();
+  const [centerRequest, setCenterRequest] = useState<Point | null>(null);
   const { user } = useAuth();
   const { data: categoryData } = useApi<{ categories: Category[] }>("/categories");
   const { data: problemData } = useApi<ProblemTypesResponse>("/reports/meta/problem-types");
@@ -171,6 +174,7 @@ function NewReportForm() {
   function restoreDraft() {
     const saved = drafts.restore();
     if (!saved) return;
+    setCenterRequest(null);
     // A restored address is the citizen's, whether typed or looked up, so a lookup
     // for the restored pin must not replace it.
     addressTouched.current = saved.address.trim() !== "";
@@ -230,16 +234,17 @@ function NewReportForm() {
 
   function useMyLocation() {
     if (!navigator.geolocation) {
-      setGeoError("Location access disabled. Tap the map or use Place pin at map center.");
+      setGeoError("Location access disabled. Pan the map, then choose Confirm location.");
       return;
     }
     setLocating(true);
     setGeoError(null);
     navigator.geolocation.getCurrentPosition(
       (position) => {
+        setCenterRequest({ lat: position.coords.latitude, lng: position.coords.longitude });
         setValues((current) => ({
           ...current,
-          point: { lat: position.coords.latitude, lng: position.coords.longitude },
+          point: null,
           address: addressTouched.current ? current.address : "",
         }));
         if (!addressTouched.current) setAddressAuto(false);
@@ -247,7 +252,7 @@ function NewReportForm() {
       },
       () => {
         setLocating(false);
-        setGeoError("Location access disabled. Tap the map or use Place pin at map center.");
+        setGeoError("Location access disabled. Pan the map, then choose Confirm location.");
       },
       { enableHighAccuracy: true, timeout: 10_000 },
     );
@@ -290,6 +295,7 @@ function NewReportForm() {
     if (created) {
       drafts.clear();
       setSubmitted(true);
+      toast(`Your report has been submitted and is awaiting review. ${created.report.reference_code}: ${created.report.title}`);
       navigate(`/reports/${created.report.id}`, { replace: true });
     }
   }
@@ -351,6 +357,8 @@ function NewReportForm() {
         </nav>
       </header>
 
+      <p className="!m-0 text-[12px] text-muted">Fields marked with an asterisk (*) are required.</p>
+
       {drafts.offer && (
         <section aria-labelledby="draft-title" className="border-2 border-accent bg-surface p-4 flex flex-col gap-3">
           <h6 id="draft-title" className="!m-0">
@@ -376,25 +384,28 @@ function NewReportForm() {
       {step === 0 && (
         <div className="flex flex-col gap-3">
           <p className="text-muted text-[13px]">
-            Tap the map where the problem is, or drag the pin to adjust it. With a keyboard,
-            use arrow keys to move the map, then choose Place pin at map center.
+            Pinpoint the damaged road, sidewalk, streetlight, drainage, sign, or other public infrastructure inside Makati.
+            Pan the map under the center pin, then choose Confirm location. With a keyboard, focus the map and use arrow keys.
           </p>
 
-          <div className="h-[300px] md:h-[420px] border-2 border-divider">
-            <MapPicker
-              value={values.point}
-              onChange={(point) => {
-                setGeoError(null);
-                setValues((current) => ({
-                  ...current,
-                  point,
-                  address: addressTouched.current ? current.address : "",
-                }));
-                if (!addressTouched.current) setAddressAuto(false);
-              }}
-            />
-          </div>
-
+          <Field required label="Report location" hint="Confirm the exact spot before continuing.">
+            <div className="h-[440px] md:h-[560px] border-2 border-divider">
+              <MapPicker
+                value={values.point}
+                centerRequest={centerRequest}
+                onChange={(point) => {
+                  if (point) setCenterRequest(null);
+                  setGeoError(null);
+                  setValues((current) => ({
+                    ...current,
+                    point,
+                    address: addressTouched.current ? current.address : "",
+                  }));
+                  if (!addressTouched.current) setAddressAuto(false);
+                }}
+              />
+            </div>
+          </Field>
           <div className="flex flex-wrap gap-3 items-center">
             <Button type="button" onClick={useMyLocation} disabled={locating}>
               {locating ? "Finding you…" : "Use my location"}
@@ -444,8 +455,9 @@ function NewReportForm() {
 
       {step === 1 && (
         <div className="flex flex-col gap-4">
-          <Field label="Category" htmlFor="category" error={shown.category_id}>
+          <Field required label="Category" htmlFor="category" error={shown.category_id}>
             <Select
+              required
               id="category"
               value={values.categoryId}
               // A new category has its own problems, so earlier choices no longer apply.
@@ -466,12 +478,14 @@ function NewReportForm() {
 
           {values.categoryId && (
             <Field
+              required
               label="Main problem"
               htmlFor="primary-problem"
               hint="What the crew will find when they arrive."
               error={shown.primary_problem_id}
             >
               <Select
+                required
                 id="primary-problem"
                 value={values.primaryId}
                 onChange={(event) =>
@@ -516,7 +530,8 @@ function NewReportForm() {
           )}
 
           <Field
-            label="Title"
+            required
+              label="Title"
             htmlFor="title"
             hint="A short headline, at least 3 characters."
             error={shown.title}
@@ -524,6 +539,7 @@ function NewReportForm() {
             max={TITLE_MAX}
           >
             <Input
+              required
               id="title"
               value={values.title}
               maxLength={TITLE_MAX}
@@ -532,7 +548,8 @@ function NewReportForm() {
           </Field>
 
           <Field
-            label="Description"
+            required
+              label="Description"
             htmlFor="description"
             hint="What is wrong, how bad is it, and is anyone at risk? At least 10 characters."
             error={shown.description}
@@ -540,6 +557,7 @@ function NewReportForm() {
             max={DESCRIPTION_MAX}
           >
             <Textarea
+              required
               id="description"
               rows={5}
               maxLength={DESCRIPTION_MAX}

@@ -43,7 +43,7 @@ Open work lives in GitHub Issues; each Partial row names its issue.
 | ID | Requirement | Priority | Status |
 | :--- | :--- | :--- | :--- |
 | MP-1 | Replace Leaflet with Google Maps for report location picking and display. | High | Done, verified hosted (#51): Google Maps and Places on every map; Leaflet removed. |
-| MP-2 | Restrict the map and all pins to Makati (current boundary, after the 2023 EMBO transfer). Pins outside Makati (the instructor's test pin was in Bataan) are rejected in the UI and on the server. | High | Done, verified hosted (#49): polygon check in the browser and API; the database box check is validated on the shared project. |
+| MP-2 | Restrict the map and all pins to Makati (current boundary, after the 2023 EMBO transfer). Pins outside Makati (the instructor's test pin was in Bataan) are rejected in the UI and on the server. | High | Done, verified hosted (#49): polygon check in the browser and API; the database box check is validated on the shared project. The larger picker now uses a fixed center pin and explicit confirmation after pan, search, or GPS (#85). Its new UI paths were checked with simulated Maps/API responses; live Google rendering was not rerun. |
 | MP-3 | "Infrastructure" means the report category list. Merged into MP-2. | Medium | Decision. |
 | MP-4 | Limit pinnable places to Makati, with place search restricted to Makati. Merged into MP-2. | Medium | Decision. |
 
@@ -57,6 +57,7 @@ Open work lives in GitHub Issues; each Partial row names its issue.
 | RS-4 | Record a primary (required) and a secondary (optional) problem type for each report. | Medium | Done: one required main problem and one optional other problem. |
 | RS-5 | Keep a draft of the report form (text and pin) and warn before unsaved input is lost. | Medium | Done: the new-report form and the pending-report edit form keep a draft in this tab (not attached files) through a reload or an idle sign-out, and warn before losing input. An edit draft is dropped with a notice once the report leaves pending or changes (#69). |
 | RS-6 | Let a citizen add a comment to their own report at any status; it appears in the report history and reaches the assigned staff member. | High | Done: the reporter comments at any status; the assigned Staff member and every Administrator are notified; 10 an hour. |
+| RS-7 | Mark required report fields and acknowledge submission without claiming review has begun. | Medium | Done (#85): required fields have red asterisks; address, other problem, and photo stay optional. Submission shows a one-time awaiting-review message with title and reference while the report stays Pending. The focused browser scenarios passed with controlled API responses. |
 
 ## 4. Staff Workflow
 

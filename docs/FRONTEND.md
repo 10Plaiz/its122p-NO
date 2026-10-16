@@ -140,10 +140,20 @@ are in the components cascade layer in `src/web/styles/ds.css`.
   rest of the page remains usable.
 - The report form keeps reverse-geocoded addresses editable. Coordinates remain
   the report location when the third-party lookup is unavailable.
-- The report map supports pointer placement and a keyboard path: arrow keys move
-  the map, then Place pin at map center selects its coordinates. Google Maps and
-  Places provide the map and location search. The API also rejects pins outside
-  Makati. If Places fails, the user can still select a pin on the map.
+- The report picker keeps a pin at the map center. Panning, place search, and
+  device location prepare a candidate; **Confirm location** selects it after the
+  map stops moving. Moving the map clears confirmation in new reports and
+  pending-report edits. Arrow keys provide the same pan-then-confirm path.
+  The initial map center is unconfirmed. Google Maps and Places provide the map
+  and search; without Places, panning still works. Without the map, device
+  coordinates can still be confirmed. Both the picker and API reject pins
+  outside Makati. Report categories include roadside public infrastructure;
+  coordinates are not snapped to roads.
+- Required report inputs have red asterisks and accessible required text.
+  Address or landmark, the other problem, and photo remain optional. Successful
+  submission shows one awaiting-review message with the title and reference
+  while opening the Pending report. Reloading detail does not repeat it;
+  Under review notifications belong to the actual workflow transition.
 - Assignment dialogs move focus inside, contain Tab navigation, close with Escape,
   and return focus to the Assign control. Staff contact offers calling through
   `tel:` only.
