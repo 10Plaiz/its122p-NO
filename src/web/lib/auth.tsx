@@ -209,12 +209,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Other tabs: a removed token is a sign-out there, and a new expiry is a refresh
   // there. `storage` fires only in the tabs that did not make the change.
   useEffect(() => {
+    let cancelled = false;
     function handleStorage(event: StorageEvent) {
       if (event.key === TOKEN_KEY && event.newValue === null && user) endLocally(readEndReason() ?? "signout");
+      if (event.key === TOKEN_KEY && event.newValue && !user) {
+        const token = event.newValue;
+        api.get<{ user: Profile }>("/auth/me").then(({ user: profile }) => {
+          if (cancelled || getToken() !== token) return;
+          setUser(profile);
+          setEnded(null);
+          setExpiresAt(getExpiresAt());
+        }).catch(() => undefined);
+      }
       if (event.key === EXPIRES_KEY) setExpiresAt(getExpiresAt());
     }
     window.addEventListener("storage", handleStorage);
-    return () => window.removeEventListener("storage", handleStorage);
+    return () => {
+      cancelled = true;
+      window.removeEventListener("storage", handleStorage);
+    };
   }, [user, endLocally]);
 
   // UA-9: refresh a minute before the access token runs out. A timer that the

@@ -2,14 +2,17 @@ import { useEffect, useState } from "react";
 import type { ChangeEvent, FormEvent } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { AuthPanel, RequiredMark } from "../components/AuthPanel.js";
+import { AddressFields } from "../components/AddressFields.js";
+import { SuffixField } from "../components/SuffixField.js";
+import { composeAddress } from "../lib/address.js";
 import { ContactNumberField, validateContactNumber } from "../components/ContactNumberField.js";
 import { EmailCodeStep } from "../components/EmailCode.js";
 import { PasswordRules } from "../components/PasswordRules.js";
 import { ResidencyProofStep } from "../components/ResidencyProofStep.js";
 import { Alert, Button, Field, Input, PasswordInput, Select, useLeftFields } from "../components/ui.js";
 import { homePathFor, useAuth } from "../lib/auth.js";
-import { ADDRESS_MAX, BARANGAYS, BARANGAY_ERROR, validateAddressLine } from "../lib/barangays.js";
-import { NAME_PART_MAX, SUFFIXES, validateNameParts } from "../lib/names.js";
+import { BARANGAYS, BARANGAY_ERROR, validateAddressLine } from "../lib/barangays.js";
+import { NAME_PART_MAX, canonicalSuffix, validateNameParts } from "../lib/names.js";
 import { PASSWORD_MAX, validatePassword } from "../lib/passwords.js";
 import { PROOF_STEP_PATH, residencyLocked } from "../lib/residency.js";
 import { useAction } from "../lib/useApi.js";
@@ -27,6 +30,7 @@ type Values = {
   password: string;
   contact: string;
   barangay: string;
+  house: string;
   address: string;
   consent: boolean;
 };
@@ -42,7 +46,7 @@ function validate(values: Values) {
   if (contactError) errors.contact_number = contactError;
 
   if (!values.barangay) errors.barangay = BARANGAY_ERROR;
-  const address = validateAddressLine(values.address);
+  const address = validateAddressLine(values.address) ?? validateAddressLine(composeAddress(values.house, values.address));
   if (address) errors.address_line = address;
   if (!values.consent) errors.privacy_consent = PRIVACY_CONSENT_ERROR;
 
@@ -68,12 +72,12 @@ export function RegisterPage() {
     password: "",
     contact: "",
     barangay: "",
+    house: "",
     address: "",
     consent: false,
   });
   const fields = useLeftFields();
-  // UA-5: set once the server has emailed a code; the screen then asks for it.
-  const [sentTo, setSentTo] = useState<string | null>(null);
+  const [sentTo, setSentTo] = useState<{ email: string; justSent: boolean } | null>(null);
 
   // A signed-in user has no reason to see the form. A correct code signs the person
   // in, so this is also how registering moves on: to the proof step while the
@@ -115,17 +119,17 @@ export function RegisterPage() {
       first_name: values.first.trim(),
       ...(middle ? { middle_name: middle } : {}),
       last_name: values.last.trim(),
-      ...(values.suffix ? { suffix: values.suffix } : {}),
+      ...(canonicalSuffix(values.suffix) ? { suffix: canonicalSuffix(values.suffix) } : {}),
       email: values.email.trim(),
       password: values.password,
       ...(contact ? { contact_number: contact } : {}),
       barangay: values.barangay,
-      address_line: values.address.trim(),
+      address_line: composeAddress(values.house, values.address),
       privacy_consent: true,
     });
 
     // run() returns null when the request failed; only a success moves on.
-    if (created) setSentTo(created.email);
+    if (created) setSentTo({ email: created.email, justSent: true });
   }
 
   if (user && locked) {
@@ -141,8 +145,8 @@ export function RegisterPage() {
     return (
       <AuthPanel title="Confirm your email">
         <EmailCodeStep
-          email={sentTo}
-          justSent
+          email={sentTo.email}
+          justSent={sentTo.justSent}
           backLabel="Use a different email"
           onBack={() => setSentTo(null)}
         />
@@ -163,22 +167,13 @@ export function RegisterPage() {
             <Field label={<>First name <RequiredMark /></>} htmlFor="first-name" error={shown.first_name}>
               <Input id="first-name" name="first_name" required autoComplete="given-name" maxLength={NAME_PART_MAX} value={values.first} onChange={set("first")} />
             </Field>
-            <Field label="Middle name" htmlFor="middle-name" hint="Optional. The full name, not an initial." error={shown.middle_name}>
+            <Field label="Middle name" htmlFor="middle-name" hint="The full name, not an initial." error={shown.middle_name}>
               <Input id="middle-name" name="middle_name" autoComplete="additional-name" maxLength={NAME_PART_MAX} value={values.middle} onChange={set("middle")} />
             </Field>
             <Field label={<>Last name <RequiredMark /></>} htmlFor="last-name" error={shown.last_name}>
               <Input id="last-name" name="last_name" required autoComplete="family-name" maxLength={NAME_PART_MAX} value={values.last} onChange={set("last")} />
             </Field>
-            <Field label="Suffix" htmlFor="suffix" hint="Optional." error={shown.suffix}>
-              <Select id="suffix" name="suffix" autoComplete="honorific-suffix" value={values.suffix} onChange={set("suffix")}>
-                <option value="">None</option>
-                {SUFFIXES.map((suffix) => (
-                  <option key={suffix} value={suffix}>
-                    {suffix}
-                  </option>
-                ))}
-              </Select>
-            </Field>
+            <SuffixField id="suffix" value={values.suffix} onChange={(suffix) => setValues((current) => ({ ...current, suffix }))} error={shown.suffix} />
           </div>
         </fieldset>
 
@@ -209,16 +204,9 @@ export function RegisterPage() {
               ))}
             </Select>
           </Field>
-          <Field
-            label={<>House number and street <RequiredMark /></>}
-            htmlFor="address"
-            hint="Used only to confirm you live in Makati."
-            error={shown.address_line}
-            count={values.address.length}
-            max={ADDRESS_MAX}
-          >
-            <Input id="address" name="address_line" required autoComplete="street-address" maxLength={ADDRESS_MAX} value={values.address} onChange={set("address")} />
-          </Field>
+          <AddressFields house={values.house} street={values.address} barangay={values.barangay} error={shown.address_line}
+            onHouseChange={(house) => setValues((current) => ({ ...current, house }))}
+            onStreetChange={(address) => setValues((current) => ({ ...current, address }))} />
         </fieldset>
 
         <fieldset className="m-0 min-w-0 flex flex-col gap-3 border-0 p-0">
@@ -266,6 +254,11 @@ export function RegisterPage() {
           </div>
 
           {error && <Alert title="Could not create your account">{error.message}</Alert>}
+          <Button type="button" variant="ghost" className="w-full justify-center text-center"
+            disabled={pending || !/^\S+@\S+\.\S+$/.test(values.email.trim())}
+            onClick={() => setSentTo({ email: values.email.trim(), justSent: false })}>
+            Already started? Continue email verification
+          </Button>
 
           <div className="flex flex-col gap-4 pt-2">
             <Button type="submit" variant="primary" className="min-h-11 w-full justify-center text-center" disabled={pending || invalid}>

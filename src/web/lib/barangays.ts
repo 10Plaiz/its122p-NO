@@ -29,7 +29,7 @@ export const BARANGAYS = [
 export const BARANGAY_ERROR = "Choose your barangay in Makati.";
 
 export const ADDRESS_MAX = 200;
-export const ADDRESS_MIN_ERROR = "Enter your house number and street.";
+export const ADDRESS_MIN_ERROR = "Enter your street or complete address.";
 export const ADDRESS_MAX_ERROR = "Keep the address under 200 characters.";
 
 export function validateAddressLine(value: string): string | undefined {

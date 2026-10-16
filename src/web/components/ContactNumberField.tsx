@@ -16,12 +16,6 @@ export function validateContactNumber(value: string): string | undefined {
   return CONTACT_PATTERN.test(entered) ? undefined : CONTACT_ERROR;
 }
 
-// The field can only ever hold digits: anything else is stripped as it arrives,
-// whether typed or pasted. Stripping rather than refusing means a number copied
-// from a contacts app as "+63 917 123 4567" still lands instead of being rejected
-// — but it changes what the person just pasted, so the field says that it did.
-// Length and prefix are left to validation: silently truncating an over-long
-// number would turn a wrong number into a plausible one.
 export function ContactNumberField({
   id,
   value,
@@ -35,14 +29,13 @@ export function ContactNumberField({
   error?: string;
   hint?: string;
 }) {
-  const [stripped, setStripped] = useState(false);
+  const [notice, setNotice] = useState("");
 
   function handleChange(event: ChangeEvent<HTMLInputElement>) {
     const raw = event.target.value;
-    const digits = raw.replace(/\D/g, "");
+    const digits = raw.replace(/\D/g, "").slice(0, 11);
 
-    // Clears itself on the next edit that needs no cleaning.
-    setStripped(digits !== raw);
+    setNotice(digits !== raw ? "Kept up to 11 digits. Removed formatting or extra digits. Check your number before saving." : "");
     onChange(digits);
   }
 
@@ -56,15 +49,25 @@ export function ContactNumberField({
           inputMode="numeric"
           autoComplete="tel"
           spellCheck={false}
+          maxLength={11}
+          onPaste={(event) => {
+            event.preventDefault();
+            const input = event.currentTarget;
+            const pasted = event.clipboardData.getData("text");
+            const raw = value.slice(0, input.selectionStart ?? value.length) + pasted + value.slice(input.selectionEnd ?? value.length);
+            const digits = raw.replace(/\D/g, "").slice(0, 11);
+            setNotice(digits !== raw ? "Kept up to 11 digits. Removed formatting or extra digits. Check your number before saving." : "");
+            onChange(digits);
+          }}
           placeholder="09171234567"
           aria-invalid={error ? true : undefined}
           aria-describedby={error || hint ? fieldNoteId(id) : undefined}
           value={value}
           onChange={handleChange}
         />
-        {stripped && (
+        {notice && (
           <span aria-live="polite" className="text-muted text-[11px]">
-            Removed characters that are not digits.
+            {notice}
           </span>
         )}
       </>

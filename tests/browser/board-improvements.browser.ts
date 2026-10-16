@@ -40,6 +40,7 @@ async function simulatedMaps(page: Page) {
   if (!reactUrl) throw new Error("Could not locate Vite's React module for the simulated Maps adapter.");
   await page.route("**/components/MapFrame.tsx*", (route) => route.fulfill({ contentType: "text/javascript", body: `export function MapFrame({children}) { return children; } export function MakatiOutline() { return null; }` }));
   await page.route("**/@vis__gl_react-google-maps.js*", (route) => route.fulfill({ contentType: "text/javascript", body: `import React from ${JSON.stringify(reactUrl)};
+    export function APIProvider({children}) { return children; }
     export function Map({children}) { return React.createElement('div', {style:{height:'100%',padding:16},'aria-label':'Simulated map'}, 'Simulated Maps adapter', children); }
     export function AdvancedMarker({children,title,onClick}) { return React.createElement('button',{onClick,title,'aria-label':'Map report: '+title,style:{margin:4,padding:8}},children); }
     export function useMap() { return null; }
