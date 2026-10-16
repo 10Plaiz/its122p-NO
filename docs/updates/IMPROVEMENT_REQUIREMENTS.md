@@ -65,7 +65,7 @@ Open work lives in GitHub Issues; each Partial row names its issue.
 | SW-1 | Assign staff by specialization (category) and area (barangay). | High | Done: barangay from the pin; Staff categories and barangays; ranked assignment suggestions. |
 | SW-2 | Require a comment with every status change, assignment, cancellation, and verification decision. | High | Done: status changes, assignments, cancellations, closure requests, and closure reviews all require a comment or reason. |
 | SW-3 | Capture each activity on a report (who, what, when) in an activity log. | High | Done: every workflow action is logged with readable labels, server filters, and export. |
-| SW-4 | Staff request resolution; an Administrator approves or returns it before the report is closed. | High | Done: Staff request closure; a different Administrator approves or returns it in one transaction. |
+| SW-4 | Staff request resolution; an Administrator approves or returns it before the report is closed. | High | Done: Staff request closure; a different Administrator approves or returns it in one transaction. Admin Reports and the Staff queue filter by Awaiting verification (#82). |
 | SW-5 | Show resolved reports in green, with a text label or icon as well. | Low | Done: green with a check on badges and map pins. |
 | SW-6 | Track status delays and show the relevant dates (submitted, assigned, completed). | Medium | Done: Key dates, a Delayed tag, Assigned on, and Days in stage. |
 | SW-7 | Staff can reject a report that cannot be fixed, with a required reason, through admin verification (new `rejected` status). | High | Done: requested by Staff, approved by an Administrator, reason shown on the public board. |

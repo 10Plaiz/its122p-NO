@@ -656,7 +656,10 @@ accepted risks.
 
 `GET /api/reports` filters by role: Citizens see their own reports, Staff see
 assigned reports, and Administrators see all. Query parameters are `q`, `status`,
-`category_id`, `barangay`, `from`, `to`, `sort`, `page`, and `per_page`. The public
+`category_id`, `barangay`, `from`, `to`, `sort`, `page`, and `per_page`. Besides
+the stored statuses, `status=awaiting_verification` returns reports under review
+or in progress whose closure request no Administrator has decided. Those reports
+also still match their own status (#82). The public
 route accepts the same filters, with status limited to `under_review`,
 `in_progress`, `resolved`, and `rejected`. Both lists, and the report export,
 sort by report `id` after the chosen `sort`, so reports that share a time or
